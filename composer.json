@@ -1,5 +1,5 @@
 {
-    "name": "beaver/framework",
+    "name": "beaverphp/framework",
     "description": "Modern PHP framework with a plugin ecosystem",
     "version": "0.1.0",
     "type": "library",
