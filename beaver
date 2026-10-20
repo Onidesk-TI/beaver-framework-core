@@ -1,0 +1,13 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * Beaver CLI — wrapper.
+ *
+ * A lógica está em bootstrap/beaver-cli.php.
+ * Este ficheiro só existe para dar um ponto de entrada limpo.
+ */
+
+declare(strict_types=1);
+
+require __DIR__ . '/bootstrap/beaver-cli.php';
