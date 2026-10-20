@@ -1,7 +1,7 @@
 # Beaver Framework
 
 [![Packagist Version](https://img.shields.io/packagist/v/beaverphp/framework?style=flat-square&color=E07800)](https://packagist.org/packages/beaverphp/framework)
-![Tests](https://img.shields.io/badge/tests-34%20passed-brightgreen?style=flat-square)
+![Tests](https://github.com/Onidesk-TI/beaver-framework-core/actions/workflows/tests.yml/badge.svg)
 
 Modern PHP framework with a plugin ecosystem.
 
