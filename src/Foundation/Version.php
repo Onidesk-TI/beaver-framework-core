@@ -29,7 +29,24 @@ final class Version
     public static function number(): string
     {
         static $v = null;
-        return $v ??= self::readFromComposer() ?? '0.0.0';
+        if ($v !== null) {
+            return $v;
+        }
+
+        // 1) Composer InstalledVersions (mais fiável — sabe a tag instalada)
+        if (class_exists(\Composer\InstalledVersions::class)) {
+            try {
+                $v = \Composer\InstalledVersions::getPrettyVersion('beaverphp/framework');
+                if ($v !== null && $v !== '') {
+                    return $v;
+                }
+            } catch (\Throwable $e) {
+                // ignorar
+            }
+        }
+
+        // 2) Fallback: ler o composer.json
+        return $v = self::readFromComposer() ?? '0.0.0';
     }
 
     /**
