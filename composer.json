@@ -11,14 +11,15 @@
     "autoload": {
         "psr-4": {
             "Beaver\\": "src/",
-            "Beaver\\Sdk\\": "sdk/src/",
-            "Beaver\\Plugins\\": "plugins/"
+            "Beaver\\Sdk\\": "sdk/src/"
         },
         "files": [
             "src/View/helpers.php"
         ]
     },
-    "bin": ["beaver"],
+    "bin": [
+        "beaver"
+    ],
     "config": {
         "optimize-autoloader": true,
         "sort-packages": true,
