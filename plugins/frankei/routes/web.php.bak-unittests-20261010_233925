@@ -1,0 +1,215 @@
+<?php
+
+/**
+ * Rotas do plugin Frankei.
+ *
+ * @var \Beaver\Http\Router                    $router
+ * @var \Beaver\Plugins\Frankei\FrankeiPlugin  $plugin
+ */
+
+use Beaver\Http\Response;
+use Beaver\Plugins\Frankei\Http\SetupController;
+use Beaver\Plugins\Frankei\Http\FixController;
+// ── Dashboard (guard: auth → path → painel) ──
+$router->get('/frankei', function () {
+    return (new SetupController())->dashboard();
+});
+
+$router->post('/api/frankei/scan-code', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->scanCode($req);
+});
+
+// ── Terminal (execução real de comandos beaver) ──
+$router->post('/api/frankei/terminal/exec', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->exec($req);
+});
+
+$router->get('/api/frankei/terminal/metadata', function () {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->metadata();
+});
+
+// ── Report (geração + download) ──
+$router->post('/api/frankei/terminal/report', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->report($req);
+});
+
+$router->get('/api/frankei/terminal/report/download', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->downloadReport($req);
+});
+
+$router->get('/api/frankei/terminal/report/zip', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->downloadZip($req);
+});
+
+// Servir assets do report (CSS, JS, SVG do coverage) inline — sem Content-Disposition
+$router->get('/api/frankei/terminal/report/asset', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->serveAsset($req);
+});
+
+$router->get('/api/frankei/terminal/coverage-inline', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->coverageInline($req);
+});
+
+$router->get('/api/frankei/terminal/report/preview', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->previewHtml($req);
+});
+
+$router->post('/api/frankei/terminal/report/beaver', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->beaverReport($req);
+});
+
+$router->get('/api/frankei/terminal/report/beaver/view', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->beaverReportView($req);
+});
+
+// ── Setup: path ──
+$router->get ('/frankei/path', function () {
+    return (new SetupController())->showPath();
+});
+$router->post('/frankei/path', function () {
+    return (new SetupController())->savePath();
+});
+
+// ── API: validar path (AJAX) ──
+$router->post('/api/frankei/validate-path', function () {
+    return (new SetupController())->validatePath();
+});
+
+// ── Logout ──
+$router->get('/frankei/logout', function () {
+    return (new SetupController())->logout();
+});
+
+// Serve assets do plugin (CSS / JS) com validação de segurança
+function frankei_serve_asset($plugin, string $folder, string $file): Response
+{
+    if (
+        !preg_match('/^[A-Za-z0-9_-]+$/', $folder) ||
+        !preg_match('/^[A-Za-z0-9_.-]+$/', $file)
+    ) {
+        return Response::text('Forbidden', 403);
+    }
+
+    $path = $plugin->path . '/resources/ui/' . $folder . '/' . $file;
+    if (!is_file($path)) {
+        return Response::text('Not found: ' . $folder . '/' . $file, 404);
+    }
+
+    $ext  = pathinfo($path, PATHINFO_EXTENSION);
+    $mime = match ($ext) {
+        'css'   => 'text/css; charset=utf-8',
+        'js'    => 'application/javascript; charset=utf-8',
+        'html'  => 'text/html; charset=utf-8',
+        'svg'   => 'image/svg+xml',
+        'png'   => 'image/png',
+        'woff'  => 'font/woff',
+        'woff2' => 'font/woff2',
+        default => 'application/octet-stream',
+    };
+
+    // Forçar headers diretamente (o php -S já enviou Content-Type default)
+    @header_remove('Content-Type');
+    @header('Content-Type: ' . $mime);
+    @header('Content-Length: ' . filesize($path));
+    @header('Cache-Control: public, max-age=300');
+    readfile($path);
+    exit;
+}
+
+$router->get('/plugins/frankei/css/{file}', function ($req, $file) use ($plugin) {
+    return frankei_serve_asset($plugin, 'css', (string) $file);
+});
+
+$router->get('/plugins/frankei/js/{file}', function ($req, $file) use ($plugin) {
+    return frankei_serve_asset($plugin, 'js', (string) $file);
+});
+
+$router->get('/plugins/frankei/img/{file}', function ($req, $file) use ($plugin) {
+    return frankei_serve_asset($plugin, 'img', (string) $file);
+});
+
+// Layout HTML interno do painel (injetado no .fk-body pelo frankei-panel.js)
+$router->get('/plugins/frankei/layout.html', function () use ($plugin) {
+    $path = $plugin->path . '/resources/ui/layout.html';
+    if (!is_file($path)) {
+        return Response::text('Not found', 404);
+    }
+    return (new Response(file_get_contents($path)))
+        ->withHeader('Content-Type', 'text/html; charset=utf-8');
+});
+
+// ── Frankei: API ──
+$router->get('/api/frankei/scanners', function () {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->scanners();
+});
+
+$router->post('/api/frankei/scan', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->scan($req);
+});
+
+$router->post('/api/frankei/invalidate', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->invalidate($req);
+});
+
+$router->post('/api/frankei/scan-path', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->scanPath($req);
+});
+
+// ── Auto-fix (aplicar correcoes) ──
+$router->post('/api/frankei/preview-fix', function ($req) {
+    return (new FixController())->preview($req);
+});
+
+$router->post('/api/frankei/fix', function ($req) {
+    return (new FixController())->apply($req);
+});
+
+// ═════════════════════════════════════════════════════════════
+// JUNIT VIEWER — assets (CSS/JS)
+// ═════════════════════════════════════════════════════════════
+
+$router->get('/api/frankei/terminal/junit-view/{file}', function ($req, $file) {
+    $file = (string) $file;
+    if (!preg_match('/^[A-Za-z0-9_.-]+\.(js|css)$/', $file)) {
+        return \Beaver\Http\Response::text('Forbidden', 403);
+    }
+
+    $sub  = str_ends_with($file, '.js') ? 'js/' : 'css/';
+    $path = dirname(__DIR__) . '/resources/ui/' . $sub . $file;
+
+    if (!is_file($path)) {
+        return \Beaver\Http\Response::text('Not found: ' . $file, 404);
+    }
+
+    $mime = str_ends_with($file, '.js')
+        ? 'application/javascript; charset=utf-8'
+        : 'text/css; charset=utf-8';
+
+    return (new \Beaver\Http\Response(file_get_contents($path)))
+        ->withHeader('Content-Type', $mime)
+        ->withHeader('Cache-Control', 'public, max-age=300');
+});
+$router->get('/api/frankei/terminal/coverage/data', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->coverageData($req);
+});
+$router->get('/api/frankei/terminal/coverage-view/{file}', function ($req, $file) {
+    $file = (string) $file;
+    if (!preg_match('/^[A-Za-z0-9_.-]+\.(js|css)$/', $file)) {
+        return \Beaver\Http\Response::text('Forbidden', 403);
+    }
+
+    $sub  = str_ends_with($file, '.js') ? 'js/' : 'css/';
+    $path = dirname(__DIR__) . '/resources/ui/' . $sub . $file;
+
+    if (!is_file($path)) {
+        return \Beaver\Http\Response::text('Not found: ' . $file, 404);
+    }
+
+    $mime = str_ends_with($file, '.js')
+        ? 'application/javascript; charset=utf-8'
+        : 'text/css; charset=utf-8';
+
+    return (new \Beaver\Http\Response(file_get_contents($path)))
+        ->withHeader('Content-Type', $mime)
+        ->withHeader('Cache-Control', 'public, max-age=300');
+});

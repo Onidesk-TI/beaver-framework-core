@@ -1,0 +1,395 @@
+/* ============================================================
+   TEMAS CLAROS BEAVER LOJA
+   Âmbar · Oceano · Floresta
+   ============================================================ */
+
+/* ---------- ÂMBAR (default) ---------- */
+[data-theme="amber"]{
+  --bg:#FDF6EC; --bg2:#F8ECD7; --card:#FFFFFF;
+  --text:#2B1D0E; --muted:#7A6A55;
+  --amber:#E67E22; --amber2:#D35400; --amber3:#F39C12;
+  --green:#27AE60;
+  --line:rgba(200,120,60,.14); --line2:rgba(200,120,60,.28);
+  --glow-a:rgba(255,200,140,.35); --glow-b:rgba(255,230,180,.25);
+  --nav-bg:rgba(253,246,236,.88);
+  --nav-link:#6B5540;
+  --nav-hover:rgba(230,126,34,.10);
+  --nav-active:rgba(230,126,34,.18);
+  --thumb-a:rgba(243,156,18,.20);
+  --thumb-b:rgba(230,126,34,.05);
+  --grid-line:rgba(120,60,20,.07);
+  --shadow-sm:rgba(120,60,20,.15);
+  --shadow-md:rgba(120,60,20,.28);
+  --btn-primary-shadow:rgba(211,84,0,.55);
+  --input-focus:rgba(230,126,34,.15);
+  --link-secondary:#6B5540;
+}
+
+/* ---------- OCEANO ---------- */
+[data-theme="ocean"]{
+  --bg:#F0F7FC; --bg2:#E1EEF8; --card:#FFFFFF;
+  --text:#0C1F33; --muted:#5B7A96;
+  --amber:#2980B9; --amber2:#1B5E8A; --amber3:#4FA9E0;
+  --green:#27AE60;
+  --line:rgba(60,120,180,.14); --line2:rgba(60,120,180,.28);
+  --glow-a:rgba(120,180,240,.35); --glow-b:rgba(160,215,255,.25);
+  --nav-bg:rgba(240,247,252,.88);
+  --nav-link:#486B87;
+  --nav-hover:rgba(41,128,185,.10);
+  --nav-active:rgba(41,128,185,.18);
+  --thumb-a:rgba(79,169,224,.20);
+  --thumb-b:rgba(41,128,185,.05);
+  --grid-line:rgba(30,80,140,.07);
+  --shadow-sm:rgba(20,80,140,.14);
+  --shadow-md:rgba(20,80,140,.28);
+  --btn-primary-shadow:rgba(27,94,138,.55);
+  --input-focus:rgba(41,128,185,.15);
+  --link-secondary:#486B87;
+}
+
+/* ---------- FLORESTA ---------- */
+[data-theme="forest"]{
+  --bg:#F1FAF3; --bg2:#E1F3E6; --card:#FFFFFF;
+  --text:#0E2A1A; --muted:#5A7E68;
+  --amber:#27AE60; --amber2:#1B8049; --amber3:#4FCC85;
+  --green:#27AE60;
+  --line:rgba(60,160,100,.14); --line2:rgba(60,160,100,.28);
+  --glow-a:rgba(140,220,170,.35); --glow-b:rgba(180,235,200,.25);
+  --nav-bg:rgba(241,250,243,.88);
+  --nav-link:#4A7360;
+  --nav-hover:rgba(39,174,96,.10);
+  --nav-active:rgba(39,174,96,.18);
+  --thumb-a:rgba(79,204,133,.20);
+  --thumb-b:rgba(39,174,96,.05);
+  --grid-line:rgba(30,110,60,.07);
+  --shadow-sm:rgba(20,110,60,.14);
+  --shadow-md:rgba(20,110,60,.28);
+  --btn-primary-shadow:rgba(27,128,73,.55);
+  --input-focus:rgba(39,174,96,.15);
+  --link-secondary:#4A7360;
+}
+
+/* ============================================================
+   APLICAÇÃO DAS VARIÁVEIS (comum aos 3 temas)
+   ============================================================ */
+
+html[data-theme] body{
+  background-color:var(--bg) !important;
+  color:var(--text) !important;
+}
+html[data-theme] body::before{
+  background:
+    radial-gradient(900px 500px at 12% -8%, var(--glow-a), transparent 62%),
+    radial-gradient(760px 460px at 88% 4%,  var(--glow-b), transparent 60%) !important;
+}
+
+/* Nav */
+html[data-theme] nav.top{
+  background: var(--nav-bg) !important;
+  border-bottom-color: var(--line) !important;
+}
+html[data-theme] nav.top .links a{ color:var(--nav-link) !important; }
+html[data-theme] nav.top .links a:hover{
+  background:var(--nav-hover) !important;
+  color:var(--text) !important;
+}
+html[data-theme] nav.top .links a.active{
+  color:var(--text) !important;
+  background:var(--nav-active) !important;
+}
+
+/* Marca */
+html[data-theme] .brand .logo{
+  background: linear-gradient(150deg, var(--thumb-a), var(--thumb-b)) !important;
+  border-color: var(--line2) !important;
+  box-shadow: 0 0 20px -8px var(--amber) !important;
+}
+html[data-theme] .brand .nm{ color:var(--text) !important; }
+html[data-theme] .brand .nm .a{ color:var(--amber) !important; }
+html[data-theme] .brand .sb{ color:var(--muted) !important; }
+
+/* Cards */
+html[data-theme] .card,
+html[data-theme] .lin,
+html[data-theme] .resumo,
+html[data-theme] .suc-box{
+  background:var(--card) !important;
+  border-color:var(--line2) !important;
+  box-shadow: 0 6px 22px -10px var(--shadow-sm) !important;
+}
+html[data-theme] .card:hover{
+  box-shadow: 0 20px 40px -18px var(--shadow-md) !important;
+}
+html[data-theme] .card .sub{ color:var(--muted) !important; }
+html[data-theme] .card .desc{ color:var(--link-secondary) !important; }
+
+/* Thumbs */
+html[data-theme] .thumb,
+html[data-theme] .pd-media,
+html[data-theme] .lin .th{
+  background: linear-gradient(150deg, var(--thumb-a), var(--thumb-b)) !important;
+  border-color: var(--line) !important;
+}
+html[data-theme] .thumb::after,
+html[data-theme] .pd-media::after{
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) !important;
+}
+
+/* Tipografia */
+html[data-theme] h1,
+html[data-theme] h2,
+html[data-theme] h3{ color:var(--text) !important; }
+html[data-theme] .hero-loja p,
+html[data-theme] .pd-info .desc,
+html[data-theme] ul.feats li,
+html[data-theme] .stock{
+  color:var(--muted) !important;
+}
+html[data-theme] .eyebrow{ color:var(--amber) !important; }
+html[data-theme] .price b{ color:var(--text) !important; }
+html[data-theme] .price s{ color:var(--muted) !important; opacity:.7; }
+html[data-theme] .rl{
+  color:var(--muted) !important;
+  border-bottom-color:var(--line) !important;
+}
+html[data-theme] .rl.total{
+  color:var(--text) !important;
+  border-top-color:var(--line2) !important;
+}
+html[data-theme] .rl.total b{ color:var(--amber2) !important; }
+html[data-theme] .ri{ border-bottom-color:var(--line) !important; }
+html[data-theme] .ri small{ color:var(--muted) !important; }
+
+/* Botões */
+html[data-theme] .btn.primary{
+  background: linear-gradient(135deg, var(--amber3), var(--amber) 45%, var(--amber2)) !important;
+  color:#FFFFFF !important;
+  box-shadow: 0 10px 26px -12px var(--btn-primary-shadow) !important;
+}
+html[data-theme] .btn.ghost{
+  background:#FFFFFF !important;
+  color:var(--text) !important;
+  border-color:var(--line2) !important;
+}
+html[data-theme] .btn.ghost:hover{
+  background:var(--bg2) !important;
+  border-color:var(--amber) !important;
+}
+
+/* Chips */
+html[data-theme] .chip{
+  background:#FFFFFF !important;
+  color:var(--link-secondary) !important;
+  border-color:var(--line2) !important;
+}
+html[data-theme] .chip:hover{ background:var(--bg2) !important; }
+html[data-theme] .chip.active{
+  background: linear-gradient(135deg, var(--amber), var(--amber2)) !important;
+  color:#FFFFFF !important;
+  border-color:transparent !important;
+}
+
+/* Tags */
+html[data-theme] .tags span{
+  background: color-mix(in srgb, var(--amber) 10%, #FFFFFF) !important;
+  border-color: color-mix(in srgb, var(--amber) 20%, #FFFFFF) !important;
+  color: var(--link-secondary) !important;
+}
+
+/* Formulários */
+html[data-theme] input[type=text],
+html[data-theme] input[type=email],
+html[data-theme] input[type=number],
+html[data-theme] textarea{
+  background:#FFFFFF !important;
+  color:var(--text) !important;
+  border-color:var(--line2) !important;
+}
+html[data-theme] input:focus,
+html[data-theme] textarea:focus{
+  border-color:var(--amber) !important;
+  background:#FFFFFF !important;
+  box-shadow: 0 0 0 4px var(--input-focus) !important;
+}
+html[data-theme] fieldset{
+  border-color:var(--line) !important;
+  background: rgba(255,255,255,.5) !important;
+}
+html[data-theme] legend{ color:var(--amber2) !important; }
+html[data-theme] label{ color:var(--link-secondary) !important; }
+html[data-theme] label small{ color:var(--muted) !important; }
+
+/* Pagamentos */
+html[data-theme] .pay{
+  background:#FFFFFF !important;
+  border-color:var(--line2) !important;
+  color:var(--text) !important;
+}
+html[data-theme] .pay:hover{ background:var(--bg2) !important; }
+html[data-theme] .pay small{ color:var(--muted) !important; }
+html[data-theme] .pay:has(input:checked){
+  border-color:var(--amber) !important;
+  background: color-mix(in srgb, var(--amber) 10%, #FFFFFF) !important;
+  box-shadow: 0 0 0 3px var(--nav-active) !important;
+}
+
+/* Qtd */
+html[data-theme] .qtd{
+  background:#FFFFFF !important;
+  border-color:var(--line2) !important;
+}
+html[data-theme] .qtd button{ color:var(--link-secondary) !important; }
+html[data-theme] .qtd button:hover{ background:var(--nav-hover) !important; }
+html[data-theme] .qtd input{ color:var(--text) !important; }
+
+/* Carrinho */
+html[data-theme] .lin input[type=number]{
+  background:#FFFFFF !important;
+  color:var(--text) !important;
+  border-color:var(--line2) !important;
+}
+html[data-theme] .lin .nm{ color:var(--text) !important; }
+html[data-theme] .lin .nm small{ color:var(--muted) !important; }
+html[data-theme] .lin .rm{ color:var(--muted) !important; }
+html[data-theme] .lin .rm:hover{
+  background: rgba(211,84,0,.12) !important;
+  color: #C0392B !important;
+}
+
+/* Flash */
+html[data-theme] .flash.ok{
+  background: rgba(39,174,96,.12) !important;
+  border-color: rgba(39,174,96,.35) !important;
+  color: #0E6E3E !important;
+}
+html[data-theme] .flash.err{
+  background: rgba(211,84,0,.10) !important;
+  border-color: rgba(211,84,0,.35) !important;
+  color: #A04000 !important;
+}
+
+/* Footer */
+html[data-theme] footer.f{
+  border-top-color:var(--line) !important;
+  color:var(--muted) !important;
+}
+
+/* Dropdown */
+html[data-theme] .theme-btn{
+  background:#FFFFFF !important;
+  color:var(--text) !important;
+  border-color:var(--line2) !important;
+}
+html[data-theme] .theme-btn:hover{ background:var(--bg2) !important; }
+html[data-theme] .theme-btn .dot{
+  background: linear-gradient(135deg, var(--amber3), var(--amber), var(--amber2)) !important;
+  box-shadow: 0 0 8px -2px var(--amber) !important;
+}
+html[data-theme] .theme-menu{
+  background: var(--card) !important;
+  border-color: var(--line2) !important;
+  box-shadow: 0 24px 50px -18px var(--shadow-md) !important;
+}
+html[data-theme] .theme-menu button{
+  color: var(--link-secondary) !important;
+}
+html[data-theme] .theme-menu button:hover{
+  background: var(--nav-hover) !important;
+  color: var(--text) !important;
+}
+html[data-theme] .theme-menu button.active{
+  background: var(--nav-active) !important;
+  color: var(--text) !important;
+}
+
+/* Badge carrinho */
+html[data-theme] #badge{
+  background: rgba(0,0,0,.18) !important;
+  color: #FFFFFF !important;
+}
+html[data-theme] .badge{
+  background: linear-gradient(135deg, var(--amber), var(--amber2)) !important;
+  color: #FFFFFF !important;
+}
+
+/* ============================================================
+   DROPDOWN DE TEMA (estrutura)
+   ============================================================ */
+.theme-picker{position:relative;display:inline-block}
+
+.theme-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 14px;border-radius:10px;
+  font-size:.85rem;font-weight:600;
+  border:1px solid var(--line2);
+  background:#FFFFFF;
+  color:var(--text);
+  transition:.2s;cursor:pointer;font-family:inherit;
+}
+.theme-btn:hover{background:var(--bg2)}
+.theme-btn .dot{
+  width:11px;height:11px;border-radius:50%;flex:none;
+  background:linear-gradient(135deg,var(--amber3),var(--amber),var(--amber2));
+  box-shadow:0 0 8px -2px var(--amber);
+}
+.theme-btn .chev{
+  width:12px;height:12px;
+  transition:transform .22s;opacity:.7;
+}
+.theme-picker.open .theme-btn .chev{transform:rotate(180deg)}
+
+.theme-menu{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:60;
+  min-width:200px;padding:6px;border-radius:14px;
+  background:var(--card);
+  backdrop-filter:blur(20px);
+  border:1px solid var(--line2);
+  box-shadow:0 24px 50px -18px var(--shadow-md);
+  opacity:0;visibility:hidden;transform:translateY(-6px);
+  transition:.2s cubic-bezier(.4,0,.2,1);
+}
+.theme-picker.open .theme-menu{
+  opacity:1;visibility:visible;transform:none;
+}
+.theme-menu button{
+  display:flex;align-items:center;gap:10px;
+  width:100%;padding:9px 12px;border-radius:10px;
+  font-size:.87rem;text-align:left;
+  color:var(--link-secondary);transition:.15s;cursor:pointer;
+  font-family:inherit;background:none;border:0;
+}
+.theme-menu button:hover{
+  background:var(--nav-hover);color:var(--text);
+}
+.theme-menu button.active{
+  background:var(--nav-active);color:var(--text);font-weight:600;
+}
+.theme-menu button .sw{
+  width:16px;height:16px;border-radius:50%;flex:none;
+  border:1px solid rgba(0,0,0,.15);
+  box-shadow:inset 0 -3px 0 rgba(0,0,0,.15);
+}
+.theme-menu button .chk{
+  margin-left:auto;color:var(--amber);
+  font-size:.9rem;opacity:0;transition:.15s;
+}
+.theme-menu button.active .chk{opacity:1}
+
+/* Bolinhas coloridas de cada tema */
+.theme-menu button[data-theme-value="amber"] .sw{
+  background:linear-gradient(135deg,#F5C77E,#E67E22,#D35400);
+}
+.theme-menu button[data-theme-value="ocean"] .sw{
+  background:linear-gradient(135deg,#7FC0E8,#2980B9,#1B5E8A);
+}
+.theme-menu button[data-theme-value="forest"] .sw{
+  background:linear-gradient(135deg,#9CE0B8,#27AE60,#1B8049);
+}
+
+@media(max-width:820px){
+  .theme-btn span.lbl{display:none}
+  .theme-btn{padding:8px 10px}
+  .theme-menu{min-width:170px}
+}

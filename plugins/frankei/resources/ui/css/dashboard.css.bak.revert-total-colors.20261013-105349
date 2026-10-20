@@ -1,0 +1,4381 @@
+/* ============================================================
+   Frankei · Dashboard — Parte 1: Base + Topbar
+   ============================================================ */
+
+:root {
+  --blue: #2b5cb8;
+  --blue-600: #24509e;
+  --blue-50: #f0f4fb;
+  --blue-100: #e6ecf8;
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --border: #d4d8de;
+  --border-2: #e6e9ee;
+  --text: #2c3238;
+  --muted: #6b7280;
+  --muted-2: #8b95a3;
+
+  --crit: #d64545;
+  --crit-bg: #fdecec;
+  --high: #e07800;
+  --high-bg: #fff4e0;
+  --med: #b8860b;
+  --med-bg: #fef9e0;
+  --low: #2b5cb8;
+  --low-bg: #e6ecf8;
+  --info: #6b7280;
+  --info-bg: #eef0f4;
+
+  --term-bg: #0d1117;
+  --term-fg: #c8d2e0;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none
+}
+
+/* ── TOPBAR ── */
+.fk-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 22px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(20, 30, 50, .04);
+}
+
+.fk-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0
+}
+
+.fk-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text)
+}
+
+.fk-brand-logo {
+  font-size: 16px
+}
+
+.fk-path {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  padding: 4px 10px;
+  background: var(--border-2);
+  color: var(--muted);
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+
+.fk-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px
+}
+
+.fk-user {
+  color: var(--muted)
+}
+
+.fk-user b {
+  color: var(--text)
+}
+
+.fk-logout {
+  color: var(--blue);
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  transition: background .12s;
+}
+
+.fk-logout:hover {
+  background: var(--blue-50)
+}
+
+/* ── LAYOUT ── */
+.fk-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+@media(max-width:900px) {
+  .fk-layout {
+    grid-template-columns: 1fr
+  }
+}
+
+.fk-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 80px
+}
+
+.fk-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0
+}
+
+/* ── CARDS ── */
+.fk-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.fk-card-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fk-count {
+  background: var(--blue-100);
+  color: var(--blue);
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 100px;
+  letter-spacing: 0;
+}
+
+/* ── BOTÕES ── */
+.fk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .08s;
+}
+
+.fk-btn:active {
+  transform: translateY(1px)
+}
+
+.fk-btn-block {
+  width: 100%;
+  margin-bottom: 8px
+}
+
+.fk-btn-block:last-child {
+  margin-bottom: 0
+}
+
+.fk-btn-primary {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(43, 92, 184, .25);
+}
+
+.fk-btn-primary:hover {
+  background: var(--blue-600)
+}
+
+.fk-btn-primary:disabled {
+  background: #c4ccd8;
+  cursor: not-allowed;
+  box-shadow: none
+}
+
+.fk-btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+.fk-btn-ghost:hover:not(:disabled) {
+  background: var(--border-2);
+  color: var(--text)
+}
+
+.fk-btn-ghost:disabled {
+  opacity: .5;
+  cursor: not-allowed
+}
+
+/* ── STATUS ── */
+.fk-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px
+}
+
+.fk-status-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px
+}
+
+.fk-status-label {
+  color: var(--muted)
+}
+
+.fk-status-value {
+  font-weight: 700;
+  color: var(--text)
+}
+
+/* ── FILTROS ── */
+.fk-filter-group {
+  margin-bottom: 14px
+}
+
+.fk-filter-group:last-child {
+  margin-bottom: 0
+}
+
+.fk-filter-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  margin-bottom: 8px;
+}
+
+.fk-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px
+}
+
+.fk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 100px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  user-select: none;
+  transition: background .12s, border-color .12s, color .12s;
+}
+
+.fk-chip input {
+  display: none
+}
+
+.fk-chip:has(input:checked) {
+  background: var(--blue-50);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.fk-chip-critical:has(input:checked) {
+  background: var(--crit-bg);
+  border-color: var(--crit);
+  color: var(--crit)
+}
+
+.fk-chip-high:has(input:checked) {
+  background: var(--high-bg);
+  border-color: var(--high);
+  color: var(--high)
+}
+
+.fk-chip-medium:has(input:checked) {
+  background: var(--med-bg);
+  border-color: var(--med);
+  color: var(--med)
+}
+
+.fk-chip-low:has(input:checked) {
+  background: var(--low-bg);
+  border-color: var(--low);
+  color: var(--low)
+}
+
+.fk-chip-info:has(input:checked) {
+  background: var(--info-bg);
+  border-color: var(--info);
+  color: var(--info)
+}
+
+/* ── TERMINAL ── */
+.fk-test-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.fk-test-actions .fk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.fk-test-hint {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fk-test-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.fk-test-actions .fk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.fk-test-hint {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fk-terminal-card {
+  padding: 0;
+  overflow: hidden;
+  background: var(--term-bg);
+  border-color: #1a2028
+}
+
+.fk-terminal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+}
+
+.fk-terminal-dots {
+  display: flex;
+  gap: 6px
+}
+
+.fk-terminal-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%
+}
+
+.fk-terminal-dots span:nth-child(1) {
+  background: #ff5f57
+}
+
+.fk-terminal-dots span:nth-child(2) {
+  background: #febc2e
+}
+
+.fk-terminal-dots span:nth-child(3) {
+  background: #28c840
+}
+
+.fk-terminal-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: #8b949e;
+  flex: 1;
+}
+
+.fk-term-engine {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  margin-left: 8px;
+  background: rgba(148, 92, 245, 0.12);
+  border: 1px solid rgba(148, 92, 245, 0.3);
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #a06ef5;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fk-term-engine-icon {
+  font-size: 12px;
+}
+
+.fk-term-engine-label {
+  letter-spacing: 0.02em;
+}
+
+.fk-term-engine-caret {
+  font-size: 9px;
+  opacity: 0.7;
+  margin-left: 2px;
+}
+
+.fk-term-engine {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fk-term-engine:hover {
+  background: rgba(148, 92, 245, 0.2);
+}
+
+.fk-term-engine-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 150px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px -8px rgba(20, 30, 50, 0.25);
+  padding: 4px;
+  z-index: 300;
+}
+
+.fk-term-engine.open .fk-term-engine-menu {
+  display: block;
+}
+
+.fk-term-engine-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  transition: background .12s;
+}
+
+.fk-term-engine-opt:hover {
+  background: var(--bg-2);
+}
+
+.fk-term-engine-opt[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fk-term-engine-opt[aria-current="true"] {
+  color: #a06ef5;
+}
+
+.fk-term-engine-opt-icon {
+  font-size: 13px;
+}
+
+.fk-terminal-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: #8b949e;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: #21262d;
+}
+
+.fk-terminal-status.running {
+  color: #febc2e;
+  background: #3d2e00
+}
+
+.fk-terminal-status.done {
+  color: #28c840;
+  background: #0d3018
+}
+
+.fk-terminal-status.error {
+  color: #ff5f57;
+  background: #3d0e0e
+}
+
+.fk-terminal-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--card);
+  border-top: 1px solid var(--border-2);
+  border-radius: 0 0 10px 10px;
+}
+
+.fk-terminal-prompt {
+  color: var(--muted-2);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 13px;
+  user-select: none;
+}
+
+.fk-terminal-input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.fk-terminal-input::placeholder {
+  color: var(--muted-2);
+  opacity: 0.5;
+}
+
+.fk-terminal-run-btn {
+  background: var(--blue);
+  color: #fff;
+  border: 0;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+
+.fk-terminal-run-btn:hover {
+  opacity: .85
+}
+
+.fk-terminal-run-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed
+}
+
+.fk-terminal-body {
+  /* fkFixedTerminalHeight: altura fixa — não cresce, não dança */
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--term-fg);
+  padding: 16px 20px;
+  height: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-anchor: none;
+  /* impede o browser de "ancorar" e arrastar a página */
+}
+
+.fk-term-line {
+  white-space: pre-wrap;
+  word-break: break-word
+}
+
+.fk-term-muted {
+  color: #6e7681
+}
+
+.fk-term-cmd {
+  color: #79c0ff;
+  font-weight: 700
+}
+
+.fk-term-ok {
+  color: #56d364
+}
+
+.fk-term-warn {
+  color: #febc2e
+}
+
+.fk-term-err {
+  color: #ff7b72
+}
+
+.fk-term-info {
+  color: #8b949e
+}
+
+/* ── FINDINGS ── */
+.fk-findings-card {
+  padding: 0;
+  overflow: hidden
+}
+
+.fk-findings-head {
+  padding: 14px 18px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+.fk-findings-head .fk-card-title {
+  margin-bottom: 0
+}
+
+.fk-findings-body {
+  padding: 0;
+  max-height: 600px;
+  overflow-y: auto
+}
+
+.fk-empty {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--muted-2);
+}
+
+.fk-empty-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+  opacity: .5
+}
+
+.fk-empty p {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px
+}
+
+.fk-empty small {
+  font-size: 12px
+}
+
+.fk-finding {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-2);
+  cursor: pointer;
+  transition: background .12s;
+  animation: fkSlide .3s ease;
+}
+
+.fk-finding:last-child {
+  border-bottom: 0
+}
+
+.fk-finding:hover {
+  background: var(--blue-50)
+}
+
+@keyframes fkSlide {
+  from {
+    opacity: 0;
+    transform: translateY(4px)
+  }
+
+  to {
+    opacity: 1;
+    transform: none
+  }
+}
+
+.fk-sev {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.fk-sev.critical {
+  background: var(--crit-bg);
+  color: var(--crit);
+  border: 1px solid #f3c1c1
+}
+
+.fk-sev.high {
+  background: var(--high-bg);
+  color: var(--high);
+  border: 1px solid #f0d49c
+}
+
+.fk-sev.medium {
+  background: var(--med-bg);
+  color: var(--med);
+  border: 1px solid #f0e3a8
+}
+
+.fk-sev.low {
+  background: var(--low-bg);
+  color: var(--low);
+  border: 1px solid #c3d3ef
+}
+
+.fk-sev.info {
+  background: var(--info-bg);
+  color: var(--info);
+  border: 1px solid #d4d8de
+}
+
+.fk-findings-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px dashed var(--border-2);
+}
+
+.fk-filters-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.fk-filters-line-off {
+  opacity: 0.55;
+}
+
+.fk-filters-key {
+  font-weight: 700;
+  color: var(--muted-2);
+  margin-right: 4px;
+}
+
+.fk-fchip {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  color: var(--muted);
+}
+
+.fk-fchip-on {
+  background: #e8f5e8;
+  border-color: #b8dcb8;
+  color: #2a5d2a;
+}
+
+.fk-fchip-off {
+  background: transparent;
+  border-color: var(--border-2);
+  color: var(--muted-2);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.fk-finding-main {
+  min-width: 0
+}
+
+.fk-attention {
+  display: inline-block;
+  margin-right: 4px;
+  font-size: 0.7em;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.fk-attention-yes {
+  opacity: 1;
+}
+
+.fk-attention-no {
+  opacity: 0.4;
+}
+
+.fk-attention-med {
+  opacity: 0.85;
+}
+
+.fk-finding-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fk-finding-meta {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  gap: 10px;
+}
+
+.fk-finding-meta b {
+  color: var(--muted);
+  font-weight: 600
+}
+
+.fk-finding-db {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--blue-50);
+  color: var(--blue);
+  border: 1px solid var(--blue-100);
+  white-space: nowrap;
+}
+
+/* ── MODAL ── */
+.fk-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(20, 30, 50, .7);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.fk-modal.open {
+  display: flex
+}
+
+.fk-modal-content {
+  background: var(--card);
+  border-radius: 14px;
+  max-width: 640px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, .35);
+}
+
+.fk-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 16px;
+  transition: background .12s;
+}
+
+.fk-modal-close:hover {
+  background: var(--border-2);
+  color: var(--text)
+}
+
+.fk-modal-body {
+  padding: 28px
+}
+
+.fk-modal-sev {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 5px 11px;
+  border-radius: 7px;
+  margin-bottom: 12px;
+}
+
+.fk-modal-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.fk-modal-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 24px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fk-modal-section {
+  margin-bottom: 20px
+}
+
+.fk-modal-section:last-child {
+  margin-bottom: 0
+}
+
+.fk-modal-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  margin-bottom: 6px;
+}
+
+.fk-modal-text {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.6
+}
+
+.fk-modal-code {
+  background: var(--term-bg);
+  color: var(--term-fg);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: pre;
+  border: 1px solid #21262d;
+}
+
+/* ══════════════════════════════════════════════════════════
+   TABS PRINCIPAIS
+   ══════════════════════════════════════════════════════════ */
+
+.fk-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 20px 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 56px;
+  z-index: 90;
+}
+
+.fk-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+
+.fk-tab:hover {
+  color: var(--text)
+}
+
+.fk-tab.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.fk-tab[disabled] {
+  color: var(--muted-2);
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.fk-tab[disabled]:hover {
+  color: var(--muted-2)
+}
+
+.fk-tab-icon {
+  font-size: 15px
+}
+
+.fk-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  border-radius: 100px;
+  background: var(--border-2);
+  color: var(--muted);
+}
+
+.fk-tab.active .fk-tab-badge {
+  background: var(--blue-100);
+  color: var(--blue);
+}
+
+.fk-tab-badge.has-crit {
+  background: var(--crit-bg);
+  color: var(--crit)
+}
+
+.fk-tab-badge.has-high {
+  background: var(--high-bg);
+  color: var(--high)
+}
+
+.fk-tab-badge.soon {
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 9.5px;
+  letter-spacing: .04em
+}
+
+/* ══════════════════════════════════════════════════════════
+   SUB-TABS
+   ══════════════════════════════════════════════════════════ */
+
+.fk-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 20px;
+  background: var(--blue-50);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 105px;
+  z-index: 89;
+}
+
+.fk-subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.fk-subtab:hover {
+  border-color: var(--blue);
+  color: var(--blue)
+}
+
+.fk-subtab.active {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+
+.fk-subtab-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, .25);
+}
+
+.fk-subtab:not(.active) .fk-subtab-badge {
+  background: var(--border-2);
+  color: var(--muted);
+}
+
+/* ══════════════════════════════════════════════════════════
+   PLACEHOLDER (tab "em breve")
+   ══════════════════════════════════════════════════════════ */
+
+.fk-placeholder {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 60px 24px;
+  text-align: center;
+}
+
+.fk-placeholder-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  opacity: .7
+}
+
+.fk-placeholder h2 {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: var(--text)
+}
+
+.fk-placeholder p {
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 520px;
+  margin: 0 auto 20px;
+  line-height: 1.6
+}
+
+.fk-placeholder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.fk-placeholder-item {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 100px;
+  background: var(--blue-50);
+  color: var(--blue);
+  border: 1px solid var(--blue-100);
+}
+
+/* BOTÃO "CORRER TUDO" NA TOPBAR */
+.fk-btn-run-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #3d6dd0, var(--blue) 60%, var(--blue-600));
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(43, 92, 184, .25);
+  transition: transform .08s, box-shadow .15s;
+}
+
+.fk-btn-run-all:hover {
+  box-shadow: 0 4px 12px rgba(43, 92, 184, .35);
+}
+
+.fk-btn-run-all:active {
+  transform: translateY(1px)
+}
+
+.fk-btn-run-all:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  box-shadow: none
+}
+
+@media(max-width:640px) {
+  .fk-tabs {
+    padding: 6px 12px 0;
+    top: 52px
+  }
+
+  .fk-tab {
+    padding: 8px 10px;
+    font-size: 12px
+  }
+
+  .fk-tab-badge {
+    display: none
+  }
+
+  .fk-subtabs {
+    padding: 8px 12px;
+    top: 96px
+  }
+
+  .fk-btn-run-all span:not(:first-child) {
+    display: none
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   SETTINGS (icon ⚙️ + dropdown)
+   ══════════════════════════════════════════════════════════ */
+
+.fk-settings-wrap {
+  position: relative;
+  display: inline-block
+}
+
+.fk-settings-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+
+.fk-settings-btn:hover {
+  background: var(--border-2);
+  color: var(--text);
+}
+
+.fk-settings-wrap.open .fk-settings-btn {
+  background: var(--blue-50);
+  color: var(--blue);
+  border-color: var(--blue-100);
+}
+
+.fk-settings-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 280px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 36px -12px rgba(20, 30, 50, .25), 0 0 0 1px rgba(0, 0, 0, .02);
+  padding: 8px;
+  z-index: 200;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity .15s, transform .15s, visibility .15s;
+}
+
+.fk-settings-wrap.open .fk-settings-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.fk-settings-head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  padding: 8px 12px 10px;
+}
+
+.fk-settings-section {
+  padding: 4px 0
+}
+
+.fk-settings-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.fk-settings-input-row label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fk-settings-input-row input[type="number"],
+.fk-settings-input-row input[type="text"] {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+}
+
+.fk-settings-input-row input:focus {
+  border-color: var(--blue);
+}
+
+.fk-settings-input-row small {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.fk-settings-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  padding: 4px 12px 8px;
+}
+
+.fk-settings-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .1s;
+  user-select: none;
+}
+
+.fk-settings-opt:hover {
+  background: var(--blue-50)
+}
+
+.fk-settings-opt input {
+  display: none
+}
+
+.fk-settings-opt::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  transition: border-color .15s, background .15s;
+  position: relative;
+}
+
+.fk-settings-opt input:checked~span::before {
+  content: "";
+  position: absolute;
+}
+
+.fk-settings-opt:has(input:checked)::before {
+  border-color: var(--blue);
+  background: var(--blue);
+  box-shadow: inset 0 0 0 3px var(--card);
+}
+
+.fk-settings-opt span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0
+}
+
+.fk-settings-opt b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3
+}
+
+.fk-settings-opt small {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin-top: 2px
+}
+
+.fk-settings-opt:has(input:checked) b {
+  color: var(--blue)
+}
+
+.fk-settings-sep {
+  height: 1px;
+  background: var(--border-2);
+  margin: 8px 4px;
+}
+
+.fk-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: background .1s;
+}
+
+.fk-settings-item:hover {
+  background: var(--blue-50);
+  color: var(--blue)
+}
+
+.fk-settings-item-danger:hover {
+  background: var(--crit-bg);
+  color: var(--crit)
+}
+
+
+/* ── Botão auto-fix no modal ── */
+.fk-modal-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-2);
+}
+
+.fk-btn-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .15s, transform .08s;
+}
+
+.fk-btn-fix-primary {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(43, 92, 184, .25);
+}
+
+.fk-btn-fix-primary:hover {
+  background: var(--blue-600)
+}
+
+.fk-btn-fix-primary:disabled {
+  background: #c4ccd8;
+  cursor: not-allowed
+}
+
+.fk-btn-fix-ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+.fk-btn-fix-ghost:hover {
+  background: var(--border-2);
+  color: var(--text)
+}
+
+.fk-fixed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: #e6f7ee;
+  color: #1f9d55;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+/* Diff visual */
+.fk-diff {
+  background: #0d1117;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  overflow-x: auto;
+  border: 1px solid #21262d;
+}
+
+.fk-diff-add {
+  color: #56d364
+}
+
+.fk-diff-rem {
+  color: #ff7b72
+}
+
+.fk-diff-ctx {
+  color: #8b949e
+}
+
+/* ══════════════════════════════════════════════════════════
+   SETTINGS — Tabs horizontais dentro do menu
+   ══════════════════════════════════════════════════════════ */
+
+.fk-settings-head-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px;
+}
+
+.fk-settings-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.fk-settings-close {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+
+.fk-settings-close:hover {
+  background: var(--border-2);
+  color: var(--text)
+}
+
+.fk-settings-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-2);
+  padding: 0 8px;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+
+.fk-settings-tabs::-webkit-scrollbar {
+  height: 4px
+}
+
+.fk-settings-tabs::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 2px
+}
+
+.fk-settings-tab {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+
+.fk-settings-tab:hover {
+  color: var(--text)
+}
+
+.fk-settings-tab.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.fk-settings-body {
+  padding: 6px 0 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.fk-settings-panel {
+  display: none
+}
+
+.fk-settings-panel.active {
+  display: block
+}
+
+/* Override: dropdown maior para caber 6 tabs + opcoes */
+.fk-settings-menu {
+  min-width: 560px;
+  max-width: 640px;
+}
+
+@media (max-width:700px) {
+  .fk-settings-menu {
+    min-width: auto;
+    max-width: 95vw;
+    width: 95vw;
+    right: 8px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   TABS — Estados visuais (running / done / error)
+   ══════════════════════════════════════════════════════════ */
+
+.fk-tab.fk-tab-running {
+  color: var(--high);
+  border-bottom-color: var(--high);
+  animation: fkTabPulse 1.4s ease-in-out infinite;
+}
+
+.fk-tab.fk-tab-running .fk-tab-icon {
+  display: inline-block;
+  animation: fkTabSpin 1.2s linear infinite;
+}
+
+.fk-tab.fk-tab-running .fk-tab-badge {
+  background: var(--high-bg);
+  color: var(--high);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fk-tab.fk-tab-done {
+  color: var(--green);
+  border-bottom-color: var(--green);
+}
+
+.fk-tab.fk-tab-done .fk-tab-badge {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.fk-tab.fk-tab-error {
+  color: var(--crit);
+  border-bottom-color: var(--crit);
+}
+
+.fk-tab.fk-tab-error .fk-tab-badge {
+  background: var(--crit-bg);
+  color: var(--crit);
+}
+
+/* Sub-tabs */
+.fk-subtab.fk-subtab-running {
+  background: var(--high-bg);
+  border-color: var(--high);
+  color: var(--high);
+}
+
+.fk-subtab.fk-subtab-done {
+  background: var(--green-bg);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+@keyframes fkTabPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes fkTabSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ícone check verde quando done */
+.fk-tab.fk-tab-done .fk-tab-icon {
+  position: relative;
+}
+
+.fk-tab.fk-tab-done .fk-tab-icon::after {
+  content: "✓";
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--green);
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--card);
+}
+
+/* ══════════════════════════════════════════════════════════
+   Toggles nas settings (100% compatível — sem :has)
+   ══════════════════════════════════════════════════════════ */
+
+.fk-settings-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .12s;
+  user-select: none;
+}
+
+.fk-settings-toggle:hover {
+  background: var(--blue-50)
+}
+
+/* Esconder o checkbox real (mas manter acessível) */
+.fk-settings-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+/* Track visual */
+.fk-settings-toggle .fk-switch-track {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 100px;
+  background: #c4ccd8;
+  transition: background .18s;
+}
+
+.fk-settings-toggle .fk-switch-track::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform .18s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+}
+
+/* Estado ligado — usa + (adjacente) */
+.fk-settings-toggle input[type="checkbox"]:checked+.fk-switch-track {
+  background: var(--blue);
+}
+
+.fk-settings-toggle input[type="checkbox"]:checked+.fk-switch-track::after {
+  transform: translateX(14px);
+}
+
+/* Texto */
+.fk-settings-toggle>span:last-child {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.fk-settings-toggle b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.fk-settings-toggle small {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin-top: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   BARRA DE PROGRESSO (acima do terminal)
+   ══════════════════════════════════════════════════════════ */
+
+.fk-progress-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  animation: fkProgressFadeIn .3s ease;
+}
+
+@keyframes fkProgressFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fk-progress-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fk-progress-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: var(--border-2);
+  color: var(--muted);
+  transition: background .25s, color .25s;
+}
+
+.fk-progress-step.fk-step-running {
+  background: var(--high-bg);
+  color: var(--high);
+  animation: fkProgressPulse 1.4s ease-in-out infinite;
+}
+
+.fk-progress-step.fk-step-done {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.fk-progress-step.fk-step-done::after {
+  content: "✓";
+  font-weight: 800;
+  margin-left: 2px;
+}
+
+.fk-progress-step.fk-step-error {
+  background: var(--crit-bg);
+  color: var(--crit);
+}
+
+.fk-progress-arrow {
+  color: var(--muted-2);
+  font-size: 12px;
+  opacity: .5;
+}
+
+.fk-progress-bar {
+  height: 6px;
+  background: var(--border-2);
+  border-radius: 100px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+/* Fill base — AZUL sólido */
+.fk-progress-fill {
+  height: 100%;
+  background: #2b5cb8;
+  border-radius: 100px;
+  transition: width .35s cubic-bezier(.4, 0, .2, 1);
+  position: relative;
+}
+
+.fk-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .35), transparent);
+  animation: fkProgressShine 1.4s linear infinite;
+}
+
+/* Verde discreto no fim */
+.fk-progress-fill.fk-fill-done {
+  background: #1f9d55;
+}
+
+.fk-progress-fill.fk-fill-done::after {
+  display: none;
+}
+
+/* Vermelho se erro */
+.fk-progress-fill.fk-fill-error {
+  background: #d64545;
+}
+
+.fk-progress-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+@keyframes fkProgressPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .55;
+  }
+}
+
+@media(max-width:640px) {
+  .fk-progress-steps {
+    font-size: 11px;
+    gap: 4px
+  }
+
+  .fk-progress-arrow {
+    display: none
+  }
+}
+
+/* ── Botão "Corrigir" ao lado do Código ── */
+.fk-modal-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fk-modal-label-row .fk-modal-label {
+  margin-bottom: 0
+}
+
+.fk-btn-fix-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  border: 1px solid var(--blue);
+  border-radius: 7px;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s, transform .08s;
+  white-space: nowrap;
+}
+
+.fk-btn-fix-inline:hover {
+  background: var(--blue-600)
+}
+
+.fk-btn-fix-inline:active {
+  transform: translateY(1px)
+}
+
+.fk-btn-fix-inline:disabled {
+  opacity: .6;
+  cursor: not-allowed
+}
+
+.fk-btn-fix-inline.fk-fix-done {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.fk-btn-fix-inline.fk-fix-error {
+  background: var(--crit);
+  border-color: var(--crit);
+}
+
+/* ── Ações na linha de finding (🔧 / 👁) ── */
+.fk-finding {
+  grid-template-columns: auto 1fr auto auto;
+}
+
+.fk-finding-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.fk-action-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  font-family: inherit;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s, transform .08s;
+}
+
+.fk-action-btn:hover {
+  background: var(--blue-50);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.fk-action-btn:active {
+  transform: translateY(1px)
+}
+
+.fk-action-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed
+}
+
+.fk-action-btn.fk-action-done {
+  background: var(--green-bg);
+  border-color: var(--green);
+  color: var(--green);
+  cursor: default;
+}
+
+.fk-action-btn.fk-action-error {
+  background: var(--crit-bg);
+  border-color: var(--crit);
+  color: var(--crit);
+}
+
+.fk-finding.fk-finding-fixed {
+  background: #f7fdf9;
+}
+
+.fk-finding.fk-finding-fixed .fk-finding-title {
+  color: var(--green);
+}
+
+/* Badge inline para findings corrigidos */
+.fk-fixed-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid rgba(31, 157, 85, .3);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Botão ⚠️ — findings críticos sem auto-fix
+   ══════════════════════════════════════════════════════════ */
+
+.fk-action-btn.fk-action-manual {
+  border-color: rgba(214, 69, 69, .4);
+  color: var(--crit);
+  background: var(--crit-bg);
+  font-size: 15px;
+}
+
+.fk-action-btn.fk-action-manual:hover {
+  background: var(--crit);
+  border-color: var(--crit);
+  color: #fff;
+}
+
+.fk-action-btn.fk-action-manual:active {
+  transform: translateY(1px);
+}
+
+/* ══════════════════════════════════════════════════════════
+   REPORT BUTTON (head do terminal)
+   ══════════════════════════════════════════════════════════ */
+
+.fk-term-report-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  margin-left: 8px;
+  background: rgba(60, 170, 90, 0.12);
+  border: 1px solid rgba(60, 170, 90, 0.3);
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #3caa5a;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .15s;
+}
+
+.fk-term-report-btn:hover {
+  background: rgba(60, 170, 90, 0.22);
+}
+
+/* ══════════════════════════════════════════════════════════
+   REPORT MODAL (maior, dedicada)
+   ══════════════════════════════════════════════════════════ */
+
+.fk-report-modal-content {
+  max-width: 1100px;
+  width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.fk-report-head {
+  padding: 20px 28px 14px;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.fk-report-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.fk-report-summary {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fk-report-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fk-report-side {
+  width: 240px;
+  flex-shrink: 0;
+  padding: 18px 20px;
+  border-right: 1px solid var(--border-2);
+  overflow-y: auto;
+}
+
+.fk-report-section {
+  margin-bottom: 20px;
+}
+
+.fk-report-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  margin-bottom: 10px;
+}
+
+.fk-report-opt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 0;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.fk-report-opt input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.fk-report-opt span {
+  font-weight: 600;
+}
+
+.fk-report-opt small {
+  flex-basis: 100%;
+  margin-left: 20px;
+  font-size: 10.5px;
+  color: var(--muted-2);
+}
+
+.fk-report-engine {
+  padding: 7px 10px;
+  background: var(--bg-2);
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--muted);
+}
+
+.fk-report-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fk-report-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-2);
+  padding: 0 20px;
+  gap: 2px;
+}
+
+.fk-report-tab {
+  padding: 10px 16px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+
+.fk-report-tab:hover {
+  color: var(--text);
+}
+
+.fk-report-tab.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.fk-report-view {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px;
+  min-height: 0;
+}
+
+.fk-report-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted-2);
+}
+
+.fk-report-preview-html {
+  width: 100%;
+  height: 500px;
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+}
+
+.fk-report-preview-text {
+  background: var(--bg-2);
+  padding: 14px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.fk-report-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fk-report-file-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-2);
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fk-report-file-item .size {
+  color: var(--muted-2);
+  font-size: 11px;
+}
+
+.fk-report-file-item .name {
+  flex: 1;
+}
+
+.fk-report-file-item button {
+  padding: 4px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid var(--border-2);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.fk-report-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-2);
+  background: var(--bg-2);
+}
+
+.fk-report-foot-info {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fk-report-foot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.fk-report-foot-actions .fk-btn {
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Botão Beaver Report */
+.fk-btn-beaver {
+  background: linear-gradient(135deg, #c25a1f, #e8a44f) !important;
+  color: #fff !important;
+  border: 0 !important;
+  font-weight: 800 !important;
+}
+
+.fk-btn-beaver:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* ---------- Summary do report — badges visuais ---------- */
+.fk-report-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.fk-report-summary>span {
+  background: rgba(15, 23, 42, .05);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.fk-report-summary>span:first-child {
+  background: rgba(34, 197, 94, .12);
+  color: #16a34a;
+}
+
+/* ─── Fix: topbar + menu de configurações por cima de tudo ───
+   O CSS define z-index:100 mas algum JS injeta z-index:10 inline.
+   Forçamos com !important e especificidade máxima. */
+html body header.fk-topbar,
+html body .fk-topbar {
+  z-index: 5000 !important;
+  position: sticky !important;
+  top: 0 !important;
+}
+
+html body .fk-settings-wrap {
+  z-index: 5500 !important;
+}
+
+html body .fk-settings-menu {
+  z-index: 6000 !important;
+}
+
+/* ─── Ordem de z-index coerente ───
+   topbar (sticky)      : 5000
+   settings menu        : 6000
+   modais (A e B)       : 10000   ← sempre por cima de tudo */
+html body .fk-modal,
+html body #fkModal,
+html body #fkReportModal {
+  z-index: 10000 !important;
+}
+
+/* ─── Modal B SEMPRE por cima da Modal A ───
+   Ambas têm z=10000, mas a fkModal vem antes no DOM,
+   logo perdia o empate. Subimos a fkModal. */
+html body #fkModal {
+  z-index: 11000 !important;
+}
+
+html body #fkReportModal {
+  z-index: 10000 !important;
+}
+
+/* ─── Modal B em fullscreen (ocupa toda a janela) ─── */
+html body #fkModal.open {
+  padding: 0 !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+}
+
+html body #fkModal.open .fk-modal-content {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+html body #fkModal.open .fk-modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+html body #fkModal.open .cv-modal-head,
+html body #fkModal.open .cv-modal-filters {
+  flex: 0 0 auto !important;
+}
+
+html body #fkModal.open .cv-modal-code {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+html body #fkModal.open .cv-modal-code iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+}
+
+
+/* fkFixedTerminalHeight: impede scroll indesejado no input do terminal */
+.fk-terminal-input-wrap {
+  scroll-margin-bottom: 24px;
+  overflow-anchor: none;
+}
+
+.fk-terminal-input {
+  scroll-margin-bottom: 24px;
+}
+
+/* ─── scroll-margin: alvos de âncoras não ficam escondidos pelo header sticky ─── */
+.fk-terminal-card,
+.fk-terminal-body,
+.fk-term-line,
+[id^="fkTerm"] {
+  scroll-margin-top: 140px;
+  /* altura topbar (60) + tabs (40) + subtabs (40) */
+}
+
+/* Para os títulos das secções do dashboard */
+.fk-card-title,
+.fk-findings-head,
+.fk-report-head {
+  scroll-margin-top: 140px;
+}
+
+/* Código dentro do iframe (coverage-inline) */
+#code tr,
+table#code tr {
+  scroll-margin-top: 90px;
+  /* breadcrumb + título */
+}
+
+/* ─── Esconder o input do terminal de análise ───
+   Este terminal só corre subcomandos "beaver", não é um shell.
+   O input (e o prompt "$") só deve aparecer num shell real.
+   Para o mostrar num shell a sério, basta adicionar a classe
+   .shell-enabled ao .fk-terminal-card:
+       .fk-terminal-card.shell-enabled .fk-terminal-input-wrap { display: flex; }
+*/
+.fk-terminal-card:not(.shell-enabled) .fk-terminal-input-wrap {
+  display: none !important;
+}
+
+
+/* ═══════════════════════════════════════════════
+ *   TABS DO TOPBAR (Unit Tests ativa, resto bloqueado)
+ * ═══════════════════════════════════════════════ */
+.fk-top-tabs {
+  display: flex;
+  gap: 6px;
+  margin-left: 24px;
+  margin-right: auto;
+  align-items: center;
+}
+
+.fk-top-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: .84rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #8895A7;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+/* ── Ativa (Unit Tests) ── */
+.fk-top-tab.active {
+  background: linear-gradient(150deg, rgba(255, 196, 107, .22), rgba(255, 154, 60, .14));
+  color: #FF9A3C;
+  border-color: rgba(255, 154, 60, .45);
+  box-shadow:
+    0 0 0 1px rgba(255, 154, 60, .15) inset,
+    0 6px 18px -8px rgba(255, 140, 60, .5);
+  cursor: default;
+}
+
+.fk-top-tab.active::before {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #FF9A3C;
+  box-shadow: 0 0 6px #FF9A3C;
+}
+
+/* ── Bloqueadas ── */
+.fk-top-tab.locked {
+  color: #4E5D70;
+  background: rgba(255, 255, 255, .02);
+  border-color: rgba(255, 255, 255, .05);
+  cursor: not-allowed;
+}
+
+.fk-top-tab.locked:hover {
+  color: #6B7280;
+  background: rgba(255, 255, 255, .03);
+}
+
+.fk-top-tab.locked::after {
+  content: "PRO";
+  font-size: .6rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: #FF9A3C;
+  background: rgba(255, 154, 60, .14);
+  padding: 2px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* Mobile: esconder as tabs se não couberem */
+@media (max-width: 900px) {
+  .fk-top-tabs {
+    display: none;
+  }
+}
+
+/* ── Ícone do user no topbar ── */
+.fk-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.fk-user-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 154, 60, .15);
+  color: #FF9A3C;
+  font-size: .72rem;
+  margin-right: 6px;
+  border: 1px solid rgba(255, 154, 60, .3);
+  flex: none;
+}
+
+/* ═══════════════════════════════════════════════
+ *   Subtab PRO (bloqueada)
+ * ═══════════════════════════════════════════════ */
+.fk-subtab.is-pro {
+  color: #6B7280 !important;
+  background: rgba(255, 255, 255, .02) !important;
+  border-color: rgba(255, 255, 255, .06) !important;
+  cursor: not-allowed !important;
+  position: relative;
+}
+
+.fk-subtab.is-pro:hover {
+  background: rgba(255, 154, 60, .05) !important;
+  color: #9CA3AF !important;
+}
+
+.fk-subtab .fk-subtab-badge.pro {
+  background: linear-gradient(150deg, #FFC46B, #FF9A3C);
+  color: #231202;
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+/* ═══════════════════════════════════════════════
+ *   Modal PRO
+ * ═══════════════════════════════════════════════ */
+.fk-pro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9900;
+  background: rgba(7, 10, 15, .75);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity .25s;
+}
+
+.fk-pro-overlay.open {
+  opacity: 1;
+}
+
+.fk-pro-modal {
+  width: 100%;
+  max-width: 440px;
+  background: linear-gradient(175deg, #131B26, #0C121A);
+  border: 1px solid rgba(255, 154, 60, .25);
+  border-radius: 22px;
+  padding: 36px 30px 26px;
+  text-align: center;
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .95);
+  transform: scale(.95);
+  transition: transform .3s cubic-bezier(.34, 1.3, .64, 1);
+}
+
+.fk-pro-overlay.open .fk-pro-modal {
+  transform: none;
+}
+
+.fk-pro-icon {
+  font-size: 2.6rem;
+  margin-bottom: 14px;
+  line-height: 1;
+}
+
+.fk-pro-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -.025em;
+  color: #E8EEF6;
+  margin-bottom: 10px;
+}
+
+.fk-pro-text {
+  font-size: .92rem;
+  color: #8895A7;
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+
+.fk-pro-text b {
+  color: #FFC46B;
+  font-weight: 700;
+}
+
+.fk-pro-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.fk-pro-btn {
+  flex: 1;
+  padding: 12px 18px;
+  border-radius: 11px;
+  font-family: inherit;
+  font-size: .88rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 0;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.fk-pro-btn-ghost {
+  background: rgba(255, 255, 255, .04);
+  color: #B9C4D4;
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+
+.fk-pro-btn-ghost:hover {
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+}
+
+.fk-pro-btn-primary {
+  background: linear-gradient(150deg, #FFC46B, #FF9A3C 55%, #FF6B35);
+  color: #231202;
+  box-shadow: 0 10px 24px -12px rgba(255, 140, 60, .6);
+}
+
+.fk-pro-btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+
+/* ── Badge "Ficheiros em análise" (topbar) ── */
+.fk-files-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .1);
+  color: #B9C4D4;
+  font-size: .78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: help;
+  transition: all .15s;
+  margin-right: 8px;
+}
+
+.fk-files-badge:hover {
+  background: rgba(255, 154, 60, .1);
+  border-color: rgba(255, 154, 60, .35);
+  color: #FFC46B;
+}
+
+.fk-files-badge-icon {
+  font-size: .85rem;
+  line-height: 1;
+}
+
+.fk-files-badge-count {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: .74rem;
+  letter-spacing: .02em;
+}
+
+/* ── Badge "25" em bolinha flutuante no canto da tab ── */
+.fk-top-tab {
+  position: relative;
+  overflow: visible;
+}
+
+.fk-top-tab-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: linear-gradient(150deg, #F59E0B, #D97706 55%, #B45309);
+  color: #fff;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: .68rem;
+  font-weight: 800;
+  line-height: 22px;
+  text-align: center;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  box-shadow:
+    0 4px 10px -3px rgba(217, 119, 6, .7),
+    0 0 0 2px #070A0F;
+  border: 1px solid rgba(255, 255, 255, .15);
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Borda da tab — para o badge encaixar por cima */
+.fk-top-tab:not(.locked):not(.active) {
+  padding-right: 18px;
+}
+
+/* ═══════════════════════════════════════════════
+ *   Paginator (copiado do plugin Beaver)
+ * ═══════════════════════════════════════════════ */
+.paginator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: .82rem;
+  flex-wrap: wrap;
+  padding: 14px 4px 4px;
+  user-select: none;
+  border-top: 1px solid rgba(255, 255, 255, .05);
+  margin-top: 12px;
+}
+
+.pg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #B9C4D4;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .08);
+  transition: .15s ease;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pg-btn:hover {
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  border-color: rgba(255, 255, 255, .14);
+}
+
+.pg-btn.is-active {
+  background: linear-gradient(135deg, #D97706, #B45309);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+  cursor: default;
+}
+
+.pg-btn.is-disabled {
+  opacity: .35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.pg-gap {
+  padding: 0 4px;
+  color: #5F6D80;
+  font-weight: 600;
+}
+
+.pg-info {
+  margin-right: 8px;
+  font-size: .76rem;
+  color: #8895A7;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ==== FK TOPBAR LIGHT THEME ==== */
+
+/* ---- container / topbar ---- */
+.fk-topbar {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ---- brand ---- */
+.fk-brand {
+  color: #111827 !important;
+  text-decoration: none
+}
+
+.fk-brand b {
+  color: #111827 !important;
+  font-weight: 400 !important;
+  background: none !important;
+  -webkit-text-fill-color: #111827 !important;
+  text-shadow: none !important;
+}
+
+.fk-brand-logo {
+  background: #f3f4f6 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* ---- path chip ---- */
+.fk-path {
+  color: #374151 !important;
+  background: #f3f4f6 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.fk-path:hover {
+  color: #111827 !important;
+  background: #e5e7eb !important
+}
+
+/* ---- top tabs (PHP + JS, ambos) ---- */
+.fk-top-tab,
+nav.fk-top-tabs .fk-top-tab {
+  color: #374151 !important;
+  font-weight: 400 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.fk-top-tab:hover {
+  color: #111827 !important;
+  background: #f3f4f6 !important
+}
+
+.fk-top-tab.active {
+  color: #111827 !important;
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+}
+
+.fk-top-tab.active::after {
+  display: none !important
+}
+
+.fk-top-tab.locked {
+  opacity: .6 !important;
+  filter: none !important
+}
+
+.fk-top-tab.locked .fk-top-tab-label {
+  color: #6b7280 !important
+}
+
+.fk-top-tab.locked .fk-top-tab-pro {
+  color: #9ca3af !important;
+  background: none !important;
+  -webkit-text-fill-color: #9ca3af !important;
+  font-weight: 400 !important;
+  text-shadow: none !important;
+}
+
+.fk-top-tab-badge {
+  background: #e5e7eb !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
+}
+
+/* ---- botão Correr tudo ---- */
+.fk-btn-run-all {
+  background: #eef2ff !important;
+  color: #1e3a8a !important;
+  border: 1px solid #c7d2fe !important;
+  font-weight: 400 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+.fk-btn-run-all:hover {
+  background: #e0e7ff !important;
+  color: #111827 !important;
+  transform: none !important;
+  filter: none !important
+}
+
+.fk-btn-run-all::after {
+  display: none !important
+}
+
+/* ---- gear settings ---- */
+.fk-settings-btn {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.fk-settings-btn:hover {
+  background: #e5e7eb !important;
+  color: #111827 !important
+}
+
+/* ---- files badge ---- */
+.fk-files-badge {
+  background: #ecfeff !important;
+  color: #155e75 !important;
+  border: 1px solid #a5f3fc !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
+}
+
+.fk-files-badge-count {
+  color: #0e7490 !important;
+  font-weight: 400 !important
+}
+
+.fk-files-badge:hover {
+  transform: none !important;
+  box-shadow: none !important
+}
+
+/* ---- trial chip ---- */
+.fk-trial-chip {
+  background: #ecfdf5 !important;
+  color: #065f46 !important;
+  border: 1px solid #a7f3d0 !important;
+  font-weight: 400 !important;
+}
+
+.fk-trial-chip .fk-trial-label {
+  color: #065f46 !important;
+  font-weight: 400 !important
+}
+
+.fk-trial-chip .fk-trial-time {
+  color: #047857 !important;
+  font-weight: 400 !important
+}
+
+.fk-trial-chip .fk-trial-dot {
+  background: #10b981 !important;
+  box-shadow: none !important;
+  animation: none !important
+}
+
+.fk-trial-chip.is-soon {
+  background: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #92400e !important;
+  animation: none !important;
+}
+
+.fk-trial-chip.is-soon .fk-trial-label,
+.fk-trial-chip.is-soon .fk-trial-time {
+  color: #92400e !important
+}
+
+.fk-trial-chip.is-soon .fk-trial-dot {
+  background: #f59e0b !important
+}
+
+.fk-trial-chip.is-urgent {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+  color: #991b1b !important;
+  animation: none !important;
+}
+
+.fk-trial-chip.is-urgent .fk-trial-label,
+.fk-trial-chip.is-urgent .fk-trial-time {
+  color: #991b1b !important
+}
+
+.fk-trial-chip.is-urgent .fk-trial-dot {
+  background: #ef4444 !important
+}
+
+/* ---- user ---- */
+.fk-user {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.fk-user b {
+  color: #111827 !important;
+  font-weight: 400 !important
+}
+
+/* ---- #fkTabs (nav do JS) em tema claro ---- */
+#fkTabs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: #ffffff !important
+}
+
+#fkTabs .fk-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #374151 !important;
+  font-weight: 400 !important;
+  cursor: pointer;
+}
+
+#fkTabs .fk-tab:hover {
+  background: #f3f4f6 !important;
+  color: #111827 !important
+}
+
+#fkTabs .fk-tab.active {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #111827 !important;
+}
+
+#fkTabs .fk-tab:disabled {
+  opacity: .55;
+  cursor: not-allowed
+}
+
+#fkTabs .fk-tab-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: #f3f4f6 !important;
+  font-size: 13px;
+}
+
+#fkTabs .fk-tab.active .fk-tab-icon {
+  background: #e0e7ff !important
+}
+
+#fkTabs .fk-tab-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #e5e7eb !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+#fkTabs .fk-tab-badge.soon {
+  background: #f3f4f6 !important;
+  color: #6b7280 !important;
+  border-color: #e5e7eb !important;
+}
+
+/* ---- subtabs também em tema claro ---- */
+.fk-subtabs {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.fk-subtab {
+  color: #374151 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  font-weight: 400 !important;
+}
+
+.fk-subtab:hover {
+  background: #f3f4f6 !important;
+  color: #111827 !important
+}
+
+.fk-subtab.active {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #111827 !important;
+}
+
+.fk-subtab.locked,
+.fk-subtab.disabled {
+  opacity: .55 !important;
+  cursor: not-allowed !important
+}
+
+.fk-subtab .fk-subtab-badge {
+  background: #e5e7eb !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  font-weight: 700;
+}
+
+.fk-subtab .fk-subtab-badge.pro {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+  border-color: #fde68a !important;
+}
+
+/* ==== FK TABS HIERARCHY ==== */
+/* Ativo: escuro + fundo suave. Inativos: cinza claro. Sem bold. */
+
+/* ---- top tabs (PHP e JS) ---- */
+.fk-top-tab,
+#fkTabs .fk-tab {
+  color: #9ca3af !important;
+  /* inativo: cinza claro */
+  font-weight: 400 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: color .18s, background .18s, border-color .18s;
+}
+
+.fk-top-tab:hover,
+#fkTabs .fk-tab:hover {
+  color: #4b5563 !important;
+  /* hover: cinza médio */
+  background: #f9fafb !important;
+}
+
+/* ---- ativo: destaque ---- */
+.fk-top-tab.active,
+#fkTabs .fk-tab.active {
+  color: #111827 !important;
+  /* ativo: quase preto */
+  background: #eef2ff !important;
+  /* fundo suave índigo */
+  border-color: #c7d2fe !important;
+}
+
+.fk-top-tab.active::after {
+  display: none !important
+}
+
+/* ícones das tabs: inativo cinza, ativo azul suave */
+.fk-top-tab .fk-tab-ico,
+#fkTabs .fk-tab-icon {
+  background: #f3f4f6 !important;
+  transition: background .18s;
+}
+
+.fk-top-tab.active .fk-tab-ico,
+#fkTabs .fk-tab.active .fk-tab-icon {
+  background: #e0e7ff !important;
+}
+
+/* ---- locked (Cobertura, Findings) ---- */
+.fk-top-tab.locked {
+  color: #d1d5db !important;
+  /* ainda mais claro */
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.fk-top-tab.locked:hover {
+  background: transparent !important;
+  color: #d1d5db !important;
+}
+
+.fk-top-tab.locked .fk-top-tab-label {
+  color: #d1d5db !important
+}
+
+.fk-top-tab.locked .fk-top-tab-pro {
+  color: #e5e7eb !important;
+  background: none !important;
+  -webkit-text-fill-color: #e5e7eb !important;
+  font-weight: 400 !important;
+}
+
+.fk-top-tab.locked .fk-top-tab-lock {
+  opacity: .7 !important
+}
+
+/* ---- badge do Análise (mantém legível mas discreto) ---- */
+.fk-top-tab-badge,
+#fkTabs .fk-tab-badge {
+  background: #e5e7eb !important;
+  color: #6b7280 !important;
+  border: 1px solid #e5e7eb !important;
+  font-weight: 400 !important;
+  box-shadow: none !important;
+}
+
+.fk-top-tab.active .fk-top-tab-badge,
+#fkTabs .fk-tab.active .fk-tab-badge {
+  background: #e0e7ff !important;
+  color: #4338ca !important;
+  border-color: #c7d2fe !important;
+}
+
+/* ---- subtabs seguem a mesma lógica ---- */
+.fk-subtab {
+  color: #9ca3af !important;
+  font-weight: 400 !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+}
+
+.fk-subtab:hover {
+  color: #4b5563 !important;
+  background: #f9fafb !important
+}
+
+.fk-subtab.active {
+  color: #111827 !important;
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+}
+
+.fk-subtab.locked,
+.fk-subtab.disabled {
+  color: #d1d5db !important;
+  opacity: 1 !important
+}
+
+.fk-subtab.locked:hover {
+  background: transparent !important;
+  color: #d1d5db !important
+}
+
+/* ==== FK SUBTAB ALL BOOST ==== */
+
+/* base — todos os subtabs visíveis e com presença */
+.fk-subtab {
+  position: relative;
+  padding: 6px 14px !important;
+  border-radius: 10px !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  color: #4b5563 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04) !important;
+  transition: background .18s, color .18s, border-color .18s, box-shadow .18s !important;
+}
+
+.fk-subtab:hover {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+  border-color: #d1d5db !important;
+}
+
+/* badge por defeito (ex.: "soon") — mais visível */
+.fk-subtab .fk-subtab-badge {
+  background: #f3f4f6 !important;
+  color: #4b5563 !important;
+  border: 1px solid #e5e7eb !important;
+  font-weight: 700 !important;
+}
+
+/* ---------- ativo: máximo destaque ---------- */
+.fk-subtab.active {
+  background: #eef2ff !important;
+  border-color: #a5b4fc !important;
+  color: #1e1b4b !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, .18) !important;
+}
+
+.fk-subtab.active::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 3px;
+  background: #6366f1;
+  border-radius: 2px;
+}
+
+/* badge PRO — mais forte */
+.fk-subtab .fk-subtab-badge.pro,
+.fk-subtab.is-pro .fk-subtab-badge.pro {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+  border: 1px solid #fcd34d !important;
+  font-weight: 700 !important;
+}
+
+/* se o PRO estiver ativo (raro) fica ainda mais forte */
+.fk-subtab.active .fk-subtab-badge.pro {
+  background: #a5b4fc !important;
+  color: #1e1b4b !important;
+  border-color: #818cf8 !important;
+}
+
+/* locked / disabled — mantém presença mas não compete com o ativo */
+.fk-subtab.locked,
+.fk-subtab.disabled {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.fk-subtab.locked:hover {
+  background: #ffffff !important;
+  color: #4b5563 !important;
+  border-color: #e5e7eb !important;
+}
+
+/* ==== FK TAB ACTIVE BLUE ==== */
+/* Tab ativa: azul do tema (--blue), texto branco, sublinhado. */
+
+.fk-top-tab.active,
+#fkTabs .fk-tab.active {
+  background: var(--blue, #2b5cb8) !important;
+  border-color: var(--blue-600, #24509e) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  text-shadow: none !important;
+  box-shadow: 0 2px 8px rgba(43, 92, 184, .28) !important;
+  position: relative;
+}
+
+.fk-top-tab.active:hover,
+#fkTabs .fk-tab.active:hover {
+  background: var(--blue-600, #24509e) !important;
+  color: #ffffff !important;
+}
+
+/* ícone dentro da tab ativa: legível sobre azul */
+.fk-top-tab.active .fk-tab-ico,
+.fk-top-tab.active .fk-top-tab-lock,
+#fkTabs .fk-tab.active .fk-tab-icon {
+  background: rgba(255, 255, 255, .20) !important;
+  color: #ffffff !important;
+}
+
+.fk-top-tab.active .fk-top-tab-label {
+  color: #ffffff !important
+}
+
+/* sublinhado por baixo */
+.fk-top-tab.active::after,
+#fkTabs .fk-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -2px;
+  height: 3px;
+  background: var(--blue-600, #24509e);
+  border-radius: 2px;
+  transform: none !important;
+  display: block !important;
+}
+
+.fk-top-tab.active::before {
+  display: none !important
+}
+
+/* badge do ativo (se existir) */
+.fk-top-tab.active .fk-top-tab-badge,
+#fkTabs .fk-tab.active .fk-tab-badge {
+  background: rgba(255, 255, 255, .26) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, .5) !important;
+}
+
+/* ==== FK REPORT ARROW HINT ==== */
+/* Hierarquia de camadas:
+     terminal card    → 10
+     botão Report     → 20
+     setas ::before/after → 30
+*/
+
+/* --- 1) TERMINAL CARD: camada própria, acima do resto --- */
+.fk-terminal-card,
+.fk-card.fk-terminal-card {
+  position: relative;
+  z-index: 10;
+  overflow: visible !important;
+}
+
+/* --- 2) HEAD do terminal: contexto para o botão e as setas --- */
+.fk-terminal-head {
+  position: relative;
+  z-index: 20;
+  padding-top: 26px !important;
+  padding-bottom: 26px !important;
+  overflow: visible !important;
+  isolation: auto !important;
+}
+
+/* todos os irmãos do botão ficam abaixo dele */
+.fk-terminal-head>* {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- 3) BOTÃO Report: acima do head, abaixo das setas --- */
+.fk-term-report-btn {
+  position: relative;
+  z-index: 20 !important;
+}
+
+.fk-term-report-btn.fk-arrow-on {
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, .20);
+  animation: fk-report-pulse 1.6s ease-in-out infinite;
+}
+
+/* --- 4) SETAS: topo absoluto --- */
+.fk-term-report-btn.fk-arrow-on::before,
+.fk-term-report-btn.fk-arrow-on::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  filter: drop-shadow(0 2px 5px rgba(249, 115, 22, .6));
+  pointer-events: none;
+  z-index: 30 !important;
+  /* topo absoluto */
+}
+
+/* seta por cima — aponta para baixo */
+.fk-term-report-btn.fk-arrow-on::before {
+  top: -26px;
+  border-top: 18px solid #f97316;
+  animation: fk-arrow-bounce 0.9s ease-in-out infinite;
+}
+
+/* seta por baixo — aponta para cima */
+.fk-term-report-btn.fk-arrow-on::after {
+  bottom: -26px;
+  border-bottom: 18px solid #f97316;
+  animation: fk-arrow-bounce 0.9s ease-in-out infinite 0.45s;
+}
+
+@keyframes fk-arrow-bounce {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  50% {
+    opacity: .45;
+    transform: translateX(-50%) translateY(-7px);
+  }
+}
+
+@keyframes fk-report-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, .20);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(249, 115, 22, .06);
+  }
+}
+
+/* ==== FK TABS HEIGHT ==== */
+nav.fk-tabs {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+  align-items: center !important;
+}
+
+/* ==== FK MODAL CLOSE / COVERAGE LAYOUT FIX ==== */
+
+/* 1) O ✕ fica SEMPRE acima do conteúdo injetado */
+.fk-modal-close,
+#fkModalClose,
+#fkReportClose {
+  z-index: 500 !important;
+  background: rgba(255, 255, 255, .92) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+  pointer-events: auto !important;
+}
+
+.fk-modal-close:hover,
+#fkModalClose:hover,
+#fkReportClose:hover {
+  background: #f3f4f6 !important;
+}
+
+/* 2) Reservar topo dentro da modal para não invadir a zona do ✕ */
+.fk-modal-body:has(.cv-modal-layout),
+.fk-modal-body:has(.cv-modal-side) {
+  padding-top: 56px !important;
+}
+
+/* 3) Se o :has() não existir (browser antigo), o próprio layout afasta-se */
+.cv-modal-layout {
+  padding-top: 44px;
+  box-sizing: border-box;
+}
+
+/* 4) Reduzir a altura do side title para não encostar ao ✕ */
+.cv-modal-side {
+  padding-top: 4px;
+}
+
+/* 5) Garantir que o conteúdo do coverage não estica até ao canto */
+.cv-modal-side,
+.cv-modal-main {
+  min-width: 0;
+}
+
+/* ==== FK TEST CREATOR BTN ==== */
+.cv-modal-action.cv-modal-action-primary {
+  background: var(--blue, #2b5cb8);
+  color: #fff !important;
+  border-color: var(--blue, #2b5cb8);
+}
+
+.cv-modal-action.cv-modal-action-primary:hover {
+  background: var(--blue-600, #24509e);
+}
+
+.cv-modal-action.cv-modal-action-primary .cv-modal-action-icon {
+  filter: brightness(1.2);
+}
+
+/* ==== FK TERM PRUNE BTN ==== */
+.fk-term-prune-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+
+.fk-term-prune-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.fk-term-prune-btn:active {
+  transform: translateY(1px);
+}
+
+.fk-term-prune-btn[disabled] {
+  opacity: .55;
+  cursor: wait;
+}
+
+.fk-term-prune-btn.is-empty {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+
+/* ==== FK CODE-WRAP POSITION (para botão copiar) ==== */
+/* O botão copiar dentro do iframe usa position:absolute,
+   o .fk-code-wrap precisa de position:relative. */
+.fk-code-wrap {
+  position: relative !important;
+  padding-top: 44px !important;
+  /* espaço para o botão no topo */
+}
+
+/* ==== FK RUN BADGE ==== */
+.cv-run-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  transition: background .15s, color .15s;
+}
+
+.cv-run-badge-ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.cv-run-badge-low {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.cv-run-badge-zero {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ==== FK CV OVERLAY LOADING (FIX) ==== */
+#cvTableWrap {
+  position: relative !important;
+}
+
+.fk-cv-loading-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 100 !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border-radius: 12px;
+}
+
+.fk-cv-loading-spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #2b5cb8;
+  border-radius: 50%;
+  animation: fk-cv-spin 0.85s linear infinite;
+}
+
+@keyframes fk-cv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fk-cv-loading-overlay p {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #2b5cb8;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TEST CREATOR — input de classe com autocomplete
+   ═══════════════════════════════════════════════════════════ */
+.fk-tc-class-input {
+  flex: 1 1 260px;
+  min-width: 220px;
+  padding: 7px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  background: #fff;
+  color: #1f2937;
+  height: 32px;
+  box-sizing: border-box;
+}
+
+.fk-tc-class-input:focus {
+  outline: none;
+  border-color: #2E9B5C;
+  box-shadow: 0 0 0 3px rgba(46, 155, 92, .15);
+}
+
+.fk-tc-class-status {
+  font-size: 15px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 32px;
+}
+
+.fk-tc-class-status.ok {
+  color: #16a34a;
+}
+
+.fk-tc-class-status.err {
+  color: #dc2626;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TEST CREATOR — aumentar a modal (#fkTestCreatorModal)
+   ═══════════════════════════════════════════════════════════ */
+#fkTestCreatorModal .fk-tc-content {
+  max-width: 1100px !important;
+  width: 94vw !important;
+  max-height: 94vh !important;
+}
+
+#fkTestCreatorModal .fk-tc-body {
+  padding: 14px 22px !important;
+}
+
+#fkTestCreatorModal textarea.fk-tc-editor {
+  min-height: 460px !important;
+  font-size: 13.5px !important;
+}
+
+
+/* ═══════════════════════════════════════════════
+ *   FK_GEAR_RIGHT — gear de configurações no extremo direito
+ * ═══════════════════════════════════════════════ */
+html body .fk-topbar-right > .fk-settings-wrap {
+  order: 99;
+}
+
+/* FK_REPORT_LOADING_CSS — spinner do botao Gerar report */
+.fk-btn .fk-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: fk-spin 0.65s linear infinite;
+  vertical-align: -2px;
+  margin-right: 8px;
+  flex: 0 0 auto;
+}
+@keyframes fk-spin {
+  to { transform: rotate(360deg); }
+}
+.fk-btn.is-loading {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* FK_RV_LOADING_CSS — loading dentro de #fkReportView */
+.fk-report-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 14px;
+  color: var(--muted, #666);
+}
+.fk-report-loading-spinner {
+  width: 38px;
+  height: 38px;
+  border: 3px solid rgba(43, 92, 184, 0.2);
+  border-top-color: var(--blue, #2b5cb8);
+  border-radius: 50%;
+  animation: fk-rv-spin 0.8s linear infinite;
+}
+.fk-report-loading-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text, #333);
+}
+.fk-report-loading-sub {
+  font-size: 12px;
+  opacity: 0.7;
+}
+@keyframes fk-rv-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* FK_BEAVER_BUTTON_CSS — botao "Ver Report Beaver" */
+.fk-btn-beaver {
+  background: linear-gradient(135deg, #FFD79A 0%, #FF9A3C 48%, #FF6B35 100%);
+  color: #1A1208;
+  font-weight: 700;
+  border: 1px solid #e08540;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, .25);
+}
+.fk-btn-beaver:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, .35);
+}
+.fk-btn-beaver:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+  filter: grayscale(.3);
+}
+.fk-btn-beaver-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+.fk-btn-beaver-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FK_TOPBAR_MEDIUM — Fundo cinza médio + lettering branco + hover laranja
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  --fk-orange:      #FF9A3C;
+  --fk-orange-2:    #FF6B35;
+  --fk-gray-1:      #64748b;   /* cinza médio (mais claro) */
+  --fk-gray-2:      #4b5563;   /* cinza médio escuro */
+}
+
+/* ─── Fundo geral ─── */
+.fk-topbar {
+  background: linear-gradient(135deg, var(--fk-gray-2) 0%, var(--fk-gray-1) 100%) !important;
+  border-bottom: 1px solid rgba(0,0,0,.15) !important;
+  box-shadow: 0 3px 16px rgba(0, 0, 0, .15) !important;
+  padding: 10px 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  min-height: 56px !important;
+}
+.fk-topbar-left,
+.fk-topbar-right {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+/* ─── LETTERING: tudo branco ─── */
+.fk-topbar,
+.fk-topbar .fk-brand,
+.fk-topbar .fk-brand b,
+.fk-topbar .fk-brand-logo,
+.fk-topbar .fk-top-tab,
+.fk-topbar .fk-top-tab-label,
+.fk-topbar .fk-top-tab-lock,
+.fk-topbar .fk-btn-run-all,
+.fk-topbar .fk-btn-run-all *,
+.fk-topbar .fk-files-badge,
+.fk-topbar .fk-files-badge *,
+.fk-topbar .fk-lang-chip,
+.fk-topbar .fk-lang-chip *,
+.fk-topbar .fk-trial-chip,
+.fk-topbar .fk-trial-label,
+.fk-topbar .fk-trial-time,
+.fk-topbar .fk-user,
+.fk-topbar .fk-user-icon {
+  color: #ffffff !important;
+}
+
+/* ─── Marca (logo + Frankei) ─── */
+.fk-topbar .fk-brand {
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  transition: background .15s !important;
+}
+.fk-topbar .fk-brand-logo {
+  font-size: 20px !important;
+  line-height: 1 !important;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.3)) !important;
+}
+.fk-topbar .fk-brand b { font-weight: 700 !important; font-size: 15px !important; }
+.fk-topbar .fk-brand:hover { background: rgba(255,255,255,.1) !important; }
+.fk-topbar .fk-brand:hover,
+.fk-topbar .fk-brand:hover b,
+.fk-topbar .fk-brand:hover .fk-brand-logo { color: var(--fk-orange) !important; }
+
+/* ─── Path ─── */
+.fk-topbar .fk-path {
+  background: rgba(0,0,0,.3) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.15) !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  font-family: ui-monospace, monospace !important;
+  font-size: 11px !important;
+}
+
+/* ─── Tabs ─── */
+.fk-topbar .fk-top-tabs {
+  display: flex !important;
+  gap: 4px !important;
+  background: rgba(0,0,0,.18) !important;
+  padding: 4px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+}
+.fk-topbar .fk-top-tab {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: #ffffff !important;
+  padding: 7px 14px !important;
+  border-radius: 7px !important;
+  font-family: inherit !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: .15s !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+}
+.fk-topbar .fk-top-tab:hover {
+  background: rgba(255,255,255,.12) !important;
+  color: var(--fk-orange) !important;
+}
+.fk-topbar .fk-top-tab:hover .fk-top-tab-label,
+.fk-topbar .fk-top-tab:hover .fk-top-tab-lock { color: var(--fk-orange) !important; }
+
+.fk-topbar .fk-top-tab.active {
+  background: linear-gradient(135deg, var(--fk-orange) 0%, var(--fk-orange-2) 100%) !important;
+  color: #ffffff !important;
+  border-color: rgba(255,255,255,.2) !important;
+  box-shadow: 0 2px 8px rgba(255,107,53,.4) !important;
+}
+.fk-topbar .fk-top-tab.active,
+.fk-topbar .fk-top-tab.active * { color: #ffffff !important; }
+.fk-topbar .fk-top-tab.active:hover,
+.fk-topbar .fk-top-tab.active:hover * { color: #ffffff !important; }
+
+.fk-topbar .fk-top-tab.locked { opacity: .65 !important; }
+.fk-topbar .fk-top-tab.locked:hover { opacity: .85 !important; }
+
+/* Badge "PRO" — fundo laranja + texto branco */
+.fk-topbar .fk-top-tab-pro {
+  background: var(--fk-orange) !important;
+  color: #ffffff !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  letter-spacing: .06em !important;
+}
+
+/* Badge numérico — fundo laranja escuro + texto branco */
+.fk-topbar .fk-top-tab-badge {
+  background: var(--fk-orange-2) !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  min-width: 18px !important;
+  text-align: center !important;
+}
+
+/* ─── Botão "Run all" ─── */
+.fk-topbar .fk-btn-run-all {
+  background: linear-gradient(135deg, var(--fk-orange) 0%, var(--fk-orange-2) 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.2) !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  font-family: inherit !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  box-shadow: 0 3px 10px rgba(255,107,53,.35) !important;
+  transition: .15s !important;
+  white-space: nowrap !important;
+}
+.fk-topbar .fk-btn-run-all:hover {
+  filter: brightness(1.12) !important;
+  transform: translateY(-1px) !important;
+}
+.fk-topbar .fk-btn-run-all:disabled { opacity: .55 !important; cursor: not-allowed !important; }
+
+/* ─── Botão settings (⚙️) ─── */
+.fk-topbar .fk-settings-btn {
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: .15s !important;
+}
+.fk-topbar .fk-settings-btn svg { stroke: #ffffff !important; }
+.fk-topbar .fk-settings-btn:hover {
+  background: rgba(255,154,60,.2) !important;
+  border-color: var(--fk-orange) !important;
+}
+.fk-topbar .fk-settings-btn:hover svg { stroke: var(--fk-orange) !important; }
+
+/* ─── CHIP: Ficheiros ─── */
+.fk-topbar .fk-files-badge {
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.2) !important;
+  padding: 5px 12px !important;
+  border-radius: 999px !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: .15s !important;
+}
+.fk-topbar .fk-files-badge:hover {
+  background: var(--fk-orange) !important;
+  border-color: var(--fk-orange) !important;
+}
+.fk-topbar .fk-files-badge:hover .fk-files-badge-count,
+.fk-topbar .fk-files-badge:hover .fk-files-badge-icon { color: #ffffff !important; }
+
+/* ─── CHIP: Idioma ─── */
+.fk-topbar .fk-lang-chip {
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.2) !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  transition: .15s !important;
+}
+.fk-topbar .fk-lang-chip:hover {
+  background: var(--fk-orange) !important;
+  border-color: var(--fk-orange) !important;
+}
+
+/* ─── CHIP: Trial ─── */
+.fk-topbar .fk-trial-chip {
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.2) !important;
+  padding: 5px 12px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  transition: .15s !important;
+}
+.fk-topbar .fk-trial-dot {
+  width: 7px !important; height: 7px !important;
+  border-radius: 50% !important;
+  background: #10b981 !important;
+  box-shadow: 0 0 8px rgba(16,185,129,.7) !important;
+}
+.fk-topbar .fk-trial-chip.is-soon .fk-trial-dot { background: #f59e0b !important; }
+.fk-topbar .fk-trial-chip.is-urgent .fk-trial-dot { background: #ef4444 !important; }
+.fk-topbar .fk-trial-label {
+  text-transform: uppercase !important;
+  letter-spacing: .05em !important;
+  font-size: 10px !important;
+}
+.fk-topbar .fk-trial-time {
+  font-family: ui-monospace, monospace !important;
+  font-size: 11px !important;
+}
+.fk-topbar .fk-trial-chip:hover {
+  background: var(--fk-orange) !important;
+  border-color: var(--fk-orange) !important;
+}
+
+/* ─── CHIP: User ─── */
+.fk-topbar .fk-user {
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.2) !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  transition: .15s !important;
+}
+.fk-topbar .fk-user b {
+  color: #FFD79A !important;
+  font-weight: 800 !important;
+}
+.fk-topbar .fk-user:hover {
+  background: var(--fk-orange) !important;
+  border-color: var(--fk-orange) !important;
+}
+.fk-topbar .fk-user:hover b { color: #ffffff !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   FK_ACTIVE_TAB — Tab ativa: cinza claro + contorno cinza escuro + texto branco
+   ══════════════════════════════════════════════════════════════ */
+
+/* Tab ativa: fundo cinza claro, contorno cinza escuro, texto branco */
+.fk-topbar .fk-top-tab.active,
+.fk-topbar .fk-top-tab.active[data-view] {
+  background: rgba(255, 255, 255, .22) !important;   /* cinza claro translúcido */
+  color: #ffffff !important;                          /* texto branco */
+  border: 2px solid #1f2937 !important;               /* contorno cinza escuro */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, .08),               /* aro subtil */
+    inset 0 1px 0 rgba(255, 255, 255, .12),           /* brilho interior */
+    0 2px 6px rgba(0, 0, 0, .25) !important;          /* sombra suave */
+  font-weight: 700 !important;
+}
+
+/* Texto/símbolos dentro da tab ativa: branco puro */
+.fk-topbar .fk-top-tab.active,
+.fk-topbar .fk-top-tab.active *,
+.fk-topbar .fk-top-tab.active .fk-top-tab-label,
+.fk-topbar .fk-top-tab.active .fk-top-tab-lock,
+.fk-topbar .fk-top-tab.active .fk-top-tab-badge,
+.fk-topbar .fk-top-tab.active .fk-top-tab-pro {
+  color: #ffffff !important;
+}
+
+/* Badge da tab ativa: fundo cinza escuro, texto branco */
+.fk-topbar .fk-top-tab.active .fk-top-tab-badge {
+  background: #1f2937 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, .15) !important;
+}
+
+/* Badge PRO na tab ativa: cinza escuro */
+.fk-topbar .fk-top-tab.active .fk-top-tab-pro {
+  background: #1f2937 !important;
+  color: #ffffff !important;
+}
+
+/* Hover na tab ativa: mantém o mesmo estilo (não fica laranja) */
+.fk-topbar .fk-top-tab.active:hover,
+.fk-topbar .fk-top-tab.active:hover * {
+  background: rgba(255, 255, 255, .28) !important;
+  color: #ffffff !important;
+  border-color: #1f2937 !important;
+}
+
+/* Não-ativas: hover continua a ficar laranja */
+.fk-topbar .fk-top-tab:not(.active):hover {
+  background: rgba(255, 255, 255, .12) !important;
+  color: var(--fk-orange, #FF9A3C) !important;
+}
+.fk-topbar .fk-top-tab:not(.active):hover * {
+  color: var(--fk-orange, #FF9A3C) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FK_FIX_REAL — corrige 3 problemas concretos detectados
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Emoji do logo: SEM fundo ── */
+.fk-topbar .fk-brand-logo {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  display: inline-block !important;
+  color: #ffffff !important;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)) !important;
+}
+
+/* ── 2. Tabs (todas, ativas e não-ativas): texto branco puro ── */
+.fk-topbar .fk-top-tabs button.fk-top-tab,
+.fk-topbar .fk-top-tabs button.fk-top-tab.locked,
+.fk-topbar .fk-top-tabs button.fk-top-tab:not(.active) {
+  color: #ffffff !important;
+  background-color: rgba(255,255,255,.06) !important;
+  border: 1px solid rgba(255,255,255,.08) !important;
+}
+.fk-topbar .fk-top-tabs button.fk-top-tab *,
+.fk-topbar .fk-top-tabs button.fk-top-tab.locked * {
+  color: #ffffff !important;
+}
+
+/* Tab ATIVA mantém o contorno escuro */
+.fk-topbar .fk-top-tabs button.fk-top-tab.active {
+  background-color: rgba(255,255,255,.22) !important;
+  border: 2px solid #1f2937 !important;
+  color: #ffffff !important;
+}
+.fk-topbar .fk-top-tabs button.fk-top-tab.active * {
+  color: #ffffff !important;
+}
+
+/* ── 3. Badge "25": fundo escuro + texto branco (contraste AAA) ── */
+.fk-topbar .fk-top-tab-badge {
+  background: #1f2937 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.25) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  min-width: 18px !important;
+  text-align: center !important;
+}
+
+/* Badge PRO: fundo laranja mais escuro + texto branco (contraste >=4.5) */
+.fk-topbar .fk-top-tab-pro {
+  background: #c2410c !important;    /* laranja escuro */
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.15) !important;
+}
+
+/* ── Hover mantém laranja ── */
+.fk-topbar .fk-top-tabs button.fk-top-tab:not(.active):hover,
+.fk-topbar .fk-top-tabs button.fk-top-tab:not(.active):hover * {
+  color: #FF9A3C !important;
+  background-color: rgba(255,255,255,.12) !important;
+}

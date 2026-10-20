@@ -1,0 +1,40 @@
+<!-- ============================================================
+     Frankei · Layout interno do painel
+     Injetado dentro do .fk-body pelo frankei-panel.js
+     ============================================================ -->
+
+<div class="fk-layout">
+
+    <nav class="fk-tabs">
+        <button class="fk-tab is-active" data-tab="overview">Visão geral</button>
+        <button class="fk-tab" data-tab="findings">Problemas</button>
+        <button class="fk-tab" data-tab="suggestions">Sugestões</button>
+        <button class="fk-tab" data-tab="raw">Raw</button>
+    </nav>
+
+    <div class="fk-tab-panels">
+
+        <section class="fk-tab-panel is-active" data-panel="overview">
+            <div class="fk-empty"><p>Corre um scan para ver o resumo.</p></div>
+        </section>
+
+        <section class="fk-tab-panel" data-panel="findings">
+            <div class="fk-empty"><p>Sem problemas detetados.</p></div>
+        </section>
+
+        <section class="fk-tab-panel" data-panel="suggestions">
+            <div class="fk-empty"><p>Sem sugestões por agora.</p></div>
+        </section>
+
+        <section class="fk-tab-panel" data-panel="raw">
+            <pre class="fk-raw"><code>// resultado em bruto aparece aqui</code></pre>
+        </section>
+
+    </div>
+
+    <footer class="fk-actions">
+        <button class="fk-action fk-action-primary" data-act="scan">▶ Correr scan</button>
+        <button class="fk-action" data-act="clear">Limpar</button>
+    </footer>
+
+</div>

@@ -1,0 +1,36 @@
+
+/* ============================================
+   Ícones SVG (octicons)
+   ============================================ */
+
+img.octicon {
+    display: inline-block !important;
+    width: 14px !important;
+    height: 16px !important;
+    vertical-align: -3px !important;
+    margin-right: 4px !important;
+    opacity: 0.8;
+    /* Cor dos ícones — laranja Frankei */
+    filter: invert(60%) sepia(85%) saturate(500%) hue-rotate(345deg) brightness(95%) contrast(90%);
+}
+
+img.octicon:hover,
+a:hover img.octicon {
+    opacity: 1;
+    filter: invert(50%) sepia(90%) saturate(600%) hue-rotate(345deg) brightness(90%) contrast(95%);
+}
+
+/* Breadcrumb */
+.breadcrumb img.octicon {
+    margin-right: 6px;
+}
+
+/* Tabelas */
+.table img.octicon,
+tr img.octicon {
+    opacity: 0.6;
+}
+
+tr:hover img.octicon {
+    opacity: 1;
+}

@@ -1,0 +1,12 @@
+{
+    "name": "onidesk/beaver-translations",
+    "description": "Beaver Translations — i18n multi-idioma.",
+    "type": "beaver-plugin",
+    "license": "MIT",
+    "require": { "php": ">=8.1" },
+    "autoload": {
+        "psr-4": {
+            "Beaver\\Plugins\\Translations\\": "src/"
+        }
+    }
+}

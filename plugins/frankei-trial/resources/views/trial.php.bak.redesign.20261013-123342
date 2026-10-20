@@ -1,0 +1,267 @@
+<?php
+/** @var array  $user */
+/** @var string $plan */
+/** @var bool   $isTrial */
+/** @var array  $limits */
+?>
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frankei Trial</title>
+<link rel="stylesheet" href="/plugins/frankei-trial/css/trial.css?v=<?= time() ?>">
+<script src="/plugins/frankei/js/frankei-i18n.js?v=<?= time() ?>" defer></script>
+</head>
+<body class="fk-trial-body">
+
+<!-- ═══════════════════════════════════════════════════════════
+     TOPBAR
+     ═══════════════════════════════════════════════════════════ -->
+<header class="fk-trial-topbar">
+    <div class="fk-trial-topbar-left">
+        <a href="/frankei-trial" class="fk-trial-brand">
+            <span class="fk-trial-brand-logo">🦫</span>
+            <span><b>Frankei</b> Trial</span>
+        </a>
+        <span class="fk-trial-chip-plan"><?= htmlspecialchars(strtoupper($plan)) ?></span>
+    </div>
+
+    <div class="fk-trial-topbar-right">
+
+        <!-- Idioma -->
+        <span class="fk-lang-chip-wrap" id="fkLangChipWrap">
+            <button type="button" class="fk-lang-chip" id="fkLangChip" title="Idioma / Language" aria-label="Mudar idioma">
+                <span class="fk-lang-chip-flag" id="fkLangChipFlag">🇵🇹</span>
+                <span class="fk-lang-chip-code" id="fkLangChipCode">PT</span>
+                <span class="fk-lang-chip-caret">▾</span>
+            </button>
+            <div class="fk-lang-dropdown" id="fkLangDropdown" hidden>
+                <button type="button" class="fk-lang-option" data-lang="pt">
+                    <span class="fk-lang-opt-flag">🇵🇹</span>
+                    <span class="fk-lang-opt-name">Português</span>
+                    <span class="fk-lang-opt-check" data-check="pt"></span>
+                </button>
+                <button type="button" class="fk-lang-option" data-lang="en">
+                    <span class="fk-lang-opt-flag">🇬🇧</span>
+                    <span class="fk-lang-opt-name">English</span>
+                    <span class="fk-lang-opt-check" data-check="en"></span>
+                </button>
+                <button type="button" class="fk-lang-option" data-lang="fr">
+                    <span class="fk-lang-opt-flag">🇫🇷</span>
+                    <span class="fk-lang-opt-name">Français</span>
+                    <span class="fk-lang-opt-check" data-check="fr"></span>
+                </button>
+                <button type="button" class="fk-lang-option" data-lang="es">
+                    <span class="fk-lang-opt-flag">🇪🇸</span>
+                    <span class="fk-lang-opt-name">Español</span>
+                    <span class="fk-lang-opt-check" data-check="es"></span>
+                </button>
+            </div>
+        </span>
+
+        <!-- User -->
+        <span class="fk-user" id="fkUserTrigger" role="button" tabindex="0" aria-expanded="false">
+            <span class="fk-user-icon">👤</span> Olá, <b><?= htmlspecialchars($user['nome'] ?? 'dev') ?></b>
+
+            <div id="fkUserMenu" class="fk-user-menu" hidden>
+                <div class="fk-user-menu-head">
+                    <span>👤 <?= htmlspecialchars(strtoupper($plan)) ?></span>
+                    <button type="button" class="fk-user-menu-close" id="fkUserMenuClose" aria-label="Fechar">✕</button>
+                </div>
+                <div class="fk-user-menu-body">
+                    <div class="fk-user-menu-section-title" data-i18n="Sessão">Sessão</div>
+                    <div class="fk-user-menu-links">
+                        <a href="/frankei/path" class="fk-user-menu-link">
+                            📁 <span data-i18n="Trocar aplicação">Trocar aplicação</span>
+                        </a>
+                        <a href="/frankei/logout" class="fk-user-menu-link danger">
+                            🚪 <span data-i18n="Terminar sessão">Terminar sessão</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </span>
+
+        <!-- Settings -->
+        <button type="button" class="fk-settings-btn" id="fkSettingsBtn" title="Configurações" aria-label="Configurações">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
+            </svg>
+        </button>
+    </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYOUT
+     ═══════════════════════════════════════════════════════════ -->
+<div class="fk-trial-layout">
+
+    <!-- ─────────── SIDEBAR ─────────── -->
+    <aside class="fk-trial-side">
+
+        <!-- Logo -->
+        <div class="fk-trial-side-card">
+            <div class="fk-trial-side-logo">
+                <div class="fk-trial-side-logo-icon">🦫</div>
+                <div class="fk-trial-side-logo-name">Frankei</div>
+                <div class="fk-trial-side-logo-sub">Trial Edition</div>
+            </div>
+        </div>
+
+        <!-- Tipo de testes -->
+        <div class="fk-trial-side-card">
+            <div class="fk-trial-side-label" data-i18n="Tipo de testes permitido">Tipo de testes permitido</div>
+            <div class="fk-trial-side-type">
+                <span class="fk-trial-side-type-icon">🧪</span>
+                <span class="fk-trial-side-type-name" data-i18n="Testes Unit">Testes Unit</span>
+                <span class="fk-trial-side-type-badge">UNIT</span>
+            </div>
+        </div>
+
+        <!-- Bola com contagem -->
+        <div class="fk-trial-side-card">
+            <div class="fk-trial-side-ball-wrap">
+                <div class="fk-trial-side-ball">
+                    <div class="fk-trial-side-ball-num" id="fkTrialBallNum">—</div>
+                    <div class="fk-trial-side-ball-label" data-i18n="testes">testes</div>
+                </div>
+                <div class="fk-trial-side-ball-hint" id="fkTrialBallHint" data-i18n="Testes disponíveis">Testes disponíveis</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ─────────── MAIN ─────────── -->
+    <main class="fk-trial-main">
+
+        <div class="fk-trial-hero">
+            <h1 data-i18n="Testes Unit">🧪 Testes Unit</h1>
+            <p data-i18n="Corre os testes, vê o resultado. Sem complicações.">Corre os testes, vê o resultado. Sem complicações.</p>
+        </div>
+
+        <!-- Lista de testes -->
+        <section class="fk-trial-card">
+            <h2>
+                <span>📋 <span data-i18n="Testes disponíveis">Testes disponíveis</span></span>
+                <span class="fk-trial-card-counter" id="fkTrialCardCounter">— / —</span>
+            </h2>
+            <div id="fkTrialList">
+                <div class="fk-trial-empty">
+                    <span class="fk-trial-spinner"></span> A carregar...
+                </div>
+            </div>
+        </section>
+
+        <!-- Correr -->
+        <section class="fk-trial-card">
+            <h2>▶ <span data-i18n="Correr testes">Correr testes</span></h2>
+            <div class="fk-trial-toolbar">
+                <button type="button" class="fk-trial-btn fk-trial-btn-primary" id="fkTrialRun">
+                    ▶ <span data-i18n="Correr testes Unit">Correr testes Unit</span>
+                </button>
+                <button type="button" class="fk-trial-btn fk-trial-btn-ghost" id="fkTrialRefresh" onclick="location.reload()">
+                    🔄 <span data-i18n="Recarregar">Recarregar</span>
+                </button>
+            </div>
+            <pre class="fk-trial-terminal" id="fkTrialTerminal"></pre>
+        </section>
+
+        <footer class="fk-trial-footer">
+            <b>Frankei Trial</b> · <span data-i18n="Versão limitada">Versão limitada</span> ·
+            <a href="/frankei/precos" data-i18n="Fazer upgrade para Pro">Fazer upgrade para Pro →</a>
+        </footer>
+
+    </main>
+</div>
+
+<script>
+/* Ligação dos controlos da topbar (lang, user, settings) */
+(function () {
+  'use strict';
+
+  // ─── Lang chip ───
+  function setChipLabel(lang) {
+    var flags = { pt: '\uD83C\uDDF5\uD83C\uDDF9', en: '\uD83C\uDDEC\uD83C\uDDE7', fr: '\uD83C\uDDEB\uD83C\uDDF7', es: '\uD83C\uDDEA\uD83C\uDDF8' };
+    var codes = { pt: 'PT', en: 'EN', fr: 'FR', es: 'ES' };
+    var f = document.getElementById('fkLangChipFlag');
+    var c = document.getElementById('fkLangChipCode');
+    if (f) f.textContent = flags[lang] || flags.pt;
+    if (c) c.textContent = codes[lang] || 'PT';
+    document.querySelectorAll('.fk-lang-option').forEach(function (o) {
+      var check = o.querySelector('.fk-lang-opt-check');
+      if (check) check.textContent = (o.dataset.lang === lang) ? '\u2713' : '';
+      o.classList.toggle('active', o.dataset.lang === lang);
+    });
+  }
+
+  var btn = document.getElementById('fkLangChip');
+  var dd  = document.getElementById('fkLangDropdown');
+  if (btn && dd) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      dd.hidden = !dd.hidden;
+    });
+    dd.querySelectorAll('.fk-lang-option').forEach(function (opt) {
+      opt.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var lang = opt.dataset.lang;
+        if (window.FrankeiI18n && window.FrankeiI18n.setLang) {
+          window.FrankeiI18n.setLang(lang);
+        }
+        setChipLabel(lang);
+        dd.hidden = true;
+      });
+    });
+    document.addEventListener('click', function (e) {
+      if (!dd.hidden && !e.target.closest('#fkLangChipWrap')) dd.hidden = true;
+    });
+  }
+
+  // ─── User chip ───
+  var userTrigger = document.getElementById('fkUserTrigger');
+  var userMenu    = document.getElementById('fkUserMenu');
+  var userClose   = document.getElementById('fkUserMenuClose');
+  if (userTrigger && userMenu) {
+    userTrigger.addEventListener('click', function (e) {
+      if (e.target.closest('#fkUserMenu')) return;
+      e.stopPropagation();
+      userMenu.hidden = !userMenu.hidden;
+    });
+    if (userClose) userClose.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      userMenu.hidden = true;
+    });
+    document.addEventListener('click', function (e) {
+      if (!userMenu.hidden && !userTrigger.contains(e.target)) userMenu.hidden = true;
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') userMenu.hidden = true;
+    });
+  }
+
+  // ─── Settings btn ─── (placeholder — mostra alert)
+  var setBtn = document.getElementById('fkSettingsBtn');
+  if (setBtn) {
+    setBtn.addEventListener('click', function () {
+      alert('Configurações do Frankei Trial:\n\n• Plano: TRIAL\n• Testes: Unit apenas\n• Limite: 25 testes\n\nPara configurações completas, faz upgrade para Pro.');
+    });
+  }
+
+  // ─── Inicializar chip ───
+  var curLang = 'pt';
+  if (window.FrankeiI18n && window.FrankeiI18n.getLang) {
+    curLang = window.FrankeiI18n.getLang();
+  } else {
+    try { curLang = localStorage.getItem('frankei:lang') || 'pt'; } catch (_) {}
+  }
+  setChipLabel(curLang);
+  window.addEventListener('frankei:lang', function (ev) {
+    if (ev.detail && ev.detail.lang) setChipLabel(ev.detail.lang);
+  });
+})();
+</script>
+
+<script src="/plugins/frankei-trial/js/trial.js?v=<?= time() ?>" defer></script>
+</body>
+</html>

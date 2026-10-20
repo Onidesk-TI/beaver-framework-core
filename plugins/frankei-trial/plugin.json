@@ -1,0 +1,15 @@
+{
+    "name": "Frankei Trial",
+    "slug": "frankei-trial",
+    "version": "0.1.0",
+    "author": "Onidesk",
+    "description": "Trial — 25 ficheiros + 25 testes Unit. Sem análise de segurança.",
+    "namespace": "Beaver\\Plugins\\FrankeiTrial",
+    "main": "src/FrankeiTrialPlugin.php",
+    "beaver_version": ">=0.1.0",
+    "requires": {
+        "php": ">=8.1"
+    },
+    "routes": "routes/web.php",
+    "enabled": true
+}

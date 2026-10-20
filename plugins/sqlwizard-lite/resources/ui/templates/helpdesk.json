@@ -1,0 +1,188 @@
+{
+  "name": "HelpDesk",
+  "icon": "🎫",
+  "description": "Tickets, messages",
+  "tables": [
+    {
+      "id": "t_users",
+      "name": "users",
+      "x": 60,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "t_tickets",
+      "name": "tickets",
+      "x": 420,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "subject",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "priority",
+          "type": "VARCHAR(20)",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_messages",
+      "name": "messages",
+      "x": 780,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "ticket_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "body",
+          "type": "TEXT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_categories",
+      "name": "categories",
+      "x": 420,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "t_ticket_categories",
+      "name": "ticket_categories",
+      "x": 780,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "ticket_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "category_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "t_tickets",
+      "to": "t_users",
+      "card": "n:1"
+    },
+    {
+      "from": "t_messages",
+      "to": "t_tickets",
+      "card": "n:1"
+    },
+    {
+      "from": "t_messages",
+      "to": "t_users",
+      "card": "n:1"
+    },
+    {
+      "from": "t_ticket_categories",
+      "to": "t_tickets",
+      "card": "n:1"
+    },
+    {
+      "from": "t_ticket_categories",
+      "to": "t_categories",
+      "card": "n:1"
+    }
+  ]
+}

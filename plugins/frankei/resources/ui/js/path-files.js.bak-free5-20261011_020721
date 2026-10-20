@@ -1,0 +1,182 @@
+/* ============================================================
+ *  Frankei — Path files
+ *  Lista ficheiros PHP do path com checkboxes + regras de tech
+ * ============================================================ */
+
+(function () {
+    'use strict';
+
+    if (window.__fkPathFilesBooted) return;
+    window.__fkPathFilesBooted = true;
+
+    var input      = document.getElementById('fkPath');
+    var wrap       = document.getElementById('fkFilesWrap');
+    var list       = document.getElementById('fkFilesList');
+    var count      = document.getElementById('fkFilesCount');
+    var limitEl    = document.getElementById('fkFilesLimit');
+    var btnAll     = document.getElementById('fkSelectAll');
+    var btnNone    = document.getElementById('fkSelectNone');
+    var form       = document.getElementById('fkFormPath');
+
+    if (!input || !wrap || !list) return;
+
+    var debounceId = 0;
+    var lastPath   = '';
+    var freeMax    = 0;
+    var totalFiles = 0;
+
+    /* ────────── força tecnologia PHP ────────── */
+    function lockTech() {
+        // Radios
+        var radios = document.querySelectorAll('#fkTechPrincipal input[type=radio]');
+        radios.forEach(function (r) {
+            if (r.value === 'php') {
+                r.checked = true;
+                r.disabled = false;
+                r.closest('.fk-radio').classList.add('is-forced-ok');
+            } else {
+                r.checked = false;
+                r.disabled = true;
+                r.closest('.fk-radio').classList.add('is-forced-bad');
+            }
+        });
+
+        // Checkboxes
+        var checks = document.querySelectorAll('#fkTechOutras input[type=checkbox]');
+        checks.forEach(function (c) {
+            c.checked = false;
+            c.disabled = true;
+            c.closest('.fk-checkbox').classList.add('is-forced-bad');
+        });
+    }
+
+    /* ────────── desenhar lista ────────── */
+    function renderFiles(data) {
+        list.innerHTML = '';
+        totalFiles = data.total || 0;
+        freeMax    = data.free_max || Math.ceil(totalFiles * 0.5);
+
+        if (!data.files || data.files.length === 0) {
+            wrap.hidden = true;
+            return;
+        }
+
+        wrap.hidden = false;
+        count.textContent = data.shown + ' de ' + totalFiles + ' ficheiros';
+
+        var frag = document.createDocumentFragment();
+        data.files.forEach(function (f) {
+            var item = document.createElement('label');
+            item.className = 'fk-file-item';
+
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.name = 'files[]';
+            cb.value = f.rel;
+            cb.checked = true;
+            cb.addEventListener('change', updateLimit);
+
+            var name = document.createElement('code');
+            name.className = 'fk-file-name';
+            name.textContent = f.rel;
+
+            var size = document.createElement('span');
+            size.className = 'fk-file-size';
+            size.textContent = (f.size < 1024 ? f.size + ' B' : (f.size / 1024).toFixed(1) + ' KB');
+
+            item.appendChild(cb);
+            item.appendChild(name);
+            item.appendChild(size);
+            frag.appendChild(item);
+        });
+        list.appendChild(frag);
+
+        updateLimit();
+    }
+
+    /* ────────── limite de 50% ────────── */
+    function updateLimit() {
+        var all = list.querySelectorAll('input[type=checkbox]');
+        var checked = list.querySelectorAll('input[type=checkbox]:checked');
+        var n = checked.length;
+
+        var isOver = n > freeMax;
+
+        // Marca os excedentes visualmente
+        var over = 0;
+        all.forEach(function (cb) {
+            cb.closest('.fk-file-item').classList.remove('is-over');
+            if (cb.checked && over >= freeMax) {
+                cb.closest('.fk-file-item').classList.add('is-over');
+                over++;
+            }
+        });
+
+        limitEl.textContent = 'Selecionados: ' + n + ' / máximo grátis: ' + freeMax;
+        limitEl.classList.toggle('is-over', isOver);
+
+        if (isOver) {
+            limitEl.textContent += '  ⚠️  Excede o plano grátis';
+        }
+    }
+
+    /* ────────── carregar ficheiros ────────── */
+    function loadFiles(path) {
+        var fd = new FormData();
+        fd.append('path', path);
+
+        fetch('/api/frankei/list-files', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin'
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.ok) { wrap.hidden = true; return; }
+            renderFiles(data);
+            lockTech();
+        })
+        .catch(function () { wrap.hidden = true; });
+    }
+
+    /* ────────── input debounce ────────── */
+    input.addEventListener('input', function () {
+        clearTimeout(debounceId);
+        var val = input.value.trim();
+        if (val === lastPath) return;
+
+        debounceId = setTimeout(function () {
+            lastPath = val;
+            if (val === '') { wrap.hidden = true; return; }
+            loadFiles(val);
+        }, 550);
+    });
+
+    /* ────────── botões todos/nenhum ────────── */
+    btnAll && btnAll.addEventListener('click', function () {
+        list.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+            cb.checked = true;
+        });
+        updateLimit();
+    });
+    btnNone && btnNone.addEventListener('click', function () {
+        list.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+            cb.checked = false;
+        });
+        updateLimit();
+    });
+
+    /* ────────── submeter: envia ficheiros marcados ────────── */
+    form && form.addEventListener('submit', function (e) {
+        var n = list.querySelectorAll('input[type=checkbox]:checked').length;
+        if (n > freeMax) {
+            e.preventDefault();
+            alert('Plano grátis: máximo ' + freeMax + ' ficheiros. Escolheste ' + n + '.');
+            return false;
+        }
+    });
+
+    /* ────────── trancar tech ao carregar (sem path ainda) ────────── */
+    document.addEventListener('DOMContentLoaded', lockTech);
+    setTimeout(lockTech, 50);
+})();

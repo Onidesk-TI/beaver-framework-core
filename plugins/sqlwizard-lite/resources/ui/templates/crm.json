@@ -1,0 +1,218 @@
+{
+  "name": "CRM",
+  "icon": "👥",
+  "description": "Clients, contacts, deals",
+  "tables": [
+    {
+      "id": "t_users",
+      "name": "users",
+      "x": 60,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "t_clients",
+      "name": "clients",
+      "x": 420,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "industry",
+          "type": "VARCHAR(100)",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "website",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_contacts",
+      "name": "contacts",
+      "x": 420,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "client_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "phone",
+          "type": "VARCHAR(50)",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_deals",
+      "name": "deals",
+      "x": 780,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "client_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "value",
+          "type": "DECIMAL(12,2)",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "stage",
+          "type": "VARCHAR(50)",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_activities",
+      "name": "activities",
+      "x": 780,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "deal_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "contact_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR(50)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "happened_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "t_contacts",
+      "to": "t_clients",
+      "card": "n:1"
+    },
+    {
+      "from": "t_deals",
+      "to": "t_clients",
+      "card": "n:1"
+    },
+    {
+      "from": "t_deals",
+      "to": "t_users",
+      "card": "n:1"
+    },
+    {
+      "from": "t_activities",
+      "to": "t_deals",
+      "card": "n:1"
+    },
+    {
+      "from": "t_activities",
+      "to": "t_contacts",
+      "card": "n:1"
+    }
+  ]
+}

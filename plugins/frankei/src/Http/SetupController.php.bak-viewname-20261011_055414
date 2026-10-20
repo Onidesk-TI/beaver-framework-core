@@ -1,0 +1,809 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\Frankei\Http;
+
+use App\Services\UserService;
+use Beaver\Http\Response;
+use Beaver\Foundation\Application;
+
+/**
+ * Frankei — Setup Controller
+ *
+ * Fluxo:
+ *   /frankei             → dashboard()  (auth → path → dashboard)
+ *   /frankei/path        → showPath()   (form do path)
+ *   /frankei/path POST   → savePath()   (guarda JSON)
+ *   /api/frankei/validate-path POST → validatePath() (AJAX)
+ *   /frankei/logout      → logout()
+ */
+class SetupController
+{
+    /** Plano free: apenas 1 path */
+    private const FREE_MAX_PATHS = 1;
+
+    /* ══════════════════════════════════════════════════════════
+       DASHBOARD  →  /frankei
+       ══════════════════════════════════════════════════════════ */
+
+    public function dashboard(string $view = 'unit-tests'): Response
+    {
+        if (!UserService::autenticado()) {
+            $next = $_SERVER['REQUEST_URI'] ?? '/frankei';
+            return Response::redirect($this->loginUrl($next));
+        }
+
+        $user   = UserService::atual();
+        $userId = (int) ($user['id'] ?? 0);
+
+        $setup = $this->loadSetup($userId);
+        if (empty($setup['path'])) {
+            return Response::redirect('/frankei/path');
+        }
+
+        // ── Trial: verificar ou iniciar automaticamente ──
+        $trialInfo = UserService::trialCheck($userId);
+
+        if (empty($trialInfo['ok'])) {
+            $motivo = $trialInfo['motivo'] ?? '';
+
+            // Se ainda não iniciou, começa agora (8 dias)
+            if ($motivo === 'Trial não iniciado.') {
+                $started = UserService::trialStart($user, $_SERVER['HTTP_HOST'] ?? '');
+                if (!empty($started['ok'])) {
+                    // Recarregar info
+                    $trialInfo = UserService::trialCheck($userId);
+                } else {
+                    // Falhou a iniciar — bloqueia
+                    UserService::destruirSessao();
+                    return Response::redirect('/auth/login?erro=' . urlencode($started['motivo'] ?? 'Trial indisponível.'));
+                }
+            } else {
+                // Expirado/usado — bloqueia
+                UserService::destruirSessao();
+                return Response::redirect('/auth/login?erro=' . urlencode($motivo));
+            }
+        }
+
+        return $this->render('dashboard.php', [
+            'user'         => $user,
+            'path'         => $setup['path'],
+            'files'        => $setup['files']       ?? [],
+            'files_count'  => $setup['files_count'] ?? 0,
+            'plan'         => $setup['plan']        ?? 'free',
+            'plan_limit'   => $setup['plan_limit']  ?? 25,
+            'trial'        => $trialInfo,
+            'view'         => $view,
+        ]);
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       PATH (GET)  →  /frankei/path
+       ══════════════════════════════════════════════════════════ */
+
+    public function showPath(): Response
+    {
+        // Público — qualquer um vê (mensagem adaptada ao estado)
+        $user = UserService::autenticado() ? UserService::atual() : null;
+
+        // Se já tem path + trial ativo → redireciona para o painel
+        if ($user) {
+            $userId = (int) ($user['id'] ?? 0);
+            $setup  = $this->loadSetup($userId);
+
+            $rows = \App\Services\SiteDB::select(
+                'SELECT trial_used, trial_expires_at FROM users WHERE id = :id',
+                [':id' => $userId]
+            );
+            $r = $rows[0] ?? [];
+
+            $hasPath  = !empty($setup['path']);
+            $hasTrial = empty($r['trial_used'])
+                     && !empty($r['trial_expires_at'])
+                     && (int) $r['trial_expires_at'] > time();
+
+            // Se já tem path mas SEM trial → deixa ver (com banner)
+            // Se já tem path E trial → vai para o painel
+            if ($hasPath && $hasTrial) {
+                return Response::redirect('/frankei');
+            }
+        }
+
+        return $this->render('path.php', [
+            'user'   => $user ?? [],
+            'errors' => $_GET['erro'] ?? null,
+            'old'    => $_GET['path'] ?? '',
+        ]);
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       PATH (POST)  →  /frankei/path
+       ══════════════════════════════════════════════════════════ */
+
+    public function savePath(): Response
+    {
+        if (!UserService::autenticado()) {
+            $next = $_SERVER['REQUEST_URI'] ?? '/frankei/path';
+            return Response::redirect($this->loginUrl($next));
+        }
+
+        $user   = UserService::atual();
+        $userId = (int) ($user['id'] ?? 0);
+
+        $setup = $this->loadSetup($userId);
+        if (!empty($setup['path'])) {
+            return Response::redirect('/frankei');
+        }
+
+        $path = trim((string) ($_POST['path'] ?? ''));
+        if ($path === '') {
+            return Response::redirect('/frankei/path?erro=' . urlencode('Indica um caminho.'));
+        }
+
+        // Normalizar (C:/... → /mnt/c/...)
+        $path = $this->normalizarPath($path);
+
+        if ($path === '') { $path = '/'; }
+
+        $valid = $this->validarPath($path);
+        if (!$valid['ok']) {
+            return Response::redirect('/frankei/path?erro=' . urlencode($valid['motivo']) . '&path=' . urlencode($path));
+        }
+
+        // Recolher os ficheiros escolhidos (máx 5 no plano grátis)
+        $files = $_POST['files'] ?? [];
+        if (!is_array($files)) $files = [];
+        $files = array_slice(array_values(array_filter($files, 'is_string')), 0, 5);
+
+        $this->saveSetup($userId, [
+            'user_id'      => $userId,
+            'path'         => $path,
+            'framework'    => $valid['framework'] ?? 'php',
+            'validated_at' => date('c'),
+            'stats'        => $valid['stats'] ?? [],
+            'files'        => $files,
+            'files_count'  => count($files),
+            'plan'         => 'free',
+            'plan_limit' => 25,
+        ]);
+
+        return Response::redirect('/frankei');
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       VALIDATE (AJAX)  →  /api/frankei/validate-path
+       ══════════════════════════════════════════════════════════ */
+
+    public function validatePath(): Response
+    {
+        if (!UserService::autenticado()) {
+            return Response::json(['ok' => false, 'motivo' => 'Não autenticado.'], 401);
+        }
+
+        $body = $_POST;
+        if (empty($body)) {
+            $raw  = file_get_contents('php://input');
+            $body = json_decode($raw ?: '[]', true) ?: [];
+        }
+
+        $path = trim((string) ($body['path'] ?? ''));
+        if ($path === '') {
+            return Response::json(['ok' => false, 'motivo' => 'Caminho vazio.']);
+        }
+
+        $path = rtrim($path, '/');
+        if ($path === '') { $path = '/'; }
+
+        return Response::json($this->validarPath($path));
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       LOGOUT  →  /frankei/logout
+       ══════════════════════════════════════════════════════════ */
+
+            public function logout(): Response
+    {
+        UserService::destruirSessao();
+
+        // Destino configurável via .env (FRANKEI_LANDING_URL)
+        // Fallback: deteção automática dev/produção
+        $url = $_ENV['FRANKEI_LANDING_URL']
+            ?? $_SERVER['FRANKEI_LANDING_URL']
+            ?? getenv('FRANKEI_LANDING_URL')
+            ?: null;
+
+        if (!$url) {
+            $host    = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $isLocal = str_starts_with($host, 'localhost') || str_starts_with($host, '127.0.0.1');
+
+            if ($isLocal) {
+                $url = '/entrar';
+            } else {
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $url = $scheme . '://' . $host . '/frankei/';
+            }
+        }
+
+        return Response::redirect($url);
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       VALIDAÇÃO (com fallbacks)
+       ══════════════════════════════════════════════════════════ */
+
+
+    /**
+     * API: lista os ficheiros PHP de um path (para o painel de seleção).
+     * Limite: 500 ficheiros (plano free: 50%).
+     */
+    public function listFiles(): Response
+    {
+        if (!UserService::autenticado()) {
+            return Response::json(['ok' => false, 'motivo' => 'Não autenticado.'], 401);
+        }
+
+        // Aceita POST form ou JSON
+        $body = $_POST;
+        if (empty($body)) {
+            $raw  = file_get_contents('php://input');
+            $body = json_decode($raw ?: '[]', true) ?: [];
+        }
+
+        $path = trim((string) ($body['path'] ?? ''));
+        $path = $this->normalizarPath($path);
+
+        if ($path === '' || !is_dir($path)) {
+            return Response::json(['ok' => false, 'motivo' => 'Path inválido.']);
+        }
+
+        $excludeDirs = ['vendor', 'node_modules', '.git', '.venv', 'storage', 'cache', 'tmp'];
+
+        $files     = [];
+        $totalPhp  = 0;
+        $limit     = 500;
+
+        try {
+            $iter = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+            $iter->setMaxDepth(8);
+
+            foreach ($iter as $file) {
+                if (!$file->isFile()) continue;
+
+                $rel = ltrim(substr($file->getPathname(), strlen($path)), '/');
+
+                // Excluir pastas indesejadas
+                $skip = false;
+                foreach ($excludeDirs as $ex) {
+                    if (str_starts_with($rel, $ex . '/') || str_contains($rel, '/' . $ex . '/')) {
+                        $skip = true;
+                        break;
+                    }
+                }
+                if ($skip) continue;
+
+                if (strtolower($file->getExtension()) !== 'php') continue;
+
+                $totalPhp++;
+
+                if (count($files) < $limit) {
+                    $files[] = [
+                        'rel'   => $rel,
+                        'size'  => $file->getSize(),
+                        'mtime' => $file->getMTime(),
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            return Response::json(['ok' => false, 'motivo' => 'Erro a listar: ' . $e->getMessage()]);
+        }
+
+        // Ordenar por caminho
+        usort($files, fn($a, $b) => strcmp($a['rel'], $b['rel']));
+
+        return Response::json([
+            'ok'        => true,
+            'path'      => $path,
+            'files'     => $files,
+            'total'     => $totalPhp,
+            'shown'     => count($files),
+            'limit'     => $limit,
+            'free_max'  => 25,   // plano grátis: máximo 5 ficheiros
+        ]);
+    }
+
+
+    /**
+     * Normaliza paths Windows (C:/... ou C:\...) para o formato WSL (/mnt/c/...).
+     * Também aceita paths Linux normais e devolve sempre com / no início.
+     */
+    private function normalizarPath(string $path): string
+    {
+        $path = trim($path);
+        if ($path === '') return $path;
+
+        // 1. Normalizar barras: backslash → forward slash
+        // chr(92) = "\" — evita problemas de escaping
+        $path = str_replace(chr(92), '/', $path);
+
+        // 2. Windows: "C:/..." ou "c:/..."
+        if (preg_match('#^([A-Za-z]):/(.*)$#', $path, $m)) {
+            $drive = strtolower($m[1]);
+            $rest  = ltrim($m[2], '/');
+            return '/mnt/' . $drive . '/' . $rest;
+        }
+
+        // 3. Remover trailing slash (excepto raiz)
+        if (strlen($path) > 1) {
+            $path = rtrim($path, '/');
+        }
+
+        return $path;
+    }
+
+    private function validarPath(string $path): array
+    {
+        // Traduzir C:/... → /mnt/c/... automaticamente
+        $path = $this->normalizarPath($path);
+
+        if (!file_exists($path)) {
+            return ['ok' => false, 'motivo' => 'O caminho não existe.'];
+        }
+        if (!is_dir($path)) {
+            return ['ok' => false, 'motivo' => 'O caminho não é uma pasta.'];
+        }
+        if (!is_readable($path)) {
+            return ['ok' => false, 'motivo' => 'Sem permissão para ler essa pasta.'];
+        }
+
+        $checks = [
+            'composer'    => is_file($path . '/composer.json'),
+            'beaver_file' => is_file($path . '/beaver'),
+            'app_dir'     => is_dir($path . '/app'),
+            'src_dir'     => is_dir($path . '/src'),
+            'public_dir'  => is_dir($path . '/public'),
+            'routes_dir'  => is_dir($path . '/routes'),
+            'index_php'   => is_file($path . '/index.php'),
+            'public_php'  => is_file($path . '/public/index.php'),
+        ];
+
+        $sinais = array_filter($checks);
+        if (empty($sinais)) {
+            return [
+                'ok'     => false,
+                'motivo' => 'A pasta não parece um projeto PHP (sem composer.json, app/, src/, public/, index.php...).',
+                'checks' => $checks,
+            ];
+        }
+
+        $framework = 'php';
+        if ($checks['beaver_file'] || is_file($path . '/composer.json')) {
+            $composerRaw = @file_get_contents($path . '/composer.json') ?: '';
+            if (stripos($composerRaw, 'beaver') !== false) {
+                $framework = 'beaver';
+            } elseif ($checks['routes_dir'] && $checks['app_dir']) {
+                $framework = 'beaver';
+            }
+        }
+
+        $stats = [
+            'php_files'   => $this->contar($path, '*.php', 5000),
+            'controllers' => $this->contar($path . '/app/Controllers', '*.php', 200),
+            'models'      => $this->contar($path . '/app/Models', '*.php', 200),
+            'views'       => $this->contar($path . '/app/Views', '*.php', 500)
+                            + $this->contar($path . '/resources/views', '*.php', 500),
+            'writable'    => is_writable($path),
+        ];
+
+        return [
+            'ok'        => true,
+            'motivo'    => 'Caminho válido.',
+            'path'      => $path,
+            'framework' => $framework,
+            'checks'    => $checks,
+            'stats'     => $stats,
+        ];
+    }
+
+    private function contar(string $dir, string $glob, int $max = 1000): int
+    {
+        if (!is_dir($dir)) return 0;
+        $files = @glob($dir . '/' . $glob, GLOB_NOSORT);
+        return is_array($files) ? min(count($files), $max) : 0;
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       STORAGE
+       ══════════════════════════════════════════════════════════ */
+
+    private function setupDir(int $userId): string
+    {
+        $base = Application::getInstance()->basePath
+              . '/plugins/frankei/storage/users/' . $userId;
+
+        if (!is_dir($base)) { @mkdir($base, 0775, true); }
+        return $base;
+    }
+
+    private function setupFile(int $userId): string
+    {
+        return $this->setupDir($userId) . '/setup.json';
+    }
+
+    private function loadSetup(int $userId): array
+    {
+        $f = $this->setupFile($userId);
+        if (!is_file($f)) return [];
+        $raw = @file_get_contents($f);
+        return is_string($raw) ? (json_decode($raw, true) ?: []) : [];
+    }
+
+    private function saveSetup(int $userId, array $data): void
+    {
+        $f = $this->setupFile($userId);
+        @file_put_contents($f, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       RENDER
+       ══════════════════════════════════════════════════════════ */
+
+    /**
+     * Devolve a URL de login a usar no guard.
+     * Configurável via .env (FRANKEI_LOGIN_URL).
+     */
+    private function loginUrl(string $next = ''): string
+    {
+        $url = $_ENV['FRANKEI_LOGIN_URL']
+            ?? $_SERVER['FRANKEI_LOGIN_URL']
+            ?? getenv('FRANKEI_LOGIN_URL')
+            ?: '/auth/login';
+
+        if ($next !== '') {
+            $sep = str_contains($url, '?') ? '&' : '?';
+            $url .= $sep . 'next=' . urlencode($next);
+        }
+
+        return $url;
+    }
+
+    private function render(string $view, array $vars = []): Response
+    {
+        $viewPath = Application::getInstance()->basePath
+              . '/plugins/frankei/resources/views/' . $view;
+
+        if (!is_file($viewPath)) {
+            return Response::text('View não encontrada: ' . $view, 500);
+        }
+
+        extract($vars, EXTR_SKIP);
+        ob_start();
+        require $viewPath;
+        return Response::html((string) ob_get_clean());
+    }
+
+
+    /* ═════════════════════════════════════════════════════════
+       EMAIL
+       ═════════════════════════════════════════════════════════ */
+
+    /**
+     * Envia email via SMTP puro (sem libs).
+     */
+    private function enviarEmailPassword(string $para, string $nome, string $password, array $cfg): bool
+    {
+        $host = $cfg['host'];
+        $port = $cfg['port'];
+        $user = $cfg['user'];
+        $pass = $cfg['pass'];
+        $from = $cfg['from'];
+        $name = $cfg['name'];
+        $enc  = $cfg['enc'];
+
+        $prefix = ($enc === 'ssl') ? 'ssl://' : '';
+        $socket = @stream_socket_client($prefix . $host . ':' . $port, $errno, $errstr, 15);
+        if (!$socket) {
+            throw new \RuntimeException("SMTP: falha a conectar a {$host}:{$port} — {$errstr}");
+        }
+
+        stream_set_timeout($socket, 15);
+        $read = function () use ($socket) {
+            $data = '';
+            while ($line = fgets($socket, 515)) {
+                $data .= $line;
+                if (isset($line[3]) && $line[3] === ' ') break;
+            }
+            return $data;
+        };
+        $send = function (string $cmd) use ($socket) { fwrite($socket, $cmd . "\r\n"); };
+
+        $read();
+
+        $send('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+        $read();
+
+        if ($enc === 'tls') {
+            $send('STARTTLS');
+            $read();
+            if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+                throw new \RuntimeException('SMTP: STARTTLS falhou');
+            }
+            $send('EHLO ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+            $read();
+        }
+
+        $send('AUTH LOGIN');
+        $read();
+        $send(base64_encode($user));
+        $read();
+        $send(base64_encode($pass));
+        $authResp = $read();
+        if (strpos($authResp, '235') === false) {
+            fclose($socket);
+            throw new \RuntimeException('SMTP: autenticação falhou — ' . trim($authResp));
+        }
+
+        $send('MAIL FROM:<' . $from . '>');
+        $read();
+        $send('RCPT TO:<' . $para . '>');
+        $read();
+        $send('DATA');
+        $read();
+
+        $subject = '=?UTF-8?B?' . base64_encode('A tua password Frankei') . '?=';
+        $html    = $this->buildEmailHtml($nome, $password);
+
+        $headers  = "From: =?UTF-8?B?" . base64_encode($name) . "?= <{$from}>\r\n";
+        $headers .= "To: <{$para}>\r\n";
+        $headers .= "Subject: {$subject}\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
+        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $headers .= "Content-Transfer-Encoding: base64\r\n";
+        $headers .= "Date: " . date('r') . "\r\n";
+
+        $body = chunk_split(base64_encode($html));
+
+        $send($headers . "\r\n" . $body . "\r\n.");
+        $final = $read();
+
+        fwrite($socket, "QUIT\r\n");
+        fclose($socket);
+
+        return strpos($final, '250') !== false;
+    }
+
+    private function buildEmailHtml(string $nome, string $password): string
+    {
+        $loginUrl = 'http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost:9000') . '/entrar';
+        $nome     = htmlspecialchars($nome ?: 'Tester', ENT_QUOTES);
+        $password = htmlspecialchars($password, ENT_QUOTES);
+
+        return '<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#FBF8F2;padding:32px;">'
+            . '<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:20px;padding:36px;">'
+            . '<h1 style="color:#2B2F36;">Frankei</h1>'
+            . '<p style="color:#5F656D;">Olá <b>' . $nome . '</b>,</p>'
+            . '<p>Aqui está a tua chave/password. Tem 30 minutos a contar do primeiro login.</p>'
+            . '<div style="background:#FFF7E8;border-radius:14px;padding:20px;margin:22px 0;text-align:center;">'
+            . '<div style="font-size:12px;color:#7A3F00;margin-bottom:8px;">A tua password</div>'
+            . '<div style="font-family:Courier,monospace;font-size:26px;font-weight:800;color:#5C2F00;">' . $password . '</div>'
+            . '</div>'
+            . '<p><a href="' . $loginUrl . '" style="display:inline-block;padding:14px 32px;background:#F5A623;color:#5C2F00;text-decoration:none;border-radius:12px;font-weight:700;">Entrar →</a></p>'
+            . '<p style="font-size:12px;color:#999;margin-top:32px;">Frankei · Beaver Framework</p>'
+            . '</div></body></html>';
+    }
+
+    /* ═════════════════════════════════════════════════════════
+       TRIAL
+       ═════════════════════════════════════════════════════════ */
+
+    public function requestTrial(): Response
+    {
+        $body = $_POST;
+        if (empty($body)) {
+            $raw  = file_get_contents('php://input');
+            $body = json_decode($raw ?: '[]', true) ?: [];
+        }
+
+        $email = strtolower(trim((string) ($body['email'] ?? '')));
+        $phone = preg_replace('/[^0-9+]/', '', (string) ($body['phone'] ?? ''));
+        $nome  = trim((string) ($body['nome'] ?? 'Tester'));
+        $path  = trim((string) ($body['path'] ?? ''));
+
+        // ── Se autenticado, usa dados da sessão (ignora POST vazio) ──
+        if (UserService::autenticado()) {
+            $u = UserService::atual();
+            if ($u) {
+                if ($email === '')  $email = strtolower((string) ($u['email'] ?? ''));
+                if ($nome === '' || $nome === 'Tester') $nome = (string) ($u['nome'] ?? 'Tester');
+                if ($phone === '')  $phone = (string) ($u['phone'] ?? '');
+            }
+        }
+
+        if ($path !== '') {
+            $path = $this->normalizarPath($path);
+        }
+
+        // ─── DEBUG TEMPORÁRIO ───
+        @file_put_contents('/tmp/fw-debug.log',
+            date('c') . "\n" .
+            "  autenticado: " . (UserService::autenticado() ? 'true' : 'false') . "\n" .
+            "  u: " . json_encode(UserService::atual()) . "\n" .
+            "  email final: '" . $email . "'\n" .
+            "  nome: '" . $nome . "'\n" .
+            "  phone: '" . $phone . "'\n" .
+            "────────────\n",
+            FILE_APPEND
+        );
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return Response::json(['ok' => false, 'erro' => 'Email inválido.'], 422);
+        }
+
+        $existente = \App\Services\UserService::porEmail($email);
+        if ($existente !== null) {
+            return Response::json(['ok' => false, 'erro' => 'Este email já pediu trial.'], 409);
+        }
+
+        $password = $this->gerarPassword(10);
+        $hash     = password_hash($password, PASSWORD_BCRYPT);
+        $now      = time();
+
+        try {
+            \App\Services\SiteDB::insert(
+                'INSERT INTO users (nome, email, phone, password_hash, ativo, role, plan, plan_limit, trial_minutes, criado_em, atualizado_em)
+                 VALUES (:n, :e, :ph, :p, 1, :r, :pl, :lm, :tm, :c, :u)',
+                [
+                    ':n'  => $nome ?: 'Tester',
+                    ':e'  => $email,
+                    ':ph' => $phone,
+                    ':p'  => $hash,
+                    ':r'  => 'user',
+                    ':pl' => 'free',
+                    ':lm' => 25,
+                    ':tm' => 11520,
+                    ':c'  => $now,
+                    ':u'  => $now,
+                ]
+            );
+        } catch (\Throwable $e) {
+            return Response::json(['ok' => false, 'erro' => 'Erro: ' . $e->getMessage()], 500);
+        }
+
+        $mailOk  = false;
+        $mailErr = '';
+        $cfg = [
+            'host' => $_ENV['MAIL_HOST'] ?? getenv('MAIL_HOST') ?: '',
+            'port' => (int) ($_ENV['MAIL_PORT'] ?? getenv('MAIL_PORT') ?: 587),
+            'user' => $_ENV['MAIL_USER'] ?? getenv('MAIL_USER') ?: '',
+            'pass' => $_ENV['MAIL_PASS'] ?? getenv('MAIL_PASS') ?: '',
+            'from' => $_ENV['MAIL_FROM'] ?? getenv('MAIL_FROM') ?: '',
+            'name' => $_ENV['MAIL_FROM_NAME'] ?? getenv('MAIL_FROM_NAME') ?: 'Frankei',
+            'enc'  => $_ENV['MAIL_ENCRYPTION'] ?? getenv('MAIL_ENCRYPTION') ?: 'tls',
+        ];
+
+        try {
+            $mailOk = $this->enviarEmailPassword($email, $nome, $password, $cfg);
+        } catch (\Throwable $e) {
+            $mailErr = $e->getMessage();
+        }
+
+        $resp = ['ok' => true, 'email' => $email, 'email_enviado' => $mailOk];
+        if (!$mailOk) {
+            $resp['password']  = $password;
+            $resp['mail_erro'] = $mailErr;
+        }
+        return Response::json($resp);
+    }
+
+    public function requestDemo(): Response
+    {
+        $body = $_POST ?: json_decode(file_get_contents('php://input') ?: '[]', true);
+        $email = strtolower(trim((string) ($body['email'] ?? '')));
+        $phone = preg_replace('/[^0-9+]/', '', (string) ($body['phone'] ?? ''));
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return Response::json(['ok' => false, 'erro' => 'Email inválido.'], 422);
+        }
+        if (strlen($phone) < 9) {
+            return Response::json(['ok' => false, 'erro' => 'Telefone inválido.'], 422);
+        }
+
+        try {
+            \App\Services\SiteDB::exec(
+                'CREATE TABLE IF NOT EXISTS demos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL,
+                    phone TEXT NOT NULL,
+                    ip TEXT, user_agent TEXT,
+                    criado_em INTEGER NOT NULL
+                )'
+            );
+            \App\Services\SiteDB::insert(
+                'INSERT INTO demos (email, phone, ip, user_agent, criado_em) VALUES (:e, :p, :ip, :ua, :c)',
+                [
+                    ':e'  => $email,
+                    ':p'  => $phone,
+                    ':ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+                    ':ua' => mb_substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500),
+                    ':c'  => time(),
+                ]
+            );
+        } catch (\Throwable $e) {
+            return Response::json(['ok' => false, 'erro' => 'Erro: ' . $e->getMessage()], 500);
+        }
+
+        return Response::json(['ok' => true, 'mensagem' => 'Pedido recebido. Entramos em contacto em 24h.']);
+    }
+
+    private function gerarPassword(int $len = 10): string
+    {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+        $out = '';
+        for ($i = 0; $i < $len; $i++) {
+            $out .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        return $out;
+    }
+
+
+    /**
+     * Guarda o setup para um user autenticado (sem criar user novo).
+     * Rota: POST /api/frankei/save-setup
+     */
+    public function saveSetupFromSession(): Response
+    {
+        if (!UserService::autenticado()) {
+            return Response::json(['ok' => false, 'erro' => 'Não autenticado.'], 401);
+        }
+
+        $u = UserService::atual();
+        if (!$u) {
+            return Response::json(['ok' => false, 'erro' => 'Sessão inválida.'], 401);
+        }
+
+        $userId = (int) $u['id'];
+        $body   = $_POST ?: json_decode(file_get_contents('php://input') ?: '[]', true);
+
+        $path = trim((string) ($body['path'] ?? ''));
+        if ($path === '') {
+            return Response::json(['ok' => false, 'erro' => 'Path em falta.'], 422);
+        }
+
+        $path = $this->normalizarPath($path);
+
+        if (!is_dir($path)) {
+            return Response::json(['ok' => false, 'erro' => 'O caminho não existe: ' . $path], 422);
+        }
+
+        $files = $body['files'] ?? [];
+        if (!is_array($files)) $files = [];
+        $files = array_slice(array_values(array_filter($files, 'is_string')), 0, 25);
+
+        if (empty($files)) {
+            return Response::json(['ok' => false, 'erro' => 'Seleciona pelo menos 1 ficheiro.'], 422);
+        }
+
+        $this->saveSetup($userId, [
+            'user_id'      => $userId,
+            'path'         => $path,
+            'framework'    => 'php',
+            'validated_at' => date('c'),
+            'files'        => $files,
+            'files_count'  => count($files),
+            'plan'         => 'free',
+            'plan_limit'   => 25,
+        ]);
+
+        return Response::json([
+            'ok'       => true,
+            'path'     => $path,
+            'files'    => count($files),
+            'redirect' => '/frankei',
+            'mensagem' => 'Setup guardado. A entrar no Frankei.',
+        ]);
+    }
+
+}

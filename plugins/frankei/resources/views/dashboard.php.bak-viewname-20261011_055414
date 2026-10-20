@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Frankei — Dashboard</title>
+    <link rel="stylesheet" href="/plugins/frankei/css/dashboard.css?v=<?= time() ?>">
+</head>
+
+<body>
+
+    <header class="fk-topbar">
+        <div class="fk-topbar-left">
+            <a href="/frankei" class="fk-brand">
+                <span class="fk-brand-logo">🔍</span>
+                <b>Frankei</b>
+            </a>
+            <code class="fk-path" title="<?= htmlspecialchars($path ?? '') ?>">
+                <?= htmlspecialchars($path ?? '—') ?>
+            </code>
+        </div>
+                <nav class="fk-top-tabs">
+            <a href="/frankei/unit-tests"
+               class="fk-top-tab <?= ($view ?? 'unit-tests') === 'unit-tests' ? 'active' : '' ?>">
+                🧪 Unit Tests
+            </a>
+            <a href="/frankei/analysis"
+               class="fk-top-tab <?= ($view ?? '') === 'analysis' ? 'active' : '' ?>">
+                🔍 Análise
+            </a>
+            <a href="/frankei/coverage"
+               class="fk-top-tab <?= ($view ?? '') === 'coverage' ? 'active' : '' ?>">
+                📊 Cobertura
+            </a>
+            <a href="/frankei/findings"
+               class="fk-top-tab <?= ($view ?? '') === 'findings' ? 'active' : '' ?>">
+                🐛 Findings
+            </a>
+        </nav>
+
+<div class="fk-topbar-right">
+            <button id="fkRunAllBtn" class="fk-btn-run-all">
+                <span>▶</span> Correr tudo
+            </button>
+
+            <div class="fk-settings-wrap">
+                <button id="fkSettingsBtn" class="fk-settings-btn" title="Configurações" aria-label="Configurações">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                    </svg>
+                </button>
+
+                <div id="fkSettingsMenu" class="fk-settings-menu">
+
+                    <div class="fk-settings-head-bar">
+                        <span class="fk-settings-title">⚙️ Configurações</span>
+                        <button class="fk-settings-close" id="fkSettingsClose" aria-label="Fechar">✕</button>
+                    </div>
+
+                    <nav class="fk-settings-tabs">
+                        <button class="fk-settings-tab active" data-settings-tab="analise">📊 Análise</button>
+                        <button class="fk-settings-tab" data-settings-tab="autofix">🔧 Auto-fix</button>
+                        <button class="fk-settings-tab" data-settings-tab="perf">⚡ Desempenho</button>
+                        <button class="fk-settings-tab" data-settings-tab="security">🔒 Segurança</button>
+                        <button class="fk-settings-tab" data-settings-tab="code">🧹 Código</button>
+                        <button class="fk-settings-tab" data-settings-tab="advanced">🎯 Avançado</button>
+                        <button class="fk-settings-tab" data-settings-tab="conta">👤 Conta</button>
+                    </nav>
+
+                    <div class="fk-settings-body">
+
+                        <div class="fk-settings-panel active" data-settings-panel="analise">
+                            <div class="fk-settings-section">
+                                <div class="fk-settings-label">Análise a correr</div>
+
+                                <label class="fk-settings-opt">
+                                    <input type="radio" name="fkRunMode" value="all" checked>
+                                    <span>
+                                        <b>Todas as análises</b>
+                                        <small>BD · Segurança · Passwords</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-opt">
+                                    <input type="radio" name="fkRunMode" value="security">
+                                    <span>
+                                        <b>Só segurança</b>
+                                        <small>XSS · SQLi · CSRF · SSRF</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-opt">
+                                    <input type="radio" name="fkRunMode" value="passwords">
+                                    <span>
+                                        <b>Só palavras-passe</b>
+                                        <small>Hashes · Política</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-opt">
+                                    <input type="radio" name="fkRunMode" value="db">
+                                    <span>
+                                        <b>Só bases de dados</b>
+                                        <small>Estrutura · Índices</small>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="fk-settings-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-2)">
+                                <div class="fk-settings-label">Comportamento</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptSequential" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Análise sequencial</b>
+                                        <small>Uma tab de cada vez, com feedback visual</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptLiveBadges" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Badges em tempo real</b>
+                                        <small>Contagem atualiza à medida que termina cada tab</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="fk-settings-panel" data-settings-panel="autofix">
+                            <div class="fk-settings-section">
+                                <div class="fk-settings-label">Correções automáticas</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptAutoFixCsrf" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Ativar auto-fix</b>
+                                        <small>Botão Aplicar nos findings CSRF</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptBackup" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Criar backup</b>
+                                        <small>Ficheiros .bak antes de alterar</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptSkipConfirm">
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Não pedir confirmação</b>
+                                        <small>Aplica direto após preview</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptShowFixed">
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Mostrar corrigidos</b>
+                                        <small>Marca com ✓ verde após correção</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Painel 3: DESEMPENHO -->
+                        <div class="fk-settings-panel" data-settings-panel="perf">
+                            <div class="fk-settings-section">
+                                <div class="fk-settings-label">N+1 Queries</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptSkipScripts" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Ignorar scripts/</b>
+                                        <small>setup-*.php, migrations, seeds</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptSkipDdl" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Ignorar DDL</b>
+                                        <small>OPTIMIZE, PRAGMA, CREATE, DROP</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptSkipTrivialLoops" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Ignorar loops triviais</b>
+                                        <small>$admins, $planos, $roles (N pequeno)</small>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="fk-settings-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-2)">
+                                <div class="fk-settings-label">SELECT *</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptIgnoreSelectById" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Ignorar SELECT * por ID</b>
+                                        <small>WHERE id = :x (1 linha)</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptSkipViews" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Ignorar views/</b>
+                                        <small>falsos positivos em templates</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkOptSelectStarAsError">
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>SELECT * como erro</b>
+                                        <small>Se desligado, fica só informativo</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Painel: SEGURANÇA -->
+                        <div class="fk-settings-panel" data-settings-panel="security">
+                            <div class="fk-settings-section">
+                                <div class="fk-settings-label">Scanners ativos</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunXss" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>XSS</b>
+                                        <small>Cross-site scripting</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunSqli" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>SQL Injection</b>
+                                        <small>Queries concatenadas</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunCmdi" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Command Injection</b>
+                                        <small>shell_exec, exec, system</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunCodeExec" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Code Execution</b>
+                                        <small>eval, assert, create_function</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunCsrf" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>CSRF</b>
+                                        <small>Forms sem token</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunDeserialize" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Deserialization</b>
+                                        <small>unserialize de input</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunFileInclusion" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>File Inclusion (LFI/RFI)</b>
+                                        <small>include/require dinâmicos</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunPathTraversal" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Path Traversal</b>
+                                        <small>../ em paths de ficheiro</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunOpenRedirect" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Open Redirect</b>
+                                        <small>header Location com input</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunSsrf" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>SSRF</b>
+                                        <small>URLs controladas pelo user</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunXxe" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>XXE</b>
+                                        <small>XML External Entity</small>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="fk-settings-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-2)">
+                                <div class="fk-settings-label">Pastas ignoradas</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkIgnoreVendor" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>vendor/</b>
+                                        <small>Dependências Composer</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkIgnoreNodeModules" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>node_modules/</b>
+                                        <small>Dependências npm</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkIgnoreTestsFixtures" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>tests/fixtures/</b>
+                                        <small>Fixtures de teste</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkIgnoreBackups" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>.backups/</b>
+                                        <small>Backups locais</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkIgnoreBuild" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>build/</b>
+                                        <small>Artefactos de build</small>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="fk-settings-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-2)">
+                                <div class="fk-settings-label">Performance</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunPerfNplus1" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Queries N+1</b>
+                                        <small>Queries de BD dentro de loops</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunPerfSelectStar" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>SELECT * em vez de colunas</b>
+                                        <small>Trazer todas as colunas</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunPerfHeavyLoop" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Loops pesados</b>
+                                        <small>Loops aninhados / grandes</small>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="fk-settings-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-2)">
+                                <div class="fk-settings-label">Passwords</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunWeakPasswordHash" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Hashes fracos</b>
+                                        <small>md5, sha1, crypt em passwords</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Painel: CÓDIGO & QUALIDADE -->
+                        <div class="fk-settings-panel" data-settings-panel="code">
+                            <div class="fk-settings-section">
+                                <div class="fk-settings-label">Verificações</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunCodeTodo" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>TODO / FIXME / HACK</b>
+                                        <small>Comentários que indicam trabalho pendente</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunCodeErrorSuppression" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Supressão de erros (@)</b>
+                                        <small>Operador @ esconde warnings</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunCodeMagicNumber" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Números mágicos</b>
+                                        <small>Literais numéricos sem constante</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunCodeLongFunction" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Funções longas</b>
+                                        <small>Funções com muitas linhas</small>
+                                    </span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkRunCodeDeepNesting" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span>
+                                        <b>Aninhamento profundo</b>
+                                        <small>if/for/while aninhados em excesso</small>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="fk-settings-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-2)">
+                                <div class="fk-settings-label">Limites</div>
+
+                                <div class="fk-settings-input-row">
+                                    <label for="fkMaxFunctionLines">Função longa a partir de</label>
+                                    <input type="number" id="fkMaxFunctionLines" min="10" max="500" value="50">
+                                    <small>Linhas (default 50)</small>
+                                </div>
+
+                                <div class="fk-settings-input-row">
+                                    <label for="fkMaxNestingDepth">Aninhamento profundo a partir de</label>
+                                    <input type="number" id="fkMaxNestingDepth" min="2" max="10" value="4">
+                                    <small>Níveis (default 4)</small>
+                                </div>
+
+                                <div class="fk-settings-input-row">
+                                    <label for="fkMagicNumberMinLength">Número mágico a partir de</label>
+                                    <input type="number" id="fkMagicNumberMinLength" min="2" max="10" value="3">
+                                    <small>Dígitos (default 3)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Painel: AVANÇADO -->
+                        <div class="fk-settings-panel" data-settings-panel="advanced">
+
+                            <!-- Contexto de análise -->
+                            <div class="fk-settings-section">
+                                <div class="fk-settings-label">Contexto de análise</div>
+
+                                <div class="fk-settings-input-row">
+                                    <label for="fkContextLines">Linhas de contexto</label>
+                                    <input type="number" id="fkContextLines" min="1" max="10" value="3">
+                                    <small>Linhas anteriores para detetar taint (SSRF, Path Traversal)</small>
+                                </div>
+                            </div>
+
+                            <!-- Tabelas que requerem atenção -->
+                            <div class="fk-settings-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-2)">
+                                <div class="fk-settings-label">Tabelas que requerem atenção</div>
+                                <p style="padding:0 12px 8px;color:var(--muted-2);font-size:11px">
+                                    SELECT * nestas tabelas aparece com 🔴 (atenção)
+                                </p>
+
+                                <div class="fk-settings-label" style="font-size:10px;padding-top:6px;opacity:0.7">Sensíveis</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttUsers" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>users</b><small>password, 2FA, PII</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttApiKeys" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>api_keys</b><small>key_hash</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttApiLogs" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>api_logs</b><small>IPs, chaves</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttUserSessions" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>user_sessions</b><small>tokens de sessão</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttUserDevices" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>user_devices</b><small>fingerprints</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttEmailQueue" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>email_queue</b><small>tokens de reset</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttModerationLog" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>moderation_log</b><small>audit log</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttVotes" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>votes</b><small>metadados de voto</small></span>
+                                </label>
+
+                                <div class="fk-settings-label" style="font-size:10px;padding-top:10px;opacity:0.7">Grandes (crescem muito)</div>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttJobs" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>jobs</b><small>fila, payloads grandes</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttScheduledJobs" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>scheduled_jobs</b><small>fila agendada</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttImageOptimizerLog" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>image_optimizer_log</b><small>log</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttTranslationHistory" checked>
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>translation_history</b><small>histórico</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttThreads">
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>threads</b><small>forum</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttReplies">
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>replies</b><small>forum</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttNotifications">
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>notifications</b><small>notificações</small></span>
+                                </label>
+
+                                <label class="fk-settings-toggle">
+                                    <input type="checkbox" id="fkAttMentions">
+                                    <span class="fk-switch-track"></span>
+                                    <span><b>mentions</b><small>menções</small></span>
+                                </label>
+
+                                <!-- Custom -->
+                                <div class="fk-settings-input-row" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-2)">
+                                    <label for="fkAttentionTablesCustom">Tabelas personalizadas</label>
+                                    <input type="text" id="fkAttentionTablesCustom" placeholder="tabela1,tabela2,..." style="width:100%">
+                                    <small>CSV: nomes adicionais (além das caixas acima)</small>
+                                </div>
+                            </div>
+
+                            <!-- Limites -->
+                            <div class="fk-settings-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-2)">
+                                <div class="fk-settings-label">Limites</div>
+
+                                <div class="fk-settings-input-row">
+                                    <label for="fkMaxFindings">Limite de findings</label>
+                                    <input type="number" id="fkMaxFindings" min="0" max="10000" value="500">
+                                    <small>0 = sem limite</small>
+                                </div>
+
+                                <div class="fk-settings-input-row">
+                                    <label for="fkScannerTimeout">Timeout por scanner (s)</label>
+                                    <input type="number" id="fkScannerTimeout" min="1" max="300" value="30">
+                                    <small>Interrompe scanners que demorem demasiado</small>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="fk-settings-panel" data-settings-panel="conta">
+                            <div class="fk-settings-section">
+                                <div class="fk-settings-label">Sessão</div>
+
+                                <a href="/frankei/path" class="fk-settings-item">
+                                    📁 Trocar aplicação
+                                </a>
+
+                                <a href="/frankei/logout" class="fk-settings-item fk-settings-item-danger">
+                                    🚪 Terminar sessão
+                                </a>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+            <span class="fk-trial-chip" id="fkTrialChip"
+                      data-expires="<?= (int) ($trial['expires'] ?? 0) ?>"
+                      data-seconds="<?= (int) ($trial['seconds'] ?? 0) ?>">
+                    <span class="fk-trial-dot"></span>
+                    <span class="fk-trial-label">Trial</span>
+                    <span class="fk-trial-time" id="fkTrialTime">—</span>
+                </span>
+                <span class="fk-user">Olá, <b><?= htmlspecialchars($user['nome'] ?? 'dev') ?></b></span>
+        </div>
+    </header>
+
+    <!-- TABS PRINCIPAIS -->
+    <nav class="fk-tabs" id="fkTabs" role="tablist"></nav>
+
+    <!-- SUB-TABS (aparecem se a tab ativa as tiver) -->
+    <nav class="fk-subtabs" id="fkSubtabs" role="tablist" style="display:none"></nav>
+
+    <!-- CONTEÚDO -->
+    <main class="fk-layout">
+
+        <?php if (($view ?? 'unit-tests') !== 'unit-tests'): ?>
+        <!-- ═══════════ VISTA ANÁLISE (sidebar + main) ═══════════ -->
+
+        <aside class="fk-side">
+            <section class="fk-card">
+                <h3 class="fk-card-title">Controlo</h3>
+                <button id="fkScanBtn" class="fk-btn fk-btn-primary fk-btn-block">
+                    <span>▶</span> Correr análise
+                </button>
+                <button id="fkExportBtn" class="fk-btn fk-btn-ghost fk-btn-block" disabled>
+                    <span>📥</span> Exportar JSON
+                </button>
+            </section>
+
+            <section class="fk-card">
+                <h3 class="fk-card-title">Estado</h3>
+                <div class="fk-status">
+                    <div class="fk-status-row">
+                        <span class="fk-status-label">Alvos</span>
+                        <span id="fkStatDbs" class="fk-status-value">—</span>
+                    </div>
+                    <div class="fk-status-row">
+                        <span class="fk-status-label">Findings</span>
+                        <span id="fkStatTotal" class="fk-status-value">—</span>
+                    </div>
+                    <div class="fk-status-row">
+                        <span class="fk-status-label">Duração</span>
+                        <span id="fkStatTime" class="fk-status-value">—</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="fk-card" id="fkFiltersCard" style="display:none">
+                <h3 class="fk-card-title">Filtros</h3>
+
+                <div class="fk-filter-group">
+                    <span class="fk-filter-label">Alvo</span>
+                    <div id="fkFilterDbs" class="fk-filter-list"></div>
+                </div>
+
+                <div class="fk-filter-group">
+                    <span class="fk-filter-label">Severidade</span>
+                    <div id="fkFilterSev" class="fk-filter-list">
+                        <label class="fk-chip fk-chip-critical"><input type="checkbox" value="critical" checked><span>🔴 Crítico</span></label>
+                        <label class="fk-chip fk-chip-high"><input type="checkbox" value="high" checked><span>🔴 Alto</span></label>
+                        <label class="fk-chip fk-chip-medium"><input type="checkbox" value="medium" checked><span>🟡 Médio</span></label>
+                        <label class="fk-chip fk-chip-low"><input type="checkbox" value="low" checked><span>🟢 Baixo</span></label>
+                        <label class="fk-chip fk-chip-info"><input type="checkbox" value="info" checked><span>🟢 Info</span></label>
+                    </div>
+                </div>
+
+                <div class="fk-filter-group" id="fkFilterCatGroup">
+                    <span class="fk-filter-label">Categoria</span>
+                    <div id="fkFilterCat" class="fk-filter-list"></div>
+                </div>
+            </section>
+        </aside>
+
+        <section class="fk-main">
+
+            <!-- ESTADO VAZIO / EM BREVE -->
+            <div id="fkPlaceholder" class="fk-placeholder" style="display:none"></div>
+
+            <!-- CONTEÚDO DA TAB ATIVA -->
+            <div id="fkTabContent" class="fk-tab-content">
+
+                <!-- BARRA DE PROGRESSO -->
+                <div class="fk-progress-wrap" id="fkProgressWrap" style="display:none">
+                    <div class="fk-progress-steps" id="fkProgressSteps">
+                        <span class="fk-progress-step" data-step="db">📊 Bases de dados</span>
+                        <span class="fk-progress-arrow">→</span>
+                        <span class="fk-progress-step" data-step="security">🔒 Segurança</span>
+                        <span class="fk-progress-arrow">→</span>
+                        <span class="fk-progress-step" data-step="passwords">🔑 Palavras-passe</span>
+                        <span class="fk-progress-arrow">→</span>
+                        <span class="fk-progress-step" data-step="done">✓ Concluído</span>
+                    </div>
+                    <div class="fk-progress-bar">
+                        <div class="fk-progress-fill" id="fkProgressFill" style="width:0%"></div>
+                    </div>
+                    <div class="fk-progress-label" id="fkProgressLabel">A iniciar…</div>
+                </div>
+
+                <div class="fk-test-actions" id="fkTestActions" style="display:none">
+                    <button id="fkTestRunSubBtn" class="fk-btn fk-btn-primary" data-cmd="beaver test">
+                        ▶ Correr <span id="fkTestRunSubLabel">tudo</span>
+                    </button>
+                    <span class="fk-test-hint" id="fkTestHint"></span>
+                </div>
+
+                <div class="fk-test-actions" id="fkTestActions" style="display:none">
+                    <button id="fkTestRunSubBtn" class="fk-btn fk-btn-primary" data-cmd="beaver test">
+                        ▶ Correr <span id="fkTestRunSubLabel">tudo</span>
+                    </button>
+                    <span class="fk-test-hint" id="fkTestHint"></span>
+                </div>
+
+                <div class="fk-card fk-terminal-card">
+                    <div class="fk-terminal-head">
+                        <div class="fk-terminal-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <span class="fk-terminal-title" id="fkTermTitle">frankei — terminal</span>
+                        <span class="fk-term-engine" id="fkTermEngine" title="Motor de testes — clica para alternar">
+                            <span class="fk-term-engine-icon" id="fkTermEngineIcon">🐀</span>
+                            <span class="fk-term-engine-label" id="fkTermEngineLabel">Pest</span>
+                            <span class="fk-term-engine-caret">▾</span>
+                            <div class="fk-term-engine-menu" id="fkTermEngineMenu">
+                                <button type="button" class="fk-term-engine-opt" data-engine="pest">
+                                    <span class="fk-term-engine-opt-icon">🐀</span>
+                                    <span>Pest</span>
+                                </button>
+                                <button type="button" class="fk-term-engine-opt" data-engine="phpunit">
+                                    <span class="fk-term-engine-opt-icon">🐘</span>
+                                    <span>PHPUnit</span>
+                                </button>
+                            </div>
+                        </span>
+                        <button type="button" class="fk-term-report-btn" id="fkTermReportBtn" title="Exportar report" style="display:none">
+                            📥 Report
+                        </button>
+                        <span class="fk-terminal-status" id="fkTermStatus">pronto</span>
+                    </div>
+                    <div class="fk-terminal-body" id="fkTerminal">
+                        <div class="fk-term-line fk-term-muted">$ Aguarda análise. Clica "Correr análise" para começar.</div>
+                    </div>
+                    <div class="fk-terminal-input-wrap">
+                        <span class="fk-terminal-prompt">$</span>
+                        <input type="text"
+                            id="fkTermInput"
+                            class="fk-terminal-input"
+                            placeholder="beaver help, beaver test, beaver plugin:list..."
+                            autocomplete="off"
+                            spellcheck="false">
+                        <button id="fkTermRunBtn" class="fk-terminal-run-btn" title="Executar (Enter)">▶</button>
+                    </div>
+                </div>
+
+                <div class="fk-card fk-findings-card">
+                    <div class="fk-findings-head">
+                        <h3 class="fk-card-title">Findings <span id="fkFindingsCount" class="fk-count">0</span></h3>
+                        <div class="fk-findings-filters" id="fkFindingsFilters"></div>
+                    </div>
+                    <div class="fk-findings-body" id="fkFindings">
+                        <div class="fk-empty">
+                            <div class="fk-empty-icon">🔍</div>
+                            <p>Sem resultados ainda</p>
+                            <small>Corre a primeira análise para ver os problemas encontrados.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    
+        <!-- Plano grátis: ficheiros em análise -->
+        <?php if (!empty($files)): ?>
+        <section class="fk-plan-files">
+            <div class="fk-plan-head">
+                <div>
+                    <span class="fk-plan-badge">Plano grátis</span>
+                    <h3>Ficheiros em análise</h3>
+                    <p>Estás limitado a <b><?= (int) ($plan_limit ?? 25) ?> ficheiros PHP</b> nesta versão. Estes foram os que escolheste:</p>
+                </div>
+                <div class="fk-plan-count">
+                    <b><?= count($files) ?></b>
+                    <span>de <?= (int) ($plan_limit ?? 25) ?></span>
+                </div>
+            </div>
+            <ul class="fk-plan-list">
+                <?php foreach ($files as $f): ?>
+                    <li>
+                        <code><?= htmlspecialchars($f) ?></code>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+            <div class="fk-plan-foot">
+                <a href="/frankei/path" class="fk-plan-reset">Alterar seleção</a>
+            </div>
+        </section>
+        <?php endif; ?>
+
+        <?php endif; ?>
+
+        <?php if (($view ?? 'unit-tests') === 'unit-tests'): ?>
+        <!-- ═══════════ VISTA UNIT TESTS ═══════════ -->
+        <section class="fk-view-unittests">
+            <header class="fk-ut-head">
+                <div>
+                    <span class="fk-ut-badge">🧪 Unit Tests</span>
+                    <h1 class="fk-ut-title">Testes unitários</h1>
+                    <p class="fk-ut-sub">Corre os teus testes com <b>Pest</b> ou <b>PHPUnit</b>. Sem cerimónia.</p>
+                </div>
+                <div class="fk-ut-engine">
+                    <span class="fk-ut-engine-label">Motor:</span>
+                    <button class="fk-ut-engine-opt active" data-engine="pest">🐀 Pest</button>
+                    <button class="fk-ut-engine-opt" data-engine="phpunit">🐘 PHPUnit</button>
+                </div>
+            </header>
+
+            <div class="fk-ut-metrics" id="fkUtMetrics">
+                <div class="fk-ut-metric">
+                    <span class="fk-ut-metric-value" id="fkUtPassed">—</span>
+                    <span class="fk-ut-metric-label">Passed</span>
+                </div>
+                <div class="fk-ut-metric">
+                    <span class="fk-ut-metric-value fk-ut-fail" id="fkUtFailed">—</span>
+                    <span class="fk-ut-metric-label">Failed</span>
+                </div>
+                <div class="fk-ut-metric">
+                    <span class="fk-ut-metric-value" id="fkUtDuration">—</span>
+                    <span class="fk-ut-metric-label">Duração</span>
+                </div>
+                <div class="fk-ut-metric fk-ut-metric-cov">
+                    <span class="fk-ut-metric-value" id="fkUtCoverage">—</span>
+                    <span class="fk-ut-metric-label">Cobertura</span>
+                </div>
+            </div>
+
+            <div class="fk-ut-actions">
+                <button class="fk-ut-btn fk-ut-btn-primary" id="fkUtRun">
+                    ▶ Correr testes
+                </button>
+                <a href="/frankei/coverage" class="fk-ut-btn fk-ut-btn-ghost">
+                    📊 Ver cobertura
+                </a>
+                <a href="/frankei/path" class="fk-ut-btn fk-ut-btn-ghost">
+                    ⚙️ Alterar ficheiros
+                </a>
+            </div>
+
+            <?php if (!empty($files)): ?>
+            <div class="fk-ut-files">
+                <div class="fk-ut-files-head">
+                    <h3>Ficheiros testados</h3>
+                    <span><?= count($files) ?> de <?= (int) ($plan_limit ?? 25) ?></span>
+                </div>
+                <ul class="fk-ut-files-list">
+                    <?php foreach ($files as $f): ?>
+                        <li>
+                            <span class="fk-ut-file-dot"></span>
+                            <code><?= htmlspecialchars($f) ?></code>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <?php endif; ?>
+
+            <div class="fk-ut-terminal">
+                <div class="fk-ut-term-head">
+                    <span class="fk-ut-term-dots"><i></i><i></i><i></i></span>
+                    <span class="fk-ut-term-title">frankei — terminal</span>
+                </div>
+                <pre class="fk-ut-term-body" id="fkUtTermBody">$ Clica em "Correr testes" para começar.</pre>
+            </div>
+        </section>
+        <?php endif; ?>
+
+</main>
+
+    <div class="fk-modal" id="fkModal">
+        <div class="fk-modal-content">
+            <button class="fk-modal-close" id="fkModalClose">✕</button>
+            <div class="fk-modal-body" id="fkModalBody"></div>
+        </div>
+    </div>
+
+    <div class="fk-modal fk-report-modal" id="fkReportModal">
+        <div class="fk-modal-content fk-report-modal-content">
+            <button class="fk-modal-close" id="fkReportClose">✕</button>
+
+            <div class="fk-report-head">
+                <h2 class="fk-report-title">📊 Report — Testes</h2>
+                <div class="fk-report-summary" id="fkReportSummary"></div>
+            </div>
+
+            <div class="fk-report-body">
+                <aside class="fk-report-side">
+                    <div class="fk-report-section">
+                        <div class="fk-report-label">Incluir no report</div>
+
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="junit" checked>
+                            <span>JUnit XML</span>
+                            <small>CI / GitHub Actions</small>
+                        </label>
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="coverage" checked>
+                            <span>Coverage HTML</span>
+                            <small>relatório visual</small>
+                        </label>
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="clover">
+                            <span>Clover XML</span>
+                            <small>integrações</small>
+                        </label>
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="cobertura">
+                            <span>Cobertura XML</span>
+                            <small>integrações</small>
+                        </label>
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="text">
+                            <span>Coverage Text</span>
+                            <small>resumo rápido</small>
+                        </label>
+                    </div>
+
+                    <div class="fk-report-section">
+                        <div class="fk-report-label">Motor</div>
+                        <div class="fk-report-engine" id="fkReportEngine">🐀 Pest</div>
+                    </div>
+
+                    <div class="fk-report-section">
+                        <button type="button" class="fk-btn fk-btn-primary fk-btn-block" id="fkReportGenerate">
+                            ⚙️ Gerar report
+                        </button>
+                    </div>
+                </aside>
+
+                <main class="fk-report-main">
+                    <div class="fk-report-tabs" id="fkReportTabs">
+                        <button type="button" class="fk-report-tab active" data-view="summary">Resumo</button>
+                        <button type="button" class="fk-report-tab" data-view="html">HTML</button>
+                        <button type="button" class="fk-report-tab" data-view="xml">XML</button>
+                        <button type="button" class="fk-report-tab" data-view="files">Ficheiros</button>
+                        <button type="button" class="fk-report-tab" data-view="beaver">🦫 Beaver Test Report</button>
+                        <button type="button" class="fk-report-tab-settings" id="fkBeaverConfigBtn" title="Configurações do Beaver Report" aria-label="Configurações">
+                            ⚙️
+                        </button>
+                    </div>
+
+                    <div class="fk-report-view" id="fkReportView">
+                        <div class="fk-report-empty">
+                            <div style="font-size:32px;opacity:0.4">📊</div>
+                            <p>Clica em <b>Gerar report</b> para produzir.</p>
+                        </div>
+                    </div>
+                </main>
+            </div>
+
+            <div class="fk-report-foot">
+                <span class="fk-report-foot-info" id="fkReportFootInfo"></span>
+                <div class="fk-report-foot-actions">
+                    <button type="button" class="fk-btn fk-btn-ghost" id="fkReportDownloadCurrent">📥 Download atual</button>
+                    <button type="button" class="fk-btn fk-btn-primary" id="fkReportDownloadZip">📦 Download tudo (.zip)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.FK_PATH = <?= json_encode($path ?? '') ?>;
+    </script>
+    <script src="/plugins/frankei/js/dashboard.js?v=<?= time() ?>"></script>
+
+
+<script>
+/* Contador de trial */
+(function () {
+    var chip = document.getElementById('fkTrialChip');
+    var timeEl = document.getElementById('fkTrialTime');
+    if (!chip || !timeEl) return;
+
+    var expires = parseInt(chip.dataset.expires, 10) * 1000;
+
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+    function tick() {
+        var diff = Math.max(0, expires - Date.now());
+
+        if (diff <= 0) {
+            timeEl.textContent = 'expirado';
+            chip.classList.add('is-urgent');
+            setTimeout(function () {
+                window.location.href = '/auth/login?erro=' + encodeURIComponent('Trial expirado.');
+            }, 5000);
+            return;
+        }
+
+        var sec   = Math.floor(diff / 1000);
+        var days  = Math.floor(sec / 86400);
+        var hours = Math.floor((sec % 86400) / 3600);
+        var mins  = Math.floor((sec % 3600) / 60);
+        var secs  = sec % 60;
+
+        if (days >= 1) {
+            timeEl.textContent = days + 'd ' + pad(hours) + 'h ' + pad(mins) + 'm';
+        } else if (hours >= 1) {
+            timeEl.textContent = pad(hours) + 'h ' + pad(mins) + 'm ' + pad(secs) + 's';
+        } else {
+            timeEl.textContent = pad(mins) + 'm ' + pad(secs) + 's';
+        }
+
+        chip.classList.remove('is-soon', 'is-urgent');
+        if (sec < 3600)       chip.classList.add('is-urgent');
+        else if (sec < 86400) chip.classList.add('is-soon');
+    }
+
+    tick();
+    setInterval(tick, 1000);
+})();
+</script>
+
+
+<script>
+/* Capturar erros JS para debug */
+window.addEventListener('error', function(e) {
+    fetch('/api/frankei/log-js-error', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            msg: e.message,
+            file: e.filename,
+            line: e.lineno,
+            col: e.colno,
+            stack: e.error ? e.error.stack : ''
+        })
+    });
+});
+</script>
+
+</body>
+
+</html>

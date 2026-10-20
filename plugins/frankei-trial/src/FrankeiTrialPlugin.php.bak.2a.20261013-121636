@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial;
+
+use Beaver\Plugin\PluginBase;
+
+// Autoload manual (fallback caso o composer nao esteja registado)
+require_once __DIR__ . '/Support/TrialLimits.php';
+require_once __DIR__ . '/Http/TrialController.php';
+
+class FrankeiTrialPlugin extends PluginBase
+{
+    public function boot(): void
+    {
+        // Forca o autoloader a ver as classes
+        class_exists('Beaver\\Plugins\\FrankeiTrial\\Http\\TrialController');
+        class_exists('Beaver\\Plugins\\FrankeiTrial\\Support\\TrialLimits');
+
+        $routesFile = $this->path . '/routes/web.php';
+        if (is_file($routesFile)) {
+            $this->loadRoutes();
+        }
+        $this->loadViews();
+    }
+}

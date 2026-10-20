@@ -1,0 +1,1125 @@
+/* ============================================================
+ * Frankei — Coverage Redesign (tema claro alinhado c/ dashboard)
+ *
+ * Reutiliza as variáveis definidas em dashboard.css:
+ *   --bg / --card / --border / --text / --muted
+ *   --high (laranja) / --med (âmbar) / --info (cinza)
+ *
+ * @package    Beaver\Plugins\Frankei
+ * @subpackage UI\Coverage
+ * @author     Franco <franco@onidesk.local>
+ * @copyright  (c) 2026 Onidesk / Beaver Framework
+ * @license    Proprietary — All rights reserved
+ * @since      Release 2.0.0
+ * @version    4.0.0
+ * ============================================================ */
+
+:root {
+    /* Fallbacks — se dashboard.css não estiver carregado,
+       o coverage-redesign.css funciona sozinho. */
+
+    /* superfícies */
+    --fk-bg:            var(--bg,       #f5f6f8);
+    --fk-bg-card:       var(--card,     #ffffff);
+    --fk-bg-hover:      #f9fafc;
+    --fk-bg-track:      #e8ebf0;
+    --fk-border:        var(--border,   #d4d8de);
+    --fk-border-h:      #b8bfca;
+
+    /* texto */
+    --fk-text:          var(--text,     #2c3238);
+    --fk-text-dim:      var(--muted,    #6b7280);
+
+    /* Beaver: laranja — reaproveita --high do dashboard */
+    --fk-orange-lo:     #b85e00;
+    --fk-orange:        var(--high,     #e07800);
+    --fk-orange-hi:     #f39a33;
+
+    /* Beaver: âmbar — reaproveita --med */
+    --fk-amber-lo:      #966c09;
+    --fk-amber:         var(--med,      #b8860b);
+    --fk-amber-hi:      #d4a520;
+
+    /* Beaver: cinza — reaproveita --info */
+    --fk-gray-lo:       #4b5563;
+    --fk-gray:          var(--info,     #6b7280);
+    --fk-gray-hi:       #9ca3af;
+
+    /* dimensões */
+    --fk-radius:        10px;
+    --fk-radius-sm:     6px;
+    --fk-shadow:        0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+    --fk-shadow-hover:  0 4px 12px rgba(15,23,42,.10);
+    --fk-bar-h:         11px;
+    --fk-mono:          ui-monospace, "JetBrains Mono", "Fira Code", Menlo, monospace;
+}
+
+/* ============================================================
+ * Lista
+ * ============================================================ */
+.coverage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* ============================================================
+ * Linha
+ * ============================================================ */
+.coverage-row {
+    display: grid;
+    grid-template-columns: 18px minmax(0,1fr) 260px 90px 90px;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: var(--fk-bg-card);
+    border: 1px solid var(--fk-border);
+    border-radius: var(--fk-radius);
+    color: var(--fk-text);
+    font-size: 14px;
+    position: relative;
+    box-shadow: var(--fk-shadow);
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.coverage-row:hover {
+    transform: translateX(2px);
+    border-color: var(--fk-border-h);
+    box-shadow: var(--fk-shadow-hover);
+}
+
+/* ============================================================
+ * Bolinha de estado
+ * ============================================================ */
+.status-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(0,0,0,.04);
+}
+.status-dot.high   { background: var(--fk-orange); }
+.status-dot.medium { background: var(--fk-amber); }
+.status-dot.low    { background: var(--fk-gray); }
+
+/* ============================================================
+ * Nome
+ * ============================================================ */
+.class-name {
+    font-family: var(--fk-mono);
+    font-size: 13.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.class-name .namespace { color: var(--fk-text-dim); }
+
+/* ============================================================
+ * Barra
+ * ============================================================ */
+.coverage-bar {
+    position: relative;
+    height: var(--fk-bar-h);
+    background: var(--fk-bg-track);
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(15,23,42,.06);
+}
+.coverage-bar .fill {
+    position: absolute; inset: 0 auto 0 0;
+    height: 100%; border-radius: 999px;
+    transition: width .9s cubic-bezier(.22,.61,.36,1), filter .2s ease;
+}
+.coverage-row:hover .fill { filter: brightness(1.05); }
+
+/* Laranja — alta cobertura */
+.coverage-bar .fill.high {
+    background: linear-gradient(90deg,
+        var(--fk-orange-lo) 0%,
+        var(--fk-orange)    50%,
+        var(--fk-orange-hi) 100%);
+}
+
+/* Âmbar — média */
+.coverage-bar .fill.medium {
+    background: linear-gradient(90deg,
+        var(--fk-amber-lo) 0%,
+        var(--fk-amber)    50%,
+        var(--fk-amber-hi) 100%);
+}
+
+/* Cinza — baixa */
+.coverage-bar .fill.low {
+    background: linear-gradient(90deg,
+        var(--fk-gray-lo) 0%,
+        var(--fk-gray)    50%,
+        var(--fk-gray-hi) 100%);
+}
+
+/* ============================================================
+ * Percentagem
+ * ============================================================ */
+.pct {
+    font-family: var(--fk-mono);
+    font-size: 15px;
+    font-weight: 700;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+.pct.high   { color: var(--fk-orange); }
+.pct.medium { color: var(--fk-amber); }
+.pct.low    { color: var(--fk-gray); }
+
+/* ============================================================
+ * Contagem
+ * ============================================================ */
+.lines-count {
+    font-family: var(--fk-mono);
+    font-size: 12px;
+    color: var(--fk-text-dim);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.lines-count .sep  { opacity: .5; margin: 0 2px; }
+.lines-count .icon { margin-right: 4px; opacity: .8; }
+
+/* ============================================================
+ * Grupos
+ * ============================================================ */
+.coverage-group {
+    background: var(--fk-bg-card);
+    border: 1px solid var(--fk-border);
+    border-radius: var(--fk-radius);
+    padding: 20px;
+    margin: 24px 0;
+    box-shadow: var(--fk-shadow);
+}
+.coverage-group.high   { border-left: 3px solid var(--fk-orange); }
+.coverage-group.medium { border-left: 3px solid var(--fk-amber); }
+.coverage-group.low    { border-left: 3px solid var(--fk-gray); }
+
+.coverage-group > header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--fk-text-dim);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 600;
+}
+.coverage-group > header .count {
+    background: rgba(15,23,42,.06);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-family: var(--fk-mono);
+    font-size: 11px;
+    color: var(--fk-text);
+}
+
+/* ============================================================
+ * Tooltip do path
+ * ============================================================ */
+.coverage-row[data-path]:hover::after {
+    content: attr(data-path);
+    position: absolute; bottom: calc(100% + 6px); left: 16px;
+    background: #2c3238; color: #f5f6f8;
+    font-family: var(--fk-mono); font-size: 11.5px;
+    padding: 6px 10px; border-radius: var(--fk-radius-sm);
+    border: 1px solid #3a3f47; white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    z-index: 100; pointer-events: none;
+}
+
+/* ============================================================
+ * Preferências / responsivo
+ * ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    .coverage-bar .fill { transition: none !important; }
+}
+
+@media (max-width: 900px) {
+    .coverage-row {
+        grid-template-columns: 18px 1fr 90px;
+        grid-template-areas:
+            "dot name  pct"
+            ".   bar   count";
+        row-gap: 8px;
+    }
+    .status-dot   { grid-area: dot; }
+    .class-name   { grid-area: name; }
+    .coverage-bar { grid-area: bar; }
+    .pct          { grid-area: pct; }
+    .lines-count  { grid-area: count; }
+}
+
+/* ============================================================
+ * Ícones — coverage-inline (breadcrumbs, título, código)
+ * ============================================================ */
+
+/* Ícone nas breadcrumbs */
+.fk-crumb-icon {
+    display: inline-block;
+    margin-right: 2px;
+    font-size: 12px;
+    opacity: .85;
+    filter: saturate(.9);
+}
+
+.fk-crumb-decorated {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+}
+
+.fk-crumb-decorated a {
+    margin-left: 2px !important;
+}
+
+/* Ícone no título */
+.fk-title-icon {
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 1.1em;
+    opacity: .9;
+    vertical-align: middle;
+}
+
+/* Marcadores ✓ / ✗ na coluna de números */
+.fk-line-marker {
+    display: inline-block;
+    width: 12px;
+    margin-right: 4px;
+    font-family: ui-sans-serif, system-ui, sans-serif !important;
+    font-weight: 700;
+    font-size: 11px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+td.fk-line-covered .fk-line-marker {
+    color: #ea580c;   /* laranja Beaver — coberto */
+}
+
+td.fk-line-notcovered .fk-line-marker {
+    color: #dc2626;   /* vermelho — não coberto */
+}
+
+td.fk-line-covered {
+    background: rgba(234, 88, 12, 0.08) !important;
+}
+
+td.fk-line-notcovered {
+    background: rgba(220, 38, 38, 0.06) !important;
+}
+
+/* ============================================================
+ * Ícones dos métodos na tabela de resumo
+ * ============================================================ */
+
+.fk-method-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    transition: opacity .15s ease !important;
+}
+
+.fk-method-link:hover {
+    opacity: .8 !important;
+}
+
+.fk-method-link a,
+.fk-method-link abbr {
+    color: inherit !important;
+    text-decoration: none !important;
+    border: 0 !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+}
+
+.fk-method-icon {
+    display: inline-block !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+    filter: saturate(.9) !important;
+}
+
+/* Aplicar também o ícone se o <a> tiver href="#num" */
+td.danger .fk-method-icon { color: #dc2626 !important; }
+td.warning .fk-method-icon { color: #f59e0b !important; }
+td.success .fk-method-icon { color: #16a34a !important; }
+
+/* ============================================================
+ * Métodos — bolinhas coloridas + bold
+ * ============================================================ */
+
+.fk-method-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    transition: opacity .15s ease, transform .12s ease !important;
+}
+
+.fk-method-link:hover {
+    opacity: .85 !important;
+    transform: translateX(2px) !important;
+}
+
+.fk-method-dot {
+    display: inline-block !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
+    filter: saturate(1.2) drop-shadow(0 0 2px rgba(0,0,0,.08)) !important;
+    flex-shrink: 0 !important;
+}
+
+.fk-method-pct {
+    display: inline-block !important;
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    opacity: .85 !important;
+    padding: 1px 6px !important;
+    border-radius: 6px !important;
+    background: rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Nome do método SEMPRE bold, independente do <a>/<abbr> */
+.fk-method-link a,
+.fk-method-link abbr,
+.fk-method-link span:not(.fk-method-dot):not(.fk-method-pct) {
+    color: inherit !important;
+    text-decoration: none !important;
+    border: 0 !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+}
+
+/* Cores por nível */
+.fk-method-link.fk-method-high           { color: #ea580c !important; }
+.fk-method-link.fk-method-medium         { color: #b8860b !important; }
+.fk-method-link.fk-method-low            { color: #dc2626 !important; }
+.fk-method-link.fk-method-low-but-some   { color: #ea580c !important; }
+
+/* Destaque do <td> da linha correspondente */
+table.table-bordered tbody tr:has(.fk-method-high) {
+    background: rgba(234, 88, 12, 0.04) !important;
+}
+table.table-bordered tbody tr:has(.fk-method-medium) {
+    background: rgba(234, 179, 8, 0.05) !important;
+}
+table.table-bordered tbody tr:has(.fk-method-low) {
+    background: rgba(220, 38, 38, 0.04) !important;
+}
+
+/* A coluna da percentagem à direita também fica bold e colorida */
+table.table-bordered td:last-child,
+table.table-bordered td[class*="pct"] {
+    font-family: ui-monospace, monospace !important;
+    font-weight: 700 !important;
+}
+
+/* ============================================================
+ * Métodos — BOLD LARANJA dominante
+ * ============================================================ */
+
+/* Todos os métodos: bold + laranja */
+table.table-bordered tbody td a,
+table.table-bordered tbody td a abbr,
+table.table-bordered tbody td .fk-method-link,
+table.table-bordered tbody td .fk-method-link a,
+table.table-bordered tbody td .fk-method-link abbr,
+table.table-bordered tbody td .fk-method-link span:not(.fk-method-dot):not(.fk-method-pct) {
+    color: #ea580c !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    border: 0 !important;
+}
+
+/* Hover mais forte */
+table.table-bordered tbody td a:hover,
+table.table-bordered tbody td .fk-method-link:hover a,
+table.table-bordered tbody td .fk-method-link:hover {
+    color: #c2410c !important;
+    text-decoration: underline !important;
+}
+
+/* Overrides por nível (só âmbar para muito bom) */
+.fk-method-link.fk-method-medium a,
+.fk-method-link.fk-method-medium abbr,
+.fk-method-link.fk-method-medium {
+    color: #b8860b !important;
+}
+
+/* Percentagens dos métodos — bold laranja */
+table.table-bordered tbody td:last-child,
+table.table-bordered tbody td[class*="pct"] {
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace !important;
+    font-weight: 700 !important;
+    color: #ea580c !important;
+    font-size: 12.5px !important;
+}
+
+/* Coluna CRAP — também em destaque */
+table.table-bordered tbody td[class*="crap"],
+table.table-bordered tbody td:nth-last-child(2) {
+    font-family: ui-monospace, monospace !important;
+    font-weight: 700 !important;
+    color: #ea580c !important;
+}
+
+/* Bolinha do método — sempre visível */
+.fk-method-dot {
+    display: inline-block !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+    margin-right: 2px !important;
+    filter: saturate(1.3) drop-shadow(0 0 2px rgba(234, 88, 12, .25)) !important;
+}
+
+/* Métodos com 0% ficam com destaque visual */
+.fk-method-link.fk-method-low .fk-method-dot {
+    filter: saturate(1.5) drop-shadow(0 0 3px rgba(234, 88, 12, .45)) !important;
+}
+
+/* Linhas cobertas/não cobertas na tabela — reforço */
+table#code td.fk-line-covered,
+table#code tr.covered td {
+    background: rgba(234, 88, 12, 0.08) !important;
+}
+
+table#code td.fk-line-notcovered,
+table#code tr.notCovered td {
+    background: rgba(234, 88, 12, 0.03) !important;
+}
+
+/* Números das linhas sempre em destaque laranja para cobertas */
+.fk-line-marker {
+    font-weight: 700 !important;
+}
+
+td.fk-line-covered .fk-line-marker {
+    color: #ea580c !important;
+}
+
+td.fk-line-notcovered .fk-line-marker {
+    color: #9ca3af !important;
+}
+
+/* ============================================================
+ * Níveis de cor por % de cobertura
+ * 🔴 low  ≤ 5%    | 🟠 high  > 5–49% | 🟡 medium 50–79% | 🟢 good ≥ 80%
+ * ============================================================ */
+
+/* --- LOW (🔴 vermelho) --- */
+.fk-summary-row-low .fk-summary-dot { filter: saturate(1.4) drop-shadow(0 0 3px rgba(220,38,38,.45)) !important; }
+.fk-method-low .fk-method-dot       { filter: saturate(1.4) drop-shadow(0 0 3px rgba(220,38,38,.45)) !important; }
+.fk-method-low,
+.fk-method-low a,
+.fk-method-low abbr                 { color: #dc2626 !important; }
+table.table-bordered tbody tr.fk-summary-row-low td:first-child { color: #dc2626 !important; }
+table.table-bordered tbody tr.fk-summary-row-low { background: rgba(220,38,38,.04) !important; }
+
+/* --- HIGH (🟠 laranja) --- */
+.fk-summary-row-high .fk-summary-dot { filter: saturate(1.3) drop-shadow(0 0 2px rgba(234,88,12,.35)) !important; }
+.fk-method-high .fk-method-dot       { filter: saturate(1.3) drop-shadow(0 0 2px rgba(234,88,12,.35)) !important; }
+.fk-method-high,
+.fk-method-high a,
+.fk-method-high abbr                 { color: #ea580c !important; }
+
+/* --- MEDIUM (🟡 âmbar) --- */
+.fk-summary-row-medium .fk-summary-dot { filter: saturate(1.3) drop-shadow(0 0 2px rgba(184,134,11,.35)) !important; }
+.fk-method-medium .fk-method-dot       { filter: saturate(1.3) drop-shadow(0 0 2px rgba(184,134,11,.35)) !important; }
+.fk-method-medium,
+.fk-method-medium a,
+.fk-method-medium abbr                 { color: #b8860b !important; }
+table.table-bordered tbody tr.fk-summary-row-medium td:first-child { color: #b8860b !important; }
+
+/* --- GOOD (🟢 verde) --- */
+.fk-summary-row-good .fk-summary-dot { filter: saturate(1.4) drop-shadow(0 0 3px rgba(22,163,74,.45)) !important; }
+.fk-method-good .fk-method-dot       { filter: saturate(1.4) drop-shadow(0 0 3px rgba(22,163,74,.45)) !important; }
+.fk-method-good,
+.fk-method-good a,
+.fk-method-good abbr                 { color: #16a34a !important; }
+table.table-bordered tbody tr.fk-summary-row-good td:first-child { color: #16a34a !important; }
+
+/* ============================================================
+ * COVERAGE-INLINE — Grafismo premium
+ * Página de código-fonte com numeração + cobertura
+ * ============================================================ */
+
+/* ---------- Reset ---------- */
+html, body {
+    color-scheme: only light !important;
+    background: #f5f6f8 !important;
+    color: #2c3238 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+    -webkit-font-smoothing: antialiased !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+/* ---------- Header ---------- */
+header,
+header.container,
+.navbar {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%) !important;
+    border-bottom: 1px solid #e2e5ec !important;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03) !important;
+    padding: 14px 24px !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+}
+
+header .container-fluid {
+    padding: 0 !important;
+    max-width: 100% !important;
+}
+
+/* ---------- Breadcrumbs ---------- */
+.breadcrumb {
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 4px !important;
+    list-style: none !important;
+    font-size: 13px !important;
+}
+
+.breadcrumb-item {
+    color: #6b7280 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: "›" !important;
+    color: #cbd5e1 !important;
+    margin: 0 6px !important;
+    font-weight: 400 !important;
+    display: inline !important;
+}
+
+.breadcrumb-item a {
+    color: #ea580c !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    padding: 3px 8px !important;
+    border-radius: 6px !important;
+    transition: all .15s ease !important;
+}
+
+.breadcrumb-item a:hover {
+    background: rgba(234,88,12,.08) !important;
+    color: #c2410c !important;
+}
+
+.breadcrumb-item.active {
+    color: #2c3238 !important;
+    font-weight: 700 !important;
+}
+
+.fk-crumb-icon {
+    font-size: 13px !important;
+    margin-right: 2px !important;
+    opacity: .9 !important;
+    filter: saturate(1.2) !important;
+    vertical-align: middle !important;
+}
+
+/* ---------- Container principal ---------- */
+.container,
+.container-fluid {
+    background: transparent !important;
+    padding: 24px !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+}
+
+/* ---------- Tabela de resumo (topo) ---------- */
+table.table-bordered {
+    background: #ffffff !important;
+    border: 1px solid #e8ebf0 !important;
+    border-radius: 12px !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100% !important;
+    margin: 0 0 24px 0 !important;
+    overflow: hidden !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,.04), 0 1px 2px rgba(15,23,42,.03) !important;
+    font-size: 13px !important;
+}
+
+table.table-bordered thead td,
+table.table-bordered thead th {
+    background: linear-gradient(180deg, #fbfcfd 0%, #f5f6f8 100%) !important;
+    color: #6b7280 !important;
+    font-weight: 700 !important;
+    font-size: 10.5px !important;
+    text-transform: uppercase !important;
+    letter-spacing: .08em !important;
+    padding: 12px 16px !important;
+    border-bottom: 1px solid #e8ebf0 !important;
+    text-align: left !important;
+}
+
+table.table-bordered thead tr:first-child td {
+    font-size: 12px !important;
+    color: #2c3238 !important;
+    text-align: center !important;
+}
+
+table.table-bordered tbody td {
+    padding: 10px 16px !important;
+    border-bottom: 1px solid #f0f2f6 !important;
+    color: #2c3238 !important;
+    background: transparent !important;
+    vertical-align: middle !important;
+    font-size: 13px !important;
+}
+
+table.table-bordered tbody tr:last-child td {
+    border-bottom: 0 !important;
+}
+
+table.table-bordered tbody tr {
+    transition: background .12s ease !important;
+}
+
+table.table-bordered tbody tr:hover {
+    background: #fafbfd !important;
+}
+
+/* Nomes na primeira coluna */
+table.table-bordered tbody td:first-child {
+    font-weight: 700 !important;
+    color: #2c3238 !important;
+    font-family: ui-sans-serif, system-ui, sans-serif !important;
+    font-size: 13px !important;
+    border-right: 1px solid #f0f2f6 !important;
+    width: 1% !important;
+    white-space: nowrap !important;
+}
+
+/* Números (percentagens, contagens) */
+table.table-bordered tbody td:not(:first-child) {
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace !important;
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    color: #64748b !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+/* ---------- Tabela de código-fonte ---------- */
+table#code,
+table.source-code {
+    background: #ffffff !important;
+    border: 1px solid #e8ebf0 !important;
+    border-radius: 12px !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,.04), 0 1px 2px rgba(15,23,42,.03) !important;
+    font-family: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, monospace !important;
+    font-size: 13px !important;
+    line-height: 1.65 !important;
+    table-layout: auto !important;
+}
+
+table#code tbody tr,
+table.source-code tbody tr {
+    transition: background .12s ease !important;
+}
+
+table#code tbody tr:hover,
+table.source-code tbody tr:hover {
+    background: #f8fafc !important;
+}
+
+/* Célula do número da linha */
+table#code tbody td:first-child,
+table.source-code tbody td:first-child {
+    color: #94a3b8 !important;
+    background: #fbfcfd !important;
+    text-align: right !important;
+    padding: 2px 14px 2px 10px !important;
+    border-right: 1px solid #eef1f5 !important;
+    border-bottom: 1px solid #f8fafc !important;
+    user-select: none !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    width: 1% !important;
+    min-width: 60px !important;
+    font-variant-numeric: tabular-nums !important;
+    position: relative !important;
+    vertical-align: top !important;
+    line-height: 1.65 !important;
+}
+
+/* Célula do código */
+table#code tbody td:last-child,
+table.source-code tbody td:last-child {
+    padding: 2px 16px !important;
+    border-bottom: 1px solid #f8fafc !important;
+    color: #1e293b !important;
+    background: transparent !important;
+    font-family: ui-monospace, "JetBrains Mono", Menlo, monospace !important;
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    white-space: pre !important;
+    vertical-align: top !important;
+}
+
+/* Remove borda da última linha */
+table#code tbody tr:last-child td,
+table.source-code tbody tr:last-child td {
+    border-bottom: 0 !important;
+}
+
+/* ---------- Linhas com cobertura ---------- */
+table#code tr.covered td:not(:first-child),
+table.source-code tr.covered td:not(:first-child) {
+    background: rgba(234, 88, 12, 0.06) !important;
+}
+
+table#code tr.notCovered td:not(:first-child),
+table.source-code tr.notCovered td:not(:first-child) {
+    background: rgba(220, 38, 38, 0.045) !important;
+}
+
+/* Coluna de números nas linhas cobertas */
+table#code tr.covered td:first-child,
+table.source-code tr.covered td:first-child {
+    background: rgba(234, 88, 12, 0.04) !important;
+    color: #ea580c !important;
+}
+
+table#code tr.notCovered td:first-child,
+table.source-code tr.notCovered td:first-child {
+    background: rgba(220, 38, 38, 0.03) !important;
+    color: #b91c1c !important;
+}
+
+/* ---------- Marcadores ✓ / ✗ ---------- */
+.fk-line-marker {
+    display: inline-block !important;
+    width: 14px !important;
+    margin-right: 4px !important;
+    text-align: center !important;
+    font-family: ui-sans-serif, system-ui, sans-serif !important;
+    font-weight: 900 !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+    vertical-align: middle !important;
+}
+
+td.fk-line-covered .fk-line-marker {
+    color: #ea580c !important;
+}
+
+td.fk-line-notcovered .fk-line-marker {
+    color: #dc2626 !important;
+    opacity: .55 !important;
+}
+
+/* ---------- Footer ---------- */
+footer, .footer {
+    background: transparent !important;
+    color: #94a3b8 !important;
+    border-top: 1px solid #e8ebf0 !important;
+    padding: 20px 24px !important;
+    font-size: 11.5px !important;
+    text-align: center !important;
+    font-family: ui-sans-serif, system-ui, sans-serif !important;
+    margin-top: 24px !important;
+}
+
+footer a {
+    color: #ea580c !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+}
+
+footer a:hover {
+    color: #c2410c !important;
+    text-decoration: underline !important;
+}
+
+/* ---------- Links gerais ---------- */
+a {
+    color: #ea580c !important;
+    text-decoration: none !important;
+    transition: color .12s ease !important;
+}
+
+a:hover {
+    color: #c2410c !important;
+}
+
+a abbr {
+    border-bottom: 0 !important;
+    text-decoration: none !important;
+}
+
+/* ---------- Scrollbar refinada ---------- */
+::-webkit-scrollbar {
+    width: 12px !important;
+    height: 12px !important;
+}
+
+::-webkit-scrollbar-track {
+    background: #f5f6f8 !important;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important;
+    border-radius: 6px !important;
+    border: 3px solid #f5f6f8 !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8 !important;
+}
+
+/* ---------- Correção de contraste para código PHP ---------- */
+table#code tbody td:last-child,
+table.source-code tbody td:last-child {
+    text-shadow: 0 1px 0 rgba(255,255,255,.5) !important;
+}
+
+/* ---------- Destacar palavras-chave do código (bónus visual) ---------- */
+table#code tbody td:last-child .keyword,
+table.source-code tbody td:last-child .keyword {
+    color: #c2410c !important;
+    font-weight: 700 !important;
+}
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 900px) {
+    header, .container, .container-fluid {
+        padding: 12px 16px !important;
+    }
+    
+    table.table-bordered,
+    table#code {
+        font-size: 12px !important;
+        border-radius: 8px !important;
+    }
+    
+    table.table-bordered tbody td,
+    table#code tbody td:last-child {
+        padding: 6px 10px !important;
+    }
+}
+
+/* ============================================================
+ * v3 — UI adicional: badge, filtros, botão fechar, copiar
+ * ============================================================ */
+
+/* ---------- Badge global ---------- */
+.fk-global-stats {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    background: linear-gradient(135deg, #ea580c 0%, #f97316 100%) !important;
+    color: #ffffff !important;
+    padding: 14px 22px !important;
+    border-radius: 12px !important;
+    font-family: ui-sans-serif, system-ui, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    margin: 0 24px 20px !important;
+    box-shadow: 0 4px 14px rgba(234, 88, 12, .28) !important;
+    letter-spacing: -0.01em !important;
+}
+
+.fk-gs-icon { font-size: 18px !important; line-height: 1 !important; }
+.fk-gs-label { opacity: .95 !important; font-weight: 600 !important; }
+.fk-gs-value { font-size: 16px !important; font-weight: 800 !important; font-family: ui-monospace, monospace !important; }
+.fk-gs-sep { opacity: .6 !important; margin: 0 2px !important; }
+.fk-gs-count { opacity: .9 !important; font-weight: 500 !important; font-size: 12px !important; }
+
+/* ---------- Filtros ---------- */
+.fk-line-filters {
+    display: flex !important;
+    gap: 8px !important;
+    margin: 0 24px 16px !important;
+    flex-wrap: wrap !important;
+}
+
+.fk-filter-btn {
+    background: #ffffff !important;
+    color: #6b7280 !important;
+    border: 1px solid #e2e5ec !important;
+    padding: 8px 14px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-family: ui-sans-serif, system-ui, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    transition: all .15s ease !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+.fk-filter-btn:hover {
+    background: #f5f6f8 !important;
+    border-color: #cbd5e1 !important;
+    color: #2c3238 !important;
+}
+
+.fk-filter-btn.active {
+    background: #ea580c !important;
+    border-color: #ea580c !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(234, 88, 12, .25) !important;
+}
+
+
+/* ---------- Copiar linha ---------- */
+table#code tbody tr {
+    cursor: pointer !important;
+}
+
+table#code tbody tr.fk-copied {
+    animation: fk-flash-copy .8s ease !important;
+}
+
+@keyframes fk-flash-copy {
+    0%   { background: rgba(234, 88, 12, .18) !important; }
+    100% { background: transparent !important; }
+}
+
+/* ---------- Sombra suave no header (sticky) ---------- */
+header {
+    transition: box-shadow .2s ease !important;
+}
+
+/* Scroll: quando passa o header, sombra mais forte */
+body.fk-scrolled header {
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .06) !important;
+}
+
+/* ---------- Melhor contraste do código PHP ---------- */
+table#code tbody td:last-child {
+    color: #1e293b !important;
+}
+
+table#code tr.covered td:last-child {
+    color: #7c2d12 !important;
+}
+
+table#code tr.notCovered td:last-child {
+    color: #334155 !important;
+}
+
+
+/* ============================================================
+ * Fix de scroll: envolver a tabela #code num wrapper
+ * A tabela precisa de overflow: visible para o scroll funcionar.
+ * O border-radius e a sombra vão para o wrapper.
+ * ============================================================ */
+
+.fk-code-wrap {
+    background: #ffffff !important;
+    border: 1px solid #e8ebf0 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    margin: 0 24px 24px !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,.04), 0 1px 2px rgba(15,23,42,.03) !important;
+}
+
+/* A tabela por dentro perde tudo o que era do wrapper */
+.fk-code-wrap table#code,
+.fk-code-wrap table.source-code {
+    border: 0 !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+}
+
+/* ============================================================
+ * Filtros unificados (dashboard ↔ iframe)
+ * ============================================================ */
+.fk-line-filters {
+    display: flex !important;
+    gap: 8px !important;
+    margin: 0 24px 16px !important;
+    flex-wrap: wrap !important;
+}
+
+.fk-filter-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: #ffffff !important;
+    color: #6b7280 !important;
+    border: 1px solid #e2e5ec !important;
+    padding: 8px 14px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-family: ui-sans-serif, system-ui, sans-serif !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    transition: all .15s ease !important;
+}
+
+.fk-filter-btn:hover {
+    background: #f5f6f8 !important;
+    border-color: #cbd5e1 !important;
+    color: #2c3238 !important;
+}
+
+.fk-filter-btn.active {
+    background: #ea580c !important;
+    border-color: #ea580c !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(234,88,12,.25) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LINHAS CLICAVEIS — .coverage-row agora é <a>
+   Herda a grelha original; só normaliza os estilos nativos do <a>.
+   ═══════════════════════════════════════════════════════════════════ */
+
+a.coverage-row {
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    outline: none;
+}
+a.coverage-row:visited,
+a.coverage-row:active,
+a.coverage-row:focus {
+    color: inherit;
+    text-decoration: none;
+}
+a.coverage-row:focus-visible {
+    outline: 2px solid var(--fk-orange, #e07800);
+    outline-offset: 2px;
+}
+
+/* ─── scroll-margin: alvos de âncoras não ficam escondidos pelo header do coverage ─── */
+table#code tbody tr,
+table.source-code tbody tr {
+    scroll-margin-top: 90px;   /* header do iframe (50px) + breadcrumb (40px) */
+}
+
+/* Breadcrumb e títulos no topo do iframe */
+.fk-coverage-header,
+.coverage-header,
+nav[aria-label="breadcrumb"] {
+    scroll-margin-top: 20px;
+}

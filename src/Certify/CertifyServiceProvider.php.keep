@@ -1,0 +1,28 @@
+<?php
+// beaver-framework/src/Certify/CertifyServiceProvider.php
+
+namespace Beaver\Certify;
+
+use Beaver\Container\ServiceProvider;
+
+class CertifyServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->container->singleton(CertificateManager::class, function ($c) {
+            $config = require base_path('config/certify.php');
+            return new CertificateManager($config);
+        });
+    }
+
+    public function commands(): array
+    {
+        return [
+            \App\Commands\CertifyMakeCommand::class,
+            \App\Commands\CertifyIssueCommand::class,
+            \App\Commands\CertifyInstallCommand::class,
+            \App\Commands\CertifyCheckCommand::class,
+            \App\Commands\CertifyRenewCommand::class,
+        ];
+    }
+}

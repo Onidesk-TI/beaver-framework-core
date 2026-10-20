@@ -1,0 +1,560 @@
+<?php
+
+/**
+ * Rotas do plugin Frankei.
+ *
+ * @var \Beaver\Http\Router                    $router
+ * @var \Beaver\Plugins\Frankei\FrankeiPlugin  $plugin
+ */
+
+use Beaver\Http\Response;
+use Beaver\Plugins\Frankei\Http\SetupController;
+use Beaver\Plugins\Frankei\Http\FixController;
+// ── Dashboard (guard: auth → path → painel) ──
+$router->get('/frankei', function () {
+    return (new SetupController())->dashboard();
+});
+
+// ── Unit tests (página informativa) ──
+$router->get('/frankei/unit-tests', function () {
+    // Mesmo fluxo do painel — guard de auth + dashboard
+    return (new SetupController())->dashboard();
+});
+
+$router->post('/api/frankei/scan-code', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->scanCode($req);
+});
+
+// ── Terminal (execução real de comandos beaver) ──
+$router->post('/api/frankei/terminal/exec', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->exec($req);
+});
+
+$router->get('/api/frankei/terminal/metadata', function () {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->metadata();
+});
+
+// ── Report (geração + download) ──
+$router->post('/api/frankei/terminal/report', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->report($req);
+});
+
+$router->get('/api/frankei/terminal/report/download', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->downloadReport($req);
+});
+
+$router->get('/api/frankei/terminal/report/zip', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->downloadZip($req);
+});
+
+// Servir assets do report (CSS, JS, SVG do coverage) inline — sem Content-Disposition
+$router->get('/api/frankei/terminal/report/asset', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->serveAsset($req);
+});
+
+$router->get('/api/frankei/terminal/coverage-inline', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->coverageInline($req);
+});
+
+$router->get('/api/frankei/terminal/report/preview', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->previewHtml($req);
+});
+
+$router->post('/api/frankei/terminal/report/beaver', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->beaverReport($req);
+});
+
+$router->get('/api/frankei/terminal/report/beaver/view', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->beaverReportView($req);
+});
+
+// ── Setup: path ──
+$router->get('/frankei/path', function () {
+    return (new SetupController())->showPath();
+});
+$router->post('/frankei/path', function () {
+    return (new SetupController())->savePath();
+});
+
+// ── API: validar path (AJAX) ──
+$router->post('/api/frankei/validate-path', function () {
+    return (new SetupController())->validatePath();
+});
+
+// ── Listar ficheiros PHP de um path ──
+$router->post('/api/frankei/list-files', function () {
+    return (new \Beaver\Plugins\Frankei\Http\SetupController())->listFiles();
+});
+
+
+// ── Logout ──
+$router->get('/frankei/logout', function () {
+    return (new SetupController())->logout();
+});
+
+// Serve assets do plugin (CSS / JS) com validação de segurança
+function frankei_serve_asset($plugin, string $folder, string $file): Response
+{
+    if (
+        !preg_match('/^[A-Za-z0-9_-]+$/', $folder) ||
+        !preg_match('/^[A-Za-z0-9_.-]+$/', $file)
+    ) {
+        return Response::text('Forbidden', 403);
+    }
+
+    $path = $plugin->path . '/resources/ui/' . $folder . '/' . $file;
+    if (!is_file($path)) {
+        return Response::text('Not found: ' . $folder . '/' . $file, 404);
+    }
+
+    $ext  = pathinfo($path, PATHINFO_EXTENSION);
+    $mime = match ($ext) {
+        'css'   => 'text/css; charset=utf-8',
+        'js'    => 'application/javascript; charset=utf-8',
+        'html'  => 'text/html; charset=utf-8',
+        'svg'   => 'image/svg+xml',
+        'png'   => 'image/png',
+        'woff'  => 'font/woff',
+        'woff2' => 'font/woff2',
+        default => 'application/octet-stream',
+    };
+
+    // Forçar headers diretamente (o php -S já enviou Content-Type default)
+    @header_remove('Content-Type');
+    @header('Content-Type: ' . $mime);
+    @header('Content-Length: ' . filesize($path));
+    @header('Cache-Control: public, max-age=300');
+    readfile($path);
+    exit;
+}
+
+$router->get('/plugins/frankei/css/{file}', function ($req, $file) use ($plugin) {
+    return frankei_serve_asset($plugin, 'css', (string) $file);
+});
+
+$router->get('/plugins/frankei/js/{file}', function ($req, $file) use ($plugin) {
+    return frankei_serve_asset($plugin, 'js', (string) $file);
+});
+
+$router->get('/plugins/frankei/img/{file}', function ($req, $file) use ($plugin) {
+    return frankei_serve_asset($plugin, 'img', (string) $file);
+});
+
+// Layout HTML interno do painel (injetado no .fk-body pelo frankei-panel.js)
+$router->get('/plugins/frankei/layout.html', function () use ($plugin) {
+    $path = $plugin->path . '/resources/ui/layout.html';
+    if (!is_file($path)) {
+        return Response::text('Not found', 404);
+    }
+    return (new Response(file_get_contents($path)))
+        ->withHeader('Content-Type', 'text/html; charset=utf-8');
+});
+
+// ── Frankei: API ──
+$router->get('/api/frankei/scanners', function () {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->scanners();
+});
+
+$router->post('/api/frankei/scan', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->scan($req);
+});
+
+$router->post('/api/frankei/invalidate', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->invalidate($req);
+});
+
+$router->post('/api/frankei/scan-path', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\FrankeiController())->scanPath($req);
+});
+
+// ── Auto-fix (aplicar correcoes) ──
+$router->post('/api/frankei/preview-fix', function ($req) {
+    return (new FixController())->preview($req);
+});
+
+$router->post('/api/frankei/fix', function ($req) {
+    return (new FixController())->apply($req);
+});
+
+// ═════════════════════════════════════════════════════════════
+// JUNIT VIEWER — assets (CSS/JS)
+// ═════════════════════════════════════════════════════════════
+
+$router->get('/api/frankei/terminal/junit-view/{file}', function ($req, $file) {
+    $file = (string) $file;
+    if (!preg_match('/^[A-Za-z0-9_.-]+\.(js|css)$/', $file)) {
+        return \Beaver\Http\Response::text('Forbidden', 403);
+    }
+
+    $sub  = str_ends_with($file, '.js') ? 'js/' : 'css/';
+    $path = dirname(__DIR__) . '/resources/ui/' . $sub . $file;
+
+    if (!is_file($path)) {
+        return \Beaver\Http\Response::text('Not found: ' . $file, 404);
+    }
+
+    $mime = str_ends_with($file, '.js')
+        ? 'application/javascript; charset=utf-8'
+        : 'text/css; charset=utf-8';
+
+    return (new \Beaver\Http\Response(file_get_contents($path)))
+        ->withHeader('Content-Type', $mime)
+        ->withHeader('Cache-Control', 'public, max-age=300');
+});
+$router->get('/api/frankei/terminal/coverage/data', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TerminalController())->coverageData($req);
+});
+$router->get('/api/frankei/terminal/coverage-view/{file}', function ($req, $file) {
+    $file = (string) $file;
+    if (!preg_match('/^[A-Za-z0-9_.-]+\.(js|css)$/', $file)) {
+        return \Beaver\Http\Response::text('Forbidden', 403);
+    }
+
+    $sub  = str_ends_with($file, '.js') ? 'js/' : 'css/';
+    $path = dirname(__DIR__) . '/resources/ui/' . $sub . $file;
+
+    if (!is_file($path)) {
+        return \Beaver\Http\Response::text('Not found: ' . $file, 404);
+    }
+
+    $mime = str_ends_with($file, '.js')
+        ? 'application/javascript; charset=utf-8'
+        : 'text/css; charset=utf-8';
+
+    return (new \Beaver\Http\Response(file_get_contents($path)))
+        ->withHeader('Content-Type', $mime)
+        ->withHeader('Cache-Control', 'public, max-age=300');
+});
+
+
+// ═══════════════════════════════════════════════════════
+//  CHAVES ÚNICAS — trial
+// ═══════════════════════════════════════════════════════
+$router->post('/api/frankei/keys/generate', function () {
+    return (new \Beaver\Plugins\Frankei\Http\KeyController())->generate();
+});
+
+$router->post('/api/frankei/keys/validate', function () {
+    return (new \Beaver\Plugins\Frankei\Http\KeyController())->validate();
+});
+
+$router->get('/api/frankei/keys/list', function () {
+    return (new \Beaver\Plugins\Frankei\Http\KeyController())->listAll();
+});
+
+$router->post('/api/frankei/keys/revoke', function () {
+    return (new \Beaver\Plugins\Frankei\Http\KeyController())->revoke();
+});
+
+
+// ═══════════════════════════════════════════════════════
+//  TRIAL E DEMO
+// ═══════════════════════════════════════════════════════
+
+// Pedir trial (email → chave por email)
+$router->post('/api/frankei/request-trial', function () {
+    return (new \Beaver\Plugins\Frankei\Http\SetupController())->requestTrial();
+});
+
+// Pedido de demo (email + telefone)
+$router->post('/api/frankei/request-demo', function () {
+    return (new \Beaver\Plugins\Frankei\Http\SetupController())->requestDemo();
+});
+
+// ── Guardar setup (user logado) ──
+$router->post('/api/frankei/save-setup', function () {
+    return (new \Beaver\Plugins\Frankei\Http\SetupController())->saveSetupFromSession();
+});
+
+// ═══════════════════════════════════════════════════════
+//  TRIAL TEMPORÁRIO (30 min, sem conta)
+// ═══════════════════════════════════════════════════════
+$router->post('/api/frankei/trial/start', function () {
+    return (new \Beaver\Plugins\Frankei\Http\TrialController())->start();
+});
+
+$router->post('/api/frankei/trial/verify', function () {
+    return (new \Beaver\Plugins\Frankei\Http\TrialController())->verify();
+});
+
+$router->get('/api/frankei/trial/status', function () {
+    return (new \Beaver\Plugins\Frankei\Http\TrialController())->status();
+});
+
+// ── Página de preços ──
+$router->get('/frankei/precos', function () {
+    return (new \Beaver\Plugins\Frankei\Http\PricingController())->index();
+});
+
+// ── Página do plano Pro (detalhes) ──
+$router->get('/frankei/pro', function () {
+    return (new \Beaver\Plugins\Frankei\Http\ProController())->index();
+});
+
+// ── Página do plano Premium (detalhes) ──
+$router->get('/frankei/premium', function () {
+    return (new \Beaver\Plugins\Frankei\Http\ProController())->index();
+});
+
+// ── Test generator (criar esqueleto de teste) ──
+$router->post('/api/frankei/tests/preview', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TestGeneratorController())->preview($req);
+});
+$router->post('/api/frankei/tests/create', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TestGeneratorController())->create($req);
+});
+
+$router->post('/api/frankei/tests/prune', function ($req) {
+    return (new \Beaver\Plugins\Frankei\Http\TestGeneratorController())->prune($req);
+});
+
+
+// ═════════════════════════════════════════════════════════════
+// CLASSES — autocomplete (PSR-4 do composer.json)
+// ═════════════════════════════════════════════════════════════
+$router->get('/api/frankei/classes', function ($req) {
+    $q     = strtolower(trim((string)($req->query['q'] ?? '')));
+    $limit = min(100, max(10, (int)($req->query['limit'] ?? 50)));
+
+    $root = dirname(__DIR__, 3);
+    $composer = json_decode((string) @file_get_contents($root . '/composer.json'), true);
+    $map = $composer['autoload']['psr-4'] ?? [];
+
+    $results = [];
+    foreach ($map as $ns => $dir) {
+        if (strpos($ns, 'Tests\\') === 0) continue;
+        $abs = $root . '/' . rtrim($dir, '/');
+        if (!is_dir($abs)) continue;
+
+        try {
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($abs, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                if ($file->getExtension() !== 'php') continue;
+                $rel = substr($file->getPathname(), strlen($abs) + 1);
+                $rel = str_replace(['/', '.php'], ['\\', ''], $rel);
+                $fqcn = $ns . $rel;
+
+                if ($q !== '' && strpos(strtolower($fqcn), $q) === false) continue;
+
+                $results[] = [
+                    'class' => $fqcn,
+                    'file'  => ltrim(substr($file->getPathname(), strlen($root)), '/'),
+                ];
+            }
+        } catch (\Throwable $e) {
+        }
+    }
+
+    usort($results, function ($a, $b) {
+        return strcmp($a['class'], $b['class']);
+    });
+    $results = array_slice($results, 0, $limit);
+
+    return \Beaver\Http\Response::json(['ok' => true, 'classes' => $results]);
+});
+
+
+// ═════════════════════════════════════════════════════════════
+// TEST FILE — ver conteúdo de um teste (só leitura)
+// ═════════════════════════════════════════════════════════════
+$router->get('/api/frankei/test-file', function ($req) {
+    $class = trim((string)($req->query['class'] ?? ''));
+    if ($class === '') {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'class obrigatória'], 422);
+    }
+
+    $root = dirname(__DIR__, 3);
+
+    // Normaliza: Tests.Unit.FkDemoServiceTest  →  Tests\Unit\FkDemoServiceTest
+    $fqcn = str_replace('.', '\\', $class);
+
+    // Candidatos por ordem:
+    //   tests/Unit/FkDemoServiceTest.php
+    //   tests/Feature/FkDemoServiceTest.php
+    //   tests/FkDemoServiceTest.php
+    $short = substr($fqcn, strrpos($fqcn, '\\') !== false ? strrpos($fqcn, '\\') + 1 : 0);
+    $candidates = [
+        $root . '/tests/' . str_replace('\\', '/', substr($fqcn, strpos($fqcn, 'Tests\\') === 0 ? 6 : 0)) . '.php',
+        $root . '/tests/' . $short . '.php',
+    ];
+
+    // Se não encontrou, procura em tests/ por basename
+    $found = null;
+    foreach ($candidates as $c) {
+        if (is_file($c)) {
+            $found = $c;
+            break;
+        }
+    }
+    if (!$found) {
+        try {
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root . '/tests', \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $f) {
+                if ($f->getExtension() !== 'php') continue;
+                if ($f->getBasename('.php') === $short) {
+                    $found = $f->getPathname();
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+    }
+
+    if (!$found || !is_file($found)) {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'Ficheiro não encontrado: ' . $short . '.php'], 404);
+    }
+
+    // Segurança: garantir que está dentro do root
+    $real = realpath($found);
+    if ($real === false || strpos($real, $root . '/tests/') !== 0) {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'Path inválido'], 403);
+    }
+
+    $content = @file_get_contents($real);
+    if ($content === false) {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'Falha a ler'], 500);
+    }
+
+    return \Beaver\Http\Response::json([
+        'ok'      => true,
+        'class'   => $fqcn,
+        'file'    => ltrim(substr($real, strlen($root)), '/'),
+        'content' => $content,
+        'size'    => strlen($content),
+        'mtime'   => date('c', filemtime($real)),
+    ]);
+});
+
+
+
+// ═════════════════════════════════════════════════════════════
+// TEST FILE — gravar conteúdo (com backup .bak.<timestamp>)
+// ═════════════════════════════════════════════════════════════
+$router->post('/api/frankei/test-file', function ($req) {
+    $body    = $req->body ?? [];
+    $class   = trim((string)($body['class']   ?? ''));
+    $content = (string)($body['content'] ?? '');
+
+    if ($class === '') {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'class obrigatória'], 422);
+    }
+    if ($content === '') {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'conteúdo vazio'], 422);
+    }
+    // Sanidade: tem de começar por <?php
+    if (strpos(ltrim($content), '<?php') !== 0) {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'ficheiro tem de começar por <?php'], 422);
+    }
+
+    $root = dirname(__DIR__, 3);
+    $fqcn = str_replace('.', '\\', $class);
+    $short = substr($fqcn, strrpos($fqcn, '\\') !== false ? strrpos($fqcn, '\\') + 1 : 0);
+
+    // Mesma lógica de resolução do GET
+    $found = null;
+    try {
+        $it = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root . '/tests', \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($it as $f) {
+            if ($f->getExtension() !== 'php') continue;
+            if ($f->getBasename('.php') === $short) {
+                $found = $f->getPathname();
+                break;
+            }
+        }
+    } catch (\Throwable $e) {
+    }
+
+    if (!$found || !is_file($found)) {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'Ficheiro não encontrado: ' . $short . '.php'], 404);
+    }
+
+    $real = realpath($found);
+    if ($real === false || strpos($real, $root . '/tests/') !== 0) {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'Path inválido'], 403);
+    }
+
+    // Backup antes de gravar
+    $bak = $real . '.bak.' . date('Ymd_His');
+    @copy($real, $bak);
+
+    $bytes = @file_put_contents($real, $content);
+    if ($bytes === false) {
+        return \Beaver\Http\Response::json(['ok' => false, 'error' => 'Falha a gravar'], 500);
+    }
+
+    return \Beaver\Http\Response::json([
+        'ok'    => true,
+        'file'  => ltrim(substr($real, strlen($root)), '/'),
+        'bytes' => $bytes,
+        'backup' => basename($bak),
+        'mtime' => date('c'),
+    ]);
+});
+
+// ── Capturar erros JS ──
+$router->post('/api/frankei/log-js-error', function () {
+    $raw = file_get_contents('php://input');
+
+    // limita tamanho — evita abuso / disco cheio
+    if (strlen($raw) > 8192) {
+        $raw = substr($raw, 0, 8192) . '...[truncated]';
+    }
+
+    // grava no storage do projeto, com rotação diária
+    $dir = dirname(__DIR__, 3) . '/storage/logs';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+
+    $line = sprintf(
+        "%s %s %s\n",
+        date('c'),
+        $_SERVER['REMOTE_ADDR'] ?? '-',
+        $raw
+    );
+
+    @file_put_contents(
+        $dir . '/js-errors-' . date('Y-m-d') . '.log',
+        $line,
+        FILE_APPEND | LOCK_EX
+    );
+
+    return Response::json(['ok' => true]);
+});
+
+// ── Capturar erros JS ──
+$router->post('/api/frankei/log-js-error', function () {
+    $raw = file_get_contents('php://input');
+
+    // limita tamanho — evita abuso / disco cheio
+    if (strlen($raw) > 8192) {
+        $raw = substr($raw, 0, 8192) . '...[truncated]';
+    }
+
+    // grava no storage do projeto, com rotação diária
+    $dir = dirname(__DIR__, 3) . '/storage/logs';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+
+    $line = sprintf(
+        "%s %s %s\n",
+        date('c'),
+        $_SERVER['REMOTE_ADDR'] ?? '-',
+        $raw
+    );
+
+    @file_put_contents(
+        $dir . '/js-errors-' . date('Y-m-d') . '.log',
+        $line,
+        FILE_APPEND | LOCK_EX
+    );
+
+    return Response::json(['ok' => true]);
+});

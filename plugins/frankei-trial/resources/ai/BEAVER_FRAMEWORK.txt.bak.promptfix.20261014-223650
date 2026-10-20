@@ -1,0 +1,160 @@
+# Framework Beaver — Guia para geração de testes
+
+Este projeto usa o framework BEAVER (custom).
+NAO e Laravel. NAO e Symfony.
+
+## REGRAS ABSOLUTAS — NUNCA usar
+
+- use Illuminate\...  (Laravel)
+- use Symfony\...     (Symfony)
+- Request::fake()
+- $response->getStatusCode()
+- $response->headers->get()
+- Route::get()
+- $request->validate()
+
+## Namespaces reais
+
+- App\Controllers\
+- App\Services\
+- Beaver\Http\
+- Beaver\Plugin\
+- Beaver\Plugins\FrankeiTrial\
+- Tests\
+
+## Beaver\Http\Request
+
+Metodos publicos:
+- static capture(): self
+- input(string $key, mixed $default = null): mixed
+- all(): array
+- header(string $name, ?string $default = null): ?string
+- isMethod(string $method): bool
+- ip(): ?string
+- isJson(): bool
+
+NAO existe: validate(), file(), method().
+
+## Beaver\Http\Response
+
+Propriedades publicas:
+- $content (string)
+- $status (int)
+- $headers (array)
+
+Metodos estaticos:
+- html(string $content, int $status = 200): self
+- json(mixed $data, int $status = 200): self
+- text(string $content, int $status = 200): self
+- css(string $content, int $status = 200): self
+- js(string $content, int $status = 200): self
+- redirect(string $url, int $status = 302): self
+
+Metodos de instancia:
+- withHeader(string $name, string $value): self
+- send(): void
+
+NAO existe: getStatusCode(), getContent(), getHeaders().
+
+## Controllers
+
+- Namespace: App\Controllers\
+- Metodos devolvem VOID (nao Response)
+- Usam $_GET e $_POST diretamente
+- Redirecionam com $this->go('/path')
+- Renderizam com $this->renderView('pasta/vista', $dados)
+- Sao classes HTTP — nao testaveis em teste unitario sem simular $_GET/$_POST
+
+## Routing
+
+- Classe: Beaver\Http\Router
+- Registo em routes/web.php:
+    $router->get('/path', function ($req) { ... });
+    $router->post('/path', [$ctrl, 'metodo']);
+    $router->get('/admin', [$ctrl, 'index'], [RequireAuth::class]);
+
+- Middlewares: RequireAuth, RequireGuest
+
+## Plugins
+
+Cada plugin vive em plugins/<slug>/ com:
+- plugin.json     (metadados)
+- composer.json   (autoload PSR-4)
+- routes/web.php  (rotas do plugin)
+- src/            (namespace Beaver\Plugins\<Nome>\)
+- resources/views/, resources/ui/js/, resources/ui/css/
+
+## Testes
+
+Framework: Pest + PHPUnit.
+
+tests/TestCase.php:
+    namespace Tests;
+    use PHPUnit\Framework\TestCase as BaseTestCase;
+    abstract class TestCase extends BaseTestCase {}
+
+Estilo Pest:
+    <?php
+    use Tests\TestCase;
+    uses(TestCase::class);
+
+    it('descricao', function () {
+        expect($valor)->toBe(...);
+    });
+
+Ficheiros: tests/Unit/*Test.php
+
+## Servicos comuns
+
+- App\Services\UserService
+    - UserService::autenticado(): bool
+
+- App\Services\SiteDB
+    - SiteDB::select($sql, $params): array
+    - SiteDB::exec($sql, $params): int
+
+## EXEMPLO DE TESTE CORRETO (servico puro)
+
+    <?php
+    use Tests\TestCase;
+    use App\Services\Calc;
+
+    uses(TestCase::class);
+
+    it('soma dois inteiros', function () {
+        $calc = new Calc();
+        expect($calc->soma(2, 3))->toBe(5);
+    });
+
+## EXEMPLO DE TESTE DE CLASSE HTTP
+
+    <?php
+    use Tests\TestCase;
+    use App\Controllers\AuthController;
+
+    uses(TestCase::class);
+
+    it('carrega a classe', function () {
+        expect(class_exists(AuthController::class))->toBeTrue();
+    });
+
+    it('showLogin() funciona', function () {
+        $this->markTestIncomplete('classe HTTP — requer $_GET/$_SERVER');
+    });
+
+## ANTI-PADROES (nunca gerar)
+
+ERRADO:
+    use Illuminate\Support\Facades\Auth;
+    Auth::user();
+    $response->getStatusCode();
+    Request::fake(['post' => '/x']);
+    $response->headers->get('Location');
+    Route::get('/x', ...);
+
+CERTO:
+    $_POST['email'];
+    $_GET['next'];
+    Response::redirect('/painel', 302);
+    $response->status;
+    $response->headers['Location'] ?? null;

@@ -1,0 +1,207 @@
+{
+  "name": "LMS",
+  "icon": "📚",
+  "description": "Courses, lessons, enrollments",
+  "tables": [
+    {
+      "id": "t_users",
+      "name": "users",
+      "x": 60,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "t_courses",
+      "name": "courses",
+      "x": 420,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "price",
+          "type": "DECIMAL(10,2)",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_lessons",
+      "name": "lessons",
+      "x": 780,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "course_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "body",
+          "type": "TEXT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "duration_min",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "ordem",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_enrollments",
+      "name": "enrollments",
+      "x": 420,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "course_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "enrolled_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "completed_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_quizzes",
+      "name": "quizzes",
+      "x": 780,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "lesson_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "question",
+          "type": "TEXT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "answer",
+          "type": "TEXT",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "t_lessons",
+      "to": "t_courses",
+      "card": "n:1"
+    },
+    {
+      "from": "t_enrollments",
+      "to": "t_users",
+      "card": "n:1"
+    },
+    {
+      "from": "t_enrollments",
+      "to": "t_courses",
+      "card": "n:1"
+    },
+    {
+      "from": "t_quizzes",
+      "to": "t_lessons",
+      "card": "n:1"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+    "user_id": 6,
+    "path": "/var/www/beaver/ftp",
+    "framework": "php",
+    "validated_at": "2026-10-11T02:45:42+01:00",
+    "stats": {
+        "php_files": 4,
+        "controllers": 0,
+        "models": 0,
+        "views": 0,
+        "writable": true
+    },
+    "files": [
+        "_boot.php",
+        "beaver-framework/app/Controllers/AuthController.php",
+        "beaver-framework/app/Controllers/ForumController.php",
+        "beaver-framework/app/Controllers/LojaController.php",
+        "beaver-framework/app/Controllers/PainelController.php"
+    ],
+    "files_count": 5,
+    "plan": "free",
+    "plan_limit": 5
+}

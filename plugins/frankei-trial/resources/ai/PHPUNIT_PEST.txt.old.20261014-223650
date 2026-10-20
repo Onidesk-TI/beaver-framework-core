@@ -1,0 +1,273 @@
+# PHPUnit + Pest — Guia completo para este projeto
+
+Este projeto usa **Pest** (framework de testes moderno) que corre POR CIMA do PHPUnit.
+A classe base e o PHPUnit\Framework\TestCase. O Pest so adiciona sintaxe mais simples.
+
+## REGRA RAPIDA
+- Ficheiros em tests/Unit/*Test.php
+- Ficheiro começa com: <?php
+- No topo: use Tests\TestCase;
+- Logo abaixo: uses(TestCase::class);
+- Cada teste: it('descricao', function () { ... });
+
+## PHPUnit — anatomia de um teste
+
+### Classe tradicional (NAO usar neste projeto)
+    <?php
+    namespace Tests\Unit;
+    use PHPUnit\Framework\TestCase;
+
+    class CalcTest extends TestCase
+    {
+        public function test_soma(): void
+        {
+            $this->assertSame(5, 2 + 3);
+        }
+    }
+
+### Estilo Pest (USAR neste projeto)
+    <?php
+    use Tests\TestCase;
+
+    uses(TestCase::class);
+
+    it('soma', function () {
+        expect(2 + 3)->toBe(5);
+    });
+
+## ASSERCOES PHPUnit (metodos $this->)
+
+    $this->assertSame($esperado, $real);        // identico (===)
+    $this->assertEquals($esperado, $real);      // igual (==)
+    $this->assertTrue($x);
+    $this->assertFalse($x);
+    $this->assertNull($x);
+    $this->assertNotNull($x);
+    $this->assertEmpty($array);
+    $this->assertNotEmpty($array);
+    $this->assertCount(3, $array);
+    $this->assertContains('a', $array);
+    $this->assertArrayHasKey('x', $array);
+    $this->assertInstanceOf(Classe::class, $obj);
+    $this->assertStringContainsString('foo', 'foobar');
+    $this->assertStringStartsWith('foo', 'foobar');
+    $this->assertMatchesRegularExpression('/\d+/', 'abc123');
+    $this->assertGreaterThan(5, 10);
+    $this->assertLessThan(10, 5);
+    $this->assertGreaterThanOrEqual(5, 5);
+
+    // Excecoes
+    $this->expectException(\RuntimeException::class);
+    $this->expectExceptionMessage('erro x');
+    throw new \RuntimeException('erro x');
+
+## PEST — expect() (substitui $this->assert*)
+
+    expect($valor)->toBe($esperado);              // ===
+    expect($valor)->toEqual($esperado);           // ==
+    expect($valor)->toBeTrue();
+    expect($valor)->toBeFalse();
+    expect($valor)->toBeNull();
+    expect($valor)->not->toBeNull();
+    expect($valor)->toBeEmpty();
+    expect($valor)->not->toBeEmpty();
+    expect($array)->toHaveCount(3);
+    expect($array)->toContain('a');
+    expect($array)->toHaveKey('x');
+    expect($valor)->toBeInstanceOf(Classe::class);
+    expect($str)->toContain('foo');
+    expect($str)->toStartWith('foo');
+    expect($str)->toMatch('/\d+/');
+    expect($valor)->toBeGreaterThan(5);
+    expect($valor)->toBeLessThan(10);
+
+    // Encadeamento (varias assercoes)
+    expect($user)
+        ->toBeArray()
+        ->toHaveKey('nome')
+        ->and($user['nome'])->toBe('Ana');
+
+## PEST — funcoes uteis
+
+    it('descricao', function () { ... });        // define teste
+    beforeEach(function () { ... });             // antes de cada it()
+    afterEach(function () { ... });              // depois de cada it()
+    test('descricao', function () { ... });      // alias de it()
+    todo('ideia futura');                        // teste pendente
+
+    // Excecoes
+    expect(fn() => throw new \Exception('x'))
+        ->toThrow(\Exception::class);
+
+    expect(fn() => throw new \Exception('x'))
+        ->toThrow(\Exception::class, 'x');
+
+## PEST — datasets (varios casos no mesmo teste)
+
+    it('soma varios', function (int $a, int $b, int $esperado) {
+        expect($a + $b)->toBe($esperado);
+    })->with([
+        [2, 3, 5],
+        [0, 0, 0],
+        [-1, 1, 0],
+    ]);
+
+## MOCKS E STUBS — apenas PHPUnit (o Pest usa os mesmos)
+
+### createStub — objeto que devolve valores fixos (nao verifica chamadas)
+    $stub = $this->createStub(UserService::class);
+    $stub->method('autenticado')->willReturn(true);
+
+    expect($stub->autenticado())->toBeTrue();
+
+### createMock — objeto que verifica chamadas (tambem devolve valores)
+    $mock = $this->createMock(UserService::class);
+    $mock->expects($this->once())
+         ->method('autenticado')
+         ->willReturn(true);
+
+    $mock->autenticado();
+
+### willReturn / willThrowException / willReturnCallback
+    $stub->method('metodo')->willReturn(42);
+    $stub->method('metodo')->willReturn(true, false);  // multiplas chamadas
+    $stub->method('metodo')->willThrowException(new \RuntimeException('x'));
+    $stub->method('metodo')->willReturnCallback(fn($x) => $x * 2);
+
+### Matchers de chamadas (expects)
+    $this->once()
+    $this->never()
+    $this->exactly(3)
+    $this->atLeastOnce()
+    $this->any()
+
+### Verificar argumentos
+    $mock->expects($this->once())
+         ->method('guardar')
+         ->with($this->equalTo('x'), $this->isType('int'));
+
+### getMockBuilder (controlo avancado)
+    $mock = $this->getMockBuilder(Classe::class)
+                 ->disableOriginalConstructor()
+                 ->onlyMethods(['metodo'])
+                 ->getMock();
+
+## NAO EXISTE NESTE PROJETO (Laravel/Mockery)
+
+    $this->mock(Classe::class, function ($m) { ... });     // Laravel
+    $this->partialMock(Classe::class, ...);                // Laravel
+    $mock->shouldReceive('metodo')->andReturn('x');        // Mockery
+    $mock->shouldNotReceive('metodo');                     // Mockery
+    $mock->shouldHaveReceived(...);                        // Mockery
+
+Se vires estes no codigo, sao ERRO.
+
+## LIFECYCLE — metodos que correm automaticamente
+
+    setUp(): void          — antes de CADA teste
+    tearDown(): void       — depois de CADA teste
+    setUpBeforeClass()     — antes de TODOS (static)
+    tearDownAfterClass()   — depois de TODOS (static)
+
+Em Pest (preferido neste projeto):
+    beforeEach(function () { ... });
+    afterEach(function () { ... });
+
+## MARCAR TESTES PENDENTES
+
+PHPUnit:
+    $this->markTestIncomplete('motivo');
+    $this->markTestSkipped('motivo');
+
+Pest:
+    $this->markTestIncomplete('motivo');
+    test('nome')->todo();          // marca como TODO
+    todo('ideia futura');
+
+## TESTES DE CLASSES HTTP (Controllers no Beaver)
+
+Os controllers do Beaver:
+- NAO sao estaticos
+- Devolvem void
+- Usam $_GET / $_POST / $_SERVER / header() / exit
+
+Um teste unitario normal NAO consegue testar o comportamento (o exit mata o teste).
+
+### CORRETO — testar o que da + marcar o resto
+    <?php
+    use Tests\TestCase;
+    use App\Controllers\AuthController;
+
+    uses(TestCase::class);
+
+    it('classe existe', function () {
+        expect(class_exists(AuthController::class))->toBeTrue();
+    });
+
+    it('tem o metodo showLogin', function () {
+        expect(method_exists(AuthController::class, 'showLogin'))->toBeTrue();
+    });
+
+    it('tem o metodo login', function () {
+        expect(method_exists(AuthController::class, 'login'))->toBeTrue();
+    });
+
+    it('showLogin() redireciona quando autenticado', function () {
+        $this->markTestIncomplete('classe HTTP — requer $_GET/$_SERVER simulados');
+    });
+
+## TESTES DE SERVICOS (o caso ideal)
+
+    <?php
+    use Tests\TestCase;
+    use App\Services\Calc;
+
+    uses(TestCase::class);
+
+    it('soma dois inteiros', function () {
+        $calc = new Calc();
+        expect($calc->soma(2, 3))->toBe(5);
+    });
+
+    it('soma zero', function () {
+        $calc = new Calc();
+        expect($calc->soma(0, 0))->toBe(0);
+    });
+
+    it('lanca excecao com negativos', function () {
+        $calc = new Calc();
+        expect(fn() => $calc->soma(-1, -2))
+            ->toThrow(\InvalidArgumentException::class);
+    });
+
+## EXEMPLO COM STUB (dependencia falsa)
+
+    <?php
+    use Tests\TestCase;
+    use App\Services\Mailer;
+    use App\Services\Registo;
+
+    uses(TestCase::class);
+
+    it('registo envia email', function () {
+        $mailer = $this->createStub(Mailer::class);
+        $mailer->method('enviar')->willReturn(true);
+
+        $registo = new Registo($mailer);
+        expect($registo->novoUtilizador('a@b.pt'))->toBeTrue();
+    });
+
+## COISAS QUE NUNCA USAR NESTE PROJETO
+
+    namespace Tests\Unit;                             // desnecessario em Pest
+    class XxxTest extends TestCase                    // usar it() em vez disto
+    use Illuminate\Support\Facades\...                // nao existe
+    use PHPUnit\Framework\TestCase;                   // usar Tests\TestCase
+    $this->mock(...)                                  // Laravel
+    shouldReceive(...)                                // Mockery
+    $response->getStatusCode()                        // nao existe no Beaver
+    $response->getContent()                           // usar ->content
+
+## REGRA FINAL
+So deves usar <?php UMA VEZ, na primeira linha do ficheiro.
+NUNCA coloques <?php dentro do corpo dos testes.

@@ -1,0 +1,69 @@
+# Regras PEST (obrigatorio quando engine=pest)
+
+## Anatomia de um ficheiro de teste
+
+    <?php
+    use Tests\TestCase;
+    uses(TestCase::class);
+
+    it('descricao do teste', function () {
+        expect($valor)->toBe($esperado);
+    });
+
+## PROIBIDO (nada disto num ficheiro Pest)
+- `namespace Tests\Unit;`
+- `class XxxTest extends TestCase`
+- `use PHPUnit\Framework\TestCase;`
+- `use Mockery\...` / `Mockery::mock(...)`
+
+## Assercoes (usa expect(), NAO $this->assert*)
+`expect($x)->toBe($y)`, `->toEqual`, `->toBeTrue`, `->toBeFalse`, `->toBeNull`,
+`->not->toBeNull`, `->toBeEmpty`, `->not->toBeEmpty`, `->toHaveCount(3)`,
+`->toContain('a')`, `->toHaveKey('k')`, `->toBeInstanceOf(X::class)`,
+`->toStartWith('x')`, `->toMatch('/re/')`, `->toBeGreaterThan(5)`
+
+Excecao: `expect(fn() => $obj->metodo())->toThrow(\RuntimeException::class)`
+
+## Stubs
+    $stub = $this->createStub(UserService::class);
+    $stub->method('autenticado')->willReturn(true);
+
+## Exemplo — servico puro (IMITA ESTE FORMATO)
+
+    <?php
+    use Tests\TestCase;
+    use App\Services\Calc;
+    uses(TestCase::class);
+
+    it('soma dois inteiros', function () {
+        $calc = new Calc();
+        expect($calc->soma(2, 3))->toBe(5);
+    });
+
+    it('soma zero', function () {
+        $calc = new Calc();
+        expect($calc->soma(0, 0))->toBe(0);
+    });
+
+## Exemplo — controller HTTP (IMITA ESTE FORMATO)
+
+    <?php
+    use Tests\TestCase;
+    use App\Controllers\AuthController;
+    uses(TestCase::class);
+
+    it('classe existe', function () {
+        expect(class_exists(AuthController::class))->toBeTrue();
+    });
+
+    it('tem o metodo login', function () {
+        expect(method_exists(AuthController::class, 'login'))->toBeTrue();
+    });
+
+    it('login() funciona', function () {
+        $this->markTestIncomplete('classe HTTP — requer $_GET/$_POST simulados');
+    });
+
+## Regra final
+- So UM `<?php`, na primeira linha
+- Cada `it('...', function () { ... });` tem de ter assercoes concretas

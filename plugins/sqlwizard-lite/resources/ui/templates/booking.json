@@ -1,0 +1,164 @@
+{
+  "name": "Booking",
+  "icon": "📅",
+  "description": "Resources, bookings, payments",
+  "tables": [
+    {
+      "id": "t_users",
+      "name": "users",
+      "x": 60,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "t_resources",
+      "name": "resources",
+      "x": 420,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR(50)",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "capacity",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_bookings",
+      "name": "bookings",
+      "x": 780,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "resource_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "start_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "end_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_payments",
+      "name": "payments",
+      "x": 780,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "booking_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "amount",
+          "type": "DECIMAL(10,2)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "method",
+          "type": "VARCHAR(50)",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "paid_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "t_bookings",
+      "to": "t_users",
+      "card": "n:1"
+    },
+    {
+      "from": "t_bookings",
+      "to": "t_resources",
+      "card": "n:1"
+    },
+    {
+      "from": "t_payments",
+      "to": "t_bookings",
+      "card": "n:1"
+    }
+  ]
+}

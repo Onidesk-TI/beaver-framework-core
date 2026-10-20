@@ -1,0 +1,248 @@
+/* ============================================================
+ *  Frankei — Path files
+ *  Lista ficheiros PHP com checkboxes + regras de tecnologia
+ *  Regra: máximo 5 ficheiros (plano grátis)
+ * ============================================================ */
+
+(function () {
+    'use strict';
+
+    if (window.__fkPathFilesBooted) return;
+    window.__fkPathFilesBooted = true;
+
+    var FREE_MAX = 5;
+
+    var input   = document.getElementById('fkPath');
+    var wrap    = document.getElementById('fkFilesWrap');
+    var list    = document.getElementById('fkFilesList');
+    var count   = document.getElementById('fkFilesCount');
+    var limitEl = document.getElementById('fkFilesLimit');
+    var btnAll  = document.getElementById('fkSelectAll');
+    var btnNone = document.getElementById('fkSelectNone');
+    var form    = document.getElementById('fkFormPath');
+
+    if (!input || !wrap || !list) return;
+
+    var debounceId = 0;
+    var lastPath   = '';
+
+    /* ---------- Toast ---------- */
+    function showToast(msg) {
+        var t = document.getElementById('fkToast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'fkToast';
+            t.className = 'fk-toast';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(window.__fkToastId);
+        window.__fkToastId = setTimeout(function () {
+            t.classList.remove('show');
+        }, 3200);
+    }
+
+    /* ---------- Forçar PHP ---------- */
+    function lockTech() {
+        var radios = document.querySelectorAll('#fkTechPrincipal input[type=radio]');
+        for (var i = 0; i < radios.length; i++) {
+            var r = radios[i];
+            var lbl = r.closest('.fk-radio');
+            if (r.value === 'php') {
+                r.checked = true;
+                r.disabled = false;
+                if (lbl) {
+                    lbl.classList.add('is-forced-ok');
+                    lbl.classList.remove('is-forced-bad');
+                }
+            } else {
+                r.checked = false;
+                r.disabled = true;
+                if (lbl) {
+                    lbl.classList.add('is-forced-bad');
+                    lbl.classList.remove('is-forced-ok');
+                }
+            }
+        }
+        var checks = document.querySelectorAll('#fkTechOutras input[type=checkbox]');
+        for (var j = 0; j < checks.length; j++) {
+            var c = checks[j];
+            c.checked = false;
+            c.disabled = true;
+            var lc = c.closest('.fk-checkbox');
+            if (lc) {
+                lc.classList.add('is-forced-bad');
+                lc.classList.remove('is-forced-ok');
+            }
+        }
+    }
+
+    /* ---------- Atualizar contador ---------- */
+    function updateLimit() {
+        var all = list.querySelectorAll('input[type=checkbox]');
+        var checked = list.querySelectorAll('input[type=checkbox]:checked');
+        var n = checked.length;
+
+        var over = 0;
+        for (var i = 0; i < all.length; i++) {
+            var item = all[i].closest('.fk-file-item');
+            if (item) item.classList.remove('is-over');
+            if (all[i].checked && over >= FREE_MAX) {
+                if (item) item.classList.add('is-over');
+                over++;
+            }
+        }
+
+        limitEl.textContent = 'Selecionados: ' + n + ' / máximo grátis: ' + FREE_MAX;
+        limitEl.classList.toggle('is-over', n > FREE_MAX);
+    }
+
+    /* ---------- Handler de cada checkbox ---------- */
+    function bindCheckbox(cb) {
+        cb.addEventListener('click', function (e) {
+            // Se está a MARCAR e já há 5, bloqueia
+            if (!cb.checked) {
+                var c = list.querySelectorAll('input[type=checkbox]:checked').length;
+                if (c >= FREE_MAX) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showToast('Máximo ' + FREE_MAX + ' ficheiros no plano grátis. Desseleciona um para escolher outro.');
+                    setTimeout(updateLimit, 0);
+                    return false;
+                }
+            }
+            setTimeout(updateLimit, 0);
+        });
+
+        cb.addEventListener('change', function () {
+            setTimeout(updateLimit, 0);
+        });
+    }
+
+    /* ---------- Desenhar lista ---------- */
+    function renderFiles(data) {
+        list.innerHTML = '';
+
+        if (!data.files || data.files.length === 0) {
+            wrap.hidden = true;
+            return;
+        }
+
+        wrap.hidden = false;
+        count.textContent = data.shown + ' de ' + (data.total || data.shown) + ' ficheiros PHP';
+
+        for (var i = 0; i < data.files.length; i++) {
+            var f = data.files[i];
+
+            var item = document.createElement('label');
+            item.className = 'fk-file-item';
+
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.name = 'files[]';
+            cb.value = f.rel;
+            cb.checked = (i < FREE_MAX);  // só os primeiros 5 marcados
+            bindCheckbox(cb);
+
+            var name = document.createElement('code');
+            name.className = 'fk-file-name';
+            name.textContent = f.rel;
+
+            var size = document.createElement('span');
+            size.className = 'fk-file-size';
+            size.textContent = f.size < 1024 ? f.size + ' B' : (f.size / 1024).toFixed(1) + ' KB';
+
+            item.appendChild(cb);
+            item.appendChild(name);
+            item.appendChild(size);
+            list.appendChild(item);
+        }
+
+        updateLimit();
+    }
+
+    /* ---------- Carregar ficheiros ---------- */
+    function loadFiles(path) {
+        var fd = new FormData();
+        fd.append('path', path);
+
+        fetch('/api/frankei/list-files', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin'
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.ok) { wrap.hidden = true; return; }
+            renderFiles(data);
+            lockTech();
+        })
+        .catch(function () { wrap.hidden = true; });
+    }
+
+    /* ---------- Debounce do input ---------- */
+    input.addEventListener('input', function () {
+        clearTimeout(debounceId);
+        var val = input.value.trim();
+        if (val === lastPath) return;
+
+        debounceId = setTimeout(function () {
+            lastPath = val;
+            if (val === '') { wrap.hidden = true; return; }
+            loadFiles(val);
+        }, 550);
+    });
+
+    /* ---------- Botão "Todos" ---------- */
+    if (btnAll) {
+        btnAll.addEventListener('click', function () {
+            var all = list.querySelectorAll('input[type=checkbox]');
+            var marked = 0;
+            for (var i = 0; i < all.length; i++) {
+                if (marked < FREE_MAX) {
+                    all[i].checked = true;
+                    marked++;
+                } else {
+                    all[i].checked = false;
+                }
+            }
+            updateLimit();
+            if (all.length > FREE_MAX) {
+                showToast('Só os primeiros ' + FREE_MAX + ' ficam marcados.');
+            }
+        });
+    }
+
+    /* ---------- Botão "Nenhum" ---------- */
+    if (btnNone) {
+        btnNone.addEventListener('click', function () {
+            var all = list.querySelectorAll('input[type=checkbox]');
+            for (var i = 0; i < all.length; i++) {
+                all[i].checked = false;
+            }
+            updateLimit();
+        });
+    }
+
+    /* ---------- Submit ---------- */
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            var n = list.querySelectorAll('input[type=checkbox]:checked').length;
+            if (n > FREE_MAX) {
+                e.preventDefault();
+                showToast('Plano grátis: máximo ' + FREE_MAX + ' ficheiros. Escolheste ' + n + '.');
+                return false;
+            }
+            if (n === 0) {
+                e.preventDefault();
+                showToast('Seleciona pelo menos 1 ficheiro para analisar.');
+                return false;
+            }
+        });
+    }
+
+    /* ---------- Lock tech no arranque ---------- */
+    lockTech();
+    setTimeout(lockTech, 100);
+})();

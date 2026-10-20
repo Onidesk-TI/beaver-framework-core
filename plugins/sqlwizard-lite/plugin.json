@@ -1,0 +1,14 @@
+{
+    "slug": "sqlwizard-lite",
+    "name": "SqlWizard Lite",
+    "version": "0.1.0",
+    "author": "Franco · Onidesk",
+    "description": "Editor visual de schema SQL minimalista — apenas canvas e 1 draft local.",
+    "namespace": "Beaver\\Plugins\\SqlWizardLite",
+    "main": "src/SqlWizardLitePlugin.php",
+    "beaver_version": ">=1.0.0",
+    "permissions": [
+        "routes.register",
+        "views.render"
+    ]
+}

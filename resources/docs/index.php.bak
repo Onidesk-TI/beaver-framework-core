@@ -1,0 +1,440 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Documentação do beaver-installer
+ * Chamada pela rota /docs do Beaver Framework
+ */
+
+$BASE      = dirname(__DIR__, 2) . '/scripts';
+$README    = $BASE . '/README.md';
+$INSTALLER = $BASE . '/beaver-installer.sh';
+$BVPK      = $BASE . '/bvpk.sh';
+
+// ─── Helpers ──────────────────────────────────────────────────
+
+function h(string $s): string
+{
+    return htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+}
+
+function lerArq(string $p): string
+{
+    return is_readable($p) ? (string) file_get_contents($p) : '';
+}
+
+function infoArq(string $p): array
+{
+    if (!is_readable($p)) {
+        return ['existe' => false];
+    }
+
+    return [
+        'existe'  => true,
+        'tamanho' => (int) filesize($p),
+        'linhas'  => count((array) file($p, FILE_IGNORE_NEW_LINES)),
+        'mod'     => (int) filemtime($p),
+    ];
+}
+
+function humanBytes(int $b): string
+{
+    $u = ['B', 'KB', 'MB', 'GB'];
+    $i = 0;
+
+    while ($b >= 1024 && $i < 3) {
+        $b /= 1024;
+        $i++;
+    }
+
+    return sprintf('%.2f %s', $b, $u[$i]);
+}
+
+/**
+ * Converte Markdown simples em HTML.
+ *
+ * Suporta:
+ *   - blocos ```lang ... ```
+ *   - headings # até ######
+ *   - `código inline`
+ *   - **negrito**, *itálico*
+ *   - [links](url)
+ *   - listas com - ou *
+ *   - --- como <hr>
+ *   - parágrafos
+ */
+function markdown(string $src): string
+{
+    $src = str_replace(["\r\n", "\r"], "\n", $src);
+
+    // ─── 1. Blocos de código (guardar antes de escapar) ──────
+    $blocos = [];
+    $src = (string) preg_replace_callback(
+        '/```(\w*)\n(.*?)```/s',
+        function (array $m) use (&$blocos): string {
+            $lang  = $m[1] !== '' ? ' class="language-' . h($m[1]) . '"' : '';
+            $idx   = count($blocos);
+            $blocos[] = '<pre><code' . $lang . '>' . h($m[2]) . '</code></pre>';
+            return "\x00B{$idx}\x00";
+        },
+        $src
+    );
+
+    // ─── 2. Escapar o resto ──────────────────────────────────
+    $src = h($src);
+
+    // ─── 3. Headings ─────────────────────────────────────────
+    $src = (string) preg_replace('/^###### (.+)$/m', '<h6>$1</h6>', $src);
+    $src = (string) preg_replace('/^##### (.+)$/m', '<h5>$1</h5>', $src);
+    $src = (string) preg_replace('/^#### (.+)$/m', '<h4>$1</h4>', $src);
+    $src = (string) preg_replace('/^### (.+)$/m', '<h3>$1</h3>', $src);
+    $src = (string) preg_replace('/^## (.+)$/m', '<h2>$1</h2>', $src);
+    $src = (string) preg_replace('/^# (.+)$/m', '<h1>$1</h1>', $src);
+
+    // ─── 4. Inline ───────────────────────────────────────────
+    $src = (string) preg_replace('/`([^`\n]+)`/', '<code>$1</code>', $src);
+    $src = (string) preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $src);
+    $src = (string) preg_replace('/(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)/s', '<em>$1</em>', $src);
+    $src = (string) preg_replace('/\[([^\]]+)\]\(([^)]+)\)/', '<a href="$2" target="_blank" rel="noopener">$1</a>', $src);
+
+    // ─── 5. <hr> ─────────────────────────────────────────────
+    $src = (string) preg_replace('/^-{3,}$/m', '<hr>', $src);
+
+    // ─── 6. Listas ───────────────────────────────────────────
+    $src = (string) preg_replace_callback(
+        '/(?:^[ \t]*[-*] .+\n?)+/m',
+        function (array $m): string {
+            $items = preg_split('/\n/', trim($m[0])) ?: [];
+            $html  = '<ul>';
+
+            foreach ($items as $it) {
+                $it = (string) preg_replace('/^[ \t]*[-*] /', '', $it);
+                $html .= "<li>{$it}</li>";
+            }
+
+            return $html . '</ul>';
+        },
+        $src
+    );
+
+    // ─── 7. Parágrafos ───────────────────────────────────────
+    // Só apanha linhas que não são tags HTML nem placeholders.
+    $src = (string) preg_replace_callback(
+        '/^(?![<])([^\n\x00]+(?:\n(?![<])(?!\n)[^\n\x00]+)*)/m',
+        function (array $m): string {
+            $t = trim($m[1]);
+
+            if ($t === '') {
+                return $m[0];
+            }
+
+            return "<p>{$t}</p>";
+        },
+        $src
+    );
+
+    // ─── 8. Restaurar blocos de código ───────────────────────
+    foreach ($blocos as $i => $b) {
+        $src = str_replace("\x00B{$i}\x00", $b, $src);
+    }
+
+    return $src;
+}
+
+/**
+ * Extrai os comandos do beaver-installer.sh a partir do bloco
+ * `case "$cmd" in ... esac`.
+ *
+ * Suporta dois formatos:
+ *   criar) cmd_criar ;;
+ *   criar)
+ *       cmd_criar
+ *       ;;
+ */
+function extrairComandos(string $script): array
+{
+    $out = [];
+
+    if (!is_readable($script)) {
+        return $out;
+    }
+
+    $src = (string) file_get_contents($script);
+
+    if (!preg_match('/case "\$cmd" in(.*?)esac/s', $src, $m)) {
+        return $out;
+    }
+
+    // Apanha "nome) cmd_funcao" com ou sem newline no meio
+    preg_match_all(
+        '/^\s*([a-z][a-z_|]*)\)\s*\n?\s*cmd_(\w+)/mi',
+        $m[1],
+        $ms,
+        PREG_SET_ORDER
+    );
+
+    foreach ($ms as $mm) {
+        $aliases = explode('|', $mm[1]);
+        $out[] = [
+            'nome'    => $aliases[0],
+            'aliases' => array_slice($aliases, 1),
+            'funcao'  => $mm[2],
+        ];
+    }
+
+    return $out;
+}
+
+// ─── Recolha de dados ────────────────────────────────────────
+
+$readme     = lerArq($README);
+$readmeHtml = $readme !== ''
+    ? markdown($readme)
+    : '<p><em>README.md não encontrado.</em></p>';
+
+$cmdList  = extrairComandos($INSTALLER);
+$infoInst = infoArq($INSTALLER);
+$infoBvpk = infoArq($BVPK);
+$infoRead = infoArq($README);
+
+$versao  = 'desconhecida';
+$instSrc = lerArq($INSTALLER);
+
+if ($instSrc !== '' && preg_match('/VERSAO_INSTALLER="([^"]+)"/', $instSrc, $m)) {
+    $versao = $m[1];
+}
+?>
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>beaver-installer — Documentação</title>
+<link rel="stylesheet" href="/plugins-manager/css/style.css">
+
+<!-- Prism — syntax highlighting -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-tomorrow.min.css">
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-markup-templating.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-php.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="container">
+        <h1>beaver-installer</h1>
+        <span class="badge">v<?= h($versao) ?></span>
+        <nav>
+            <a href="#sobre">Sobre</a>
+            <a href="#comandos">Comandos</a>
+            <a href="#arquivos">Arquivos</a>
+            <a href="#docs">Docs</a>
+        </nav>
+    </div>
+</header>
+
+<main class="container">
+
+    <div class="page-head">
+        <span class="kicker">🦫 beaver-installer v<?= h($versao) ?></span>
+        <h1>Gestor de <span class="grad">Plugins</span></h1>
+        <p>Instala, empacota, verifica e distribui plugins no formato <code>.bvpk</code> com verificação SHA-256.</p>
+    </div>
+
+    <section class="card" id="sobre">
+        <h2>Sobre</h2>
+        <p><strong>beaver-installer</strong> é uma CLI completa para gerir plugins do <em>Beaver Framework</em>. Cria estrutura, empacota em <code>.bvpk</code> (ZIP padrão), verifica integridade e resolve dependências com semver.</p>
+        <ul class="stats">
+            <li><strong><?= count($cmdList) ?></strong> comandos</li>
+            <li><strong>SHA-256</strong> verificação</li>
+            <li><strong>ZIP</strong> formato</li>
+            <li><strong>Bash + Python</strong></li>
+        </ul>
+    </section>
+
+    <section class="card">
+        <h2>🔁 Fluxo de trabalho</h2>
+        <div class="flow">
+            <div class="flow-step"><div class="flow-icon">🛠️</div><div class="flow-label">criar</div><div class="flow-sub">estrutura</div></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step"><div class="flow-icon">📦</div><div class="flow-label">empacotar</div><div class="flow-sub">.bvpk + hash</div></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step"><div class="flow-icon">🔐</div><div class="flow-label">verificar</div><div class="flow-sub">SHA-256</div></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step"><div class="flow-icon">🚀</div><div class="flow-label">instalar</div><div class="flow-sub">plugins/</div></div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step"><div class="flow-icon">✅</div><div class="flow-label">listar</div><div class="flow-sub">ativos</div></div>
+        </div>
+    </section>
+
+    <section class="card" id="comandos">
+        <h2>🎛️ Comandos</h2>
+
+        <?php if ($cmdList === []) : ?>
+            <p class="muted"><em>Nenhum comando detetado em <code>beaver-installer.sh</code>. Confirma que o ficheiro existe e que o bloco <code>case "$cmd" in</code> está presente.</em></p>
+        <?php endif; ?>
+
+        <div class="cmd-group">
+            <h3 class="cmd-group-title">🛠️ Criar e estruturar</h3>
+            <div class="cmd-grid">
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">✨</span><code class="cmd-name">criar</code><span class="cmd-badge badge-criar">criar</span></div>
+                    <p class="cmd-desc">Gera a estrutura completa de um novo plugin com manifest, código e README.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh criar meu-plugin</code></pre>
+                </div>
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">✅</span><code class="cmd-name">validar</code><span class="cmd-badge badge-validar">validar</span></div>
+                    <p class="cmd-desc">Verifica se o <code>plugin.json</code> é válido e se o arquivo de entrada existe.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh validar ./plugins/meu-plugin</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="cmd-group">
+            <h3 class="cmd-group-title">📦 Distribuir</h3>
+            <div class="cmd-grid">
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">📦</span><code class="cmd-name">empacotar</code><span class="cmd-badge badge-empacotar">distribuir</span></div>
+                    <p class="cmd-desc">Empacota um plugin em <code>.bvpk</code> (ZIP padrão) e gera o hash <code>.sha256</code> ao lado.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh empacotar meu-plugin</code></pre>
+                </div>
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">📥</span><code class="cmd-name">instalar</code><span class="cmd-badge badge-instalar">distribuir</span></div>
+                    <p class="cmd-desc">Instala um plugin de arquivo local ou URL. Verifica SHA-256 antes de extrair.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh instalar ./meu-plugin-0.1.0.bvpk</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="cmd-group">
+            <h3 class="cmd-group-title">📋 Gerir</h3>
+            <div class="cmd-grid">
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">📋</span><code class="cmd-name">listar</code><span class="cmd-badge badge-listar">gerir</span></div>
+                    <p class="cmd-desc">Lista todos os plugins instalados em <code>plugins/</code> com nome, versão e descrição.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh listar</code></pre>
+                </div>
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">🔍</span><code class="cmd-name">info</code><span class="cmd-badge badge-info">gerir</span></div>
+                    <p class="cmd-desc">Mostra o manifesto completo do plugin e os hashes registados no cache.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh info meu-plugin</code></pre>
+                </div>
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">🗑️</span><code class="cmd-name">remover</code><span class="cmd-badge badge-remover">gerir</span></div>
+                    <p class="cmd-desc">Remove um plugin instalado. Pede confirmação antes de apagar.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh remover meu-plugin</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="cmd-group">
+            <h3 class="cmd-group-title">🔐 Segurança</h3>
+            <div class="cmd-grid">
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">🔐</span><code class="cmd-name">verificar</code><span class="cmd-badge badge-verificar">segurança</span></div>
+                    <p class="cmd-desc">Verifica a integridade SHA-256 de um pacote.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh verificar ./plugin.bvpk</code></pre>
+                </div>
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">📜</span><code class="cmd-name">politica</code><span class="cmd-badge badge-politica">segurança</span></div>
+                    <p class="cmd-desc">Define o nível de exigência: <code>estrita</code>, <code>aviso</code> ou <code>off</code>.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh politica estrita</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="cmd-group">
+            <h3 class="cmd-group-title">💾 Cache e registry</h3>
+            <div class="cmd-grid">
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">💾</span><code class="cmd-name">hash listar</code><span class="cmd-badge badge-hash">cache</span></div>
+                    <p class="cmd-desc">Lista os hashes SHA-256 registados em <code>.beaver-cache/hashes/</code>.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh hash listar</code></pre>
+                </div>
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">🧹</span><code class="cmd-name">hash limpar</code><span class="cmd-badge badge-hash">cache</span></div>
+                    <p class="cmd-desc">Apaga todos os hashes do cache.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh hash limpar</code></pre>
+                </div>
+                <div class="cmd-card">
+                    <div class="cmd-head"><span class="cmd-icon">🔎</span><code class="cmd-name">buscar</code><span class="cmd-badge badge-buscar">registry</span></div>
+                    <p class="cmd-desc">Busca plugins no registry remoto.</p>
+                    <pre class="cmd-example"><code class="language-bash">./beaver-installer.sh buscar auth</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>🚀 Exemplo prático</h2>
+        <p>Cria, empacota, verifica e instala um plugin em 5 comandos:</p>
+        <pre class="cmd-session"><code class="language-bash"><span class="c-prompt">$</span> <span class="c-cmd">./beaver-installer.sh criar meu-plugin</span>
+<span class="c-ok">[ OK ]</span> Plugin 'meu-plugin' criado em ./plugins/meu-plugin
+
+<span class="c-prompt">$</span> <span class="c-cmd">./beaver-installer.sh empacotar meu-plugin</span>
+<span class="c-info">[INFO]</span> Empacotando ... <span class="c-info">via: zip-lib</span>
+<span class="c-ok">[ OK ]</span> Pacote criado: meu-plugin-0.1.0.bvpk
+
+<span class="c-prompt">$</span> <span class="c-cmd">./beaver-installer.sh verificar ./meu-plugin-0.1.0.bvpk</span>
+<span class="c-hash">[HASH]</span> Integridade OK: a3f2c9d18b7e45f1...
+
+<span class="c-prompt">$</span> <span class="c-cmd">./beaver-installer.sh instalar ./meu-plugin-0.1.0.bvpk</span>
+<span class="c-ok">[ OK ]</span> Plugin 'meu-plugin' v0.1.0 instalado
+
+<span class="c-prompt">$</span> <span class="c-cmd">./beaver-installer.sh listar</span>
+<span class="c-dim">NOME                      VERSAO       DESCRICAO</span>
+meu-plugin                0.1.0        Plugin meu-plugin</code></pre>
+    </section>
+
+    <section class="card" id="arquivos">
+        <h2>📁 Arquivos do projeto</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Arquivo</th>
+                    <th>Tamanho</th>
+                    <th>Linhas</th>
+                    <th>Alteração</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach (
+            [
+                ['beaver-installer.sh', $infoInst],
+                ['bvpk.sh',             $infoBvpk],
+                ['README.md',           $infoRead],
+            ] as [$nome, $info]
+) : ?>
+                <tr>
+                    <td><code><?= h($nome) ?></code></td>
+                    <?php if (!empty($info['existe'])) : ?>
+                        <td><?= h(humanBytes((int) $info['tamanho'])) ?></td>
+                        <td><?= (int) $info['linhas'] ?></td>
+                        <td><?= h(date('d/m/Y H:i', (int) $info['mod'])) ?></td>
+                    <?php else : ?>
+                        <td colspan="3" class="muted">não encontrado</td>
+                    <?php endif; ?>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card" id="docs">
+        <h2>📖 Documentação completa</h2>
+        <article class="markdown"><?= $readmeHtml ?></article>
+    </section>
+
+</main>
+
+<footer class="footer">
+    <div class="container">
+        <p>beaver-installer v<?= h($versao) ?> — gerado em <?= h(date('d/m/Y H:i:s')) ?></p>
+    </div>
+</footer>
+
+</body>
+</html>

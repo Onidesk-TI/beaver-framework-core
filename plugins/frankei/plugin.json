@@ -1,0 +1,13 @@
+{
+    "name": "Frankei",
+    "slug": "frankei",
+    "version": "0.1.0",
+    "author": "Onidesk",
+    "description": "Security analyzer for SQL — injection, XSS, permissions",
+    "namespace": "Beaver\\Plugins\\Frankei",
+    "main": "src/FrankeiPlugin.php",
+    "beaver_version": ">=0.1.0",
+    "requires": { "php": ">=8.1" },
+    "routes": "routes/web.php",
+    "enabled": true
+}

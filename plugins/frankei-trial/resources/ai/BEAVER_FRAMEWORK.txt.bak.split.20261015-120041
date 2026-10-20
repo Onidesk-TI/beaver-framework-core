@@ -1,0 +1,179 @@
+# Beaver + Pest — regras essenciais
+
+## Framework
+Beaver NAO e Laravel nem Symfony. NUNCA uses:
+- `use Illuminate\...` / `use Symfony\...`
+- `Route::`, `Request::fake()`, `Auth::user()`
+- `$response->getStatusCode()`, `$response->getContent()`, `$response->getHeaders()`
+- `shouldReceive(...)`, `$this->mock(...)` (Mockery/Laravel)
+
+## Controllers (`App\Controllers\*`)
+- Devolvem **void**, usam `$_GET`/`$_POST`/`$_SERVER` diretamente
+- Sao HTTP — NAO testaveis em teste unitario sem simular superglobais
+
+## Response (`Beaver\Http\Response`)
+- Propriedades publicas: `$response->content`, `$response->status`, `$response->headers`
+- Estaticos: `Response::json($data)`, `Response::html()`, `Response::redirect($url)`
+- NAO existem: `getStatusCode()`, `getContent()`, `getHeaders()`
+
+## Regras Pest — OBRIGATORIO
+
+Ficheiro em `tests/Unit/*Test.php`:
+
+    <?php
+    use Tests\TestCase;
+    uses(TestCase::class);
+
+    it('descricao', function () {
+        expect($valor)->toBe($esperado);
+    });
+
+- NUNCA `namespace Tests\Unit;`
+- NUNCA `class XxxTest extends TestCase`
+- NUNCA `use PHPUnit\Framework\TestCase;` — usar `use Tests\TestCase;`
+- So `<?php` UMA vez, na primeira linha
+
+## Assercoes Pest (usa estas, NAO `$this->assert*`)
+`expect($x)->toBe($y)`, `->toEqual`, `->toBeTrue`, `->toBeFalse`, `->toBeNull`,
+`->not->toBeNull`, `->toBeEmpty`, `->not->toBeEmpty`, `->toHaveCount(3)`,
+`->toContain('a')`, `->toHaveKey('k')`, `->toBeInstanceOf(X::class)`,
+`->toStartWith`, `->toMatch('/re/')`, `->toBeGreaterThan(5)`
+
+Excecao: `expect(fn() => $obj->metodo())->toThrow(\RuntimeException::class)`
+
+## Stubs / Mocks (dependencias falsas)
+
+    $stub = $this->createStub(UserService::class);
+    $stub->method('autenticado')->willReturn(true);
+
+    $mock = $this->createMock(UserService::class);
+    $mock->expects($this->once())
+         ->method('autenticado')
+         ->willReturn(true);
+
+## Caso ideal — servico puro
+
+    <?php
+    use Tests\TestCase;
+    use App\Services\Calc;
+    uses(TestCase::class);
+
+    it('soma dois inteiros', function () {
+        $calc = new Calc();
+        expect($calc->soma(2, 3))->toBe(5);
+    });
+
+## Controller HTTP — caso comum
+
+    <?php
+    use Tests\TestCase;
+    use App\Controllers\AuthController;
+    uses(TestCase::class);
+
+    it('classe existe', function () {
+        expect(class_exists(AuthController::class))->toBeTrue();
+    });
+
+    it('tem o metodo login', function () {
+        expect(method_exists(AuthController::class, 'login'))->toBeTrue();
+    });
+
+    it('login() funciona', function () {
+        $this->markTestIncomplete('classe HTTP — requer $_GET/$_POST simulados');
+    });
+
+## Servicos do projeto
+- `App\Services\UserService::autenticado(): bool`
+- `App\Services\SiteDB::select($sql, $params): array`
+- `App\Services\SiteDB::exec($sql, $params): int`
+
+## Regras finais
+- So deves usar `<?php` UMA vez, na primeira linha do ficheiro
+- NUNCA coloques `<?php` dentro do corpo dos testes
+- Cada `it('...', function () { ... });` tem de ter assercoes concretas
+
+## EXEMPLOS REAIS deste projeto (imita EXATAMENTE este estilo)
+
+### Exemplo 1 — tests/Unit/FkDemoServiceTest.php
+```php
+<?php
+
+use Tests\TestCase;
+use App\Services\FkDemoService;
+
+uses(TestCase::class);
+
+it('FkDemoService::somar soma corretamente', function () {
+    expect(FkDemoService::somar(2, 3))->toBe(5);
+    expect(FkDemoService::somar(-1, 1))->toBe(0);
+});
+
+it('FkDemoService::ehPar deteta pares', function () {
+    expect(FkDemoService::ehPar(4))->toBeTrue();
+    expect(FkDemoService::ehPar(5))->toBeFalse();
+});
+
+it('FkDemoService::saudar cumprimenta', function () {
+    expect(FkDemoService::saudar('João'))->toBe('Olá, João');
+    expect(FkDemoService::saudar('  Ana  '))->toBe('Olá, Ana');
+});
+```
+
+### Exemplo 2 — tests/Unit/SmokeTest.php
+```php
+<?php
+
+it('confirma que o motor de testes está a funcionar', function () {
+    expect(true)->toBeTrue();
+});
+
+it('confirma a matemática básica', function () {
+    expect(1 + 1)->toBe(2);
+});
+```
+
+REGRA FINAL: os teus testes têm de ser IDÊNTICOS em formato aos exemplos acima.
+Se escreveres namespace Tests\Unit ou class XxxTest extends TestCase, está ERRADO.
+
+## EXEMPLOS REAIS deste projeto (imita EXATAMENTE este estilo)
+
+### Exemplo 1 — tests/Unit/FkDemoServiceTest.php
+```php
+<?php
+
+use Tests\TestCase;
+use App\Services\FkDemoService;
+
+uses(TestCase::class);
+
+it('FkDemoService::somar soma corretamente', function () {
+    expect(FkDemoService::somar(2, 3))->toBe(5);
+    expect(FkDemoService::somar(-1, 1))->toBe(0);
+});
+
+it('FkDemoService::ehPar deteta pares', function () {
+    expect(FkDemoService::ehPar(4))->toBeTrue();
+    expect(FkDemoService::ehPar(5))->toBeFalse();
+});
+
+it('FkDemoService::saudar cumprimenta', function () {
+    expect(FkDemoService::saudar('João'))->toBe('Olá, João');
+    expect(FkDemoService::saudar('  Ana  '))->toBe('Olá, Ana');
+});
+```
+
+### Exemplo 2 — tests/Unit/SmokeTest.php
+```php
+<?php
+
+it('confirma que o motor de testes está a funcionar', function () {
+    expect(true)->toBeTrue();
+});
+
+it('confirma a matemática básica', function () {
+    expect(1 + 1)->toBe(2);
+});
+```
+
+REGRA FINAL: os teus testes têm de ser IDÊNTICOS em formato aos exemplos acima.
+Se escreveres namespace Tests\Unit ou class XxxTest extends TestCase, está ERRADO.

@@ -1,0 +1,169 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Console\Commands;
+
+use Beaver\Console\Command;
+
+class TestCommand extends Command
+{
+    protected string $signature = 'test {--testsuite=} {--filter=} {--parallel} {--engine=} {--coverage} {--log-junit=} {--coverage-html=} {--coverage-clover=} {--coverage-cobertura=} {--coverage-text=}';
+    protected string $description = 'Corre os testes do projeto (Pest ou PHPUnit)';
+
+    public function handle(): int
+    {
+        $pest    = $this->projectPath . '/vendor/bin/pest';
+        $phpunit = $this->projectPath . '/vendor/bin/phpunit';
+        $config  = $this->projectPath . '/phpunit.xml';
+
+        // Detetar motor
+        $engine  = $this->option('engine') ?: null;
+        $binary  = null;
+        $label   = '';
+
+        if ($engine === 'pest' && is_file($pest)) {
+            $binary = $pest;
+            $label  = 'Pest';
+        } elseif ($engine === 'phpunit' && is_file($phpunit)) {
+            $binary = $phpunit;
+            $label  = 'PHPUnit';
+        } elseif ($engine === null) {
+            // Auto: Pest tem prioridade, senão PHPUnit
+            if (is_file($pest)) {
+                $binary = $pest;
+                $label  = 'Pest';
+            } elseif (is_file($phpunit)) {
+                $binary = $phpunit;
+                $label  = 'PHPUnit';
+            }
+        }
+
+        if ($binary === null) {
+            $this->error('Nenhum motor de testes encontrado.');
+            $this->line();
+            $this->info('Para instalar Pest:');
+            $this->line('  composer require --dev pestphp/pest');
+            $this->line();
+            $this->info('Ou PHPUnit:');
+            $this->line('  composer require --dev phpunit/phpunit');
+            return self::FAILURE;
+        }
+
+        $args = [];
+
+        // Só PHPUnit precisa de --configuration explícito
+        // Pest respeita o phpunit.xml automaticamente
+        if ($label === 'PHPUnit' && $config && is_file($config)) {
+            $args[] = '--configuration ' . escapeshellarg($config);
+        }
+
+        if ($filter = $this->option('filter')) {
+            $args[] = '--filter ' . escapeshellarg((string) $filter);
+        }
+
+        // ── --testsuite (tradução: Pest → pasta, PHPUnit → --testsuite) ──
+        if ($suite = $this->option('testsuite')) {
+            $suite = trim((string) $suite);
+
+            if ($suite !== '' && !preg_match('/^[A-Za-z0-9_\-]+$/', $suite)) {
+                $this->error('--testsuite inválido: ' . $suite);
+                return self::FAILURE;
+            }
+
+            if ($suite !== '') {
+                if ($label === 'PHPUnit') {
+                    $args[] = '--testsuite ' . escapeshellarg($suite);
+                } else {
+                    // Pest: passar a pasta tests/<Suite> como argumento posicional
+                    $dir = $this->projectPath . '/tests/' . $suite;
+                    if (is_dir($dir)) {
+                        $args[] = escapeshellarg($dir);
+                    } else {
+                        $this->warning("Testsuite '{$suite}' não existe em tests/. A correr todos.");
+                    }
+                }
+            }
+        }
+
+        if ($this->option('parallel')) {
+            // Pest suporta --parallel nativo
+            if ($label === 'Pest') {
+                $args[] = '--parallel';
+            } else {
+                $this->warning('--parallel requer paratest no PHPUnit. A ignorar.');
+            }
+        }
+
+        // ── Flags de report ──
+
+        // Ativar cobertura (Pest/PHPUnit exigem --coverage antes das flags --coverage-*)
+        if ($this->option('coverage')) {
+            $args[] = '--coverage';
+
+            // Paths default — coerentes com o que o dashboard lê
+            $uid = 0;
+            try {
+                if (class_exists('\\Beaver\\Auth\\Auth')) {
+                    $uid = (int) (\Beaver\Auth\Auth::id() ?? 0);
+                }
+            } catch (\Throwable $e) {}
+
+            $base    = $this->projectPath . '/storage/frankei-reports/' . $uid . '/current';
+            $covHtml = $base . '/coverage';
+            $covClv  = $base . '/clover.xml';
+
+            if (!is_dir($base)) {
+                @mkdir($base, 0755, true);
+            }
+
+            if (!$this->option('coverage-html')) {
+                $args[] = '--coverage-html=' . escapeshellarg($covHtml);
+            }
+            if (!$this->option('coverage-clover')) {
+                $args[] = '--coverage-clover=' . escapeshellarg($covClv);
+            }
+        }
+
+        if ($v = $this->option('log-junit')) {
+            $args[] = '--log-junit=' . escapeshellarg((string) $v);
+        }
+
+        if ($v = $this->option('coverage-html')) {
+            $args[] = '--coverage-html=' . escapeshellarg((string) $v);
+        }
+
+        if ($v = $this->option('coverage-clover')) {
+            $args[] = '--coverage-clover=' . escapeshellarg((string) $v);
+        }
+
+        if ($v = $this->option('coverage-cobertura')) {
+            $args[] = '--coverage-cobertura=' . escapeshellarg((string) $v);
+        }
+
+        if ($v = $this->option('coverage-text')) {
+            $args[] = '--coverage-text=' . escapeshellarg((string) $v);
+        }
+
+        $cmd = escapeshellarg($binary) . ' ' . implode(' ', $args);
+
+        // Logo conforme o motor
+        $logo = $label === 'Pest' ? '🐀' : '🐘';
+
+        $this->line();
+        $this->info($logo . ' Beaver — Testes (' . $label . ')');
+        $this->line("  Comando: {$cmd}");
+        $this->line();
+
+        passthru($cmd, $code);
+
+        $this->line();
+        if ($code === 0) {
+            $this->success('Todos os testes passaram');
+        } else {
+            $this->error($label . ' devolveu código ' . $code);
+        }
+
+        return $code === 0 ? self::SUCCESS : self::FAILURE;
+    }
+}

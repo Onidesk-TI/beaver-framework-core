@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>🦫 Beaver Test Report</title>
+<style>
+{{CSS}}
+
+/* FK_LANG_ACTIVE_STRONG — botão de idioma ativo bem visível */
+.fk-lang-btn.active,
+.fk-lang-btn[data-active="1"] {
+  background: linear-gradient(135deg, #FFD79A 0%, #FF9A3C 48%, #FF6B35 100%) !important;
+  color: #1A1208 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, .35) !important;
+  transform: scale(1.03);
+}
+.fk-lang-btn.active::after {
+  content: "✓";
+  margin-left: 5px;
+  font-weight: 900;
+  color: #1A1208;
+  display: inline-block;
+}
+.fk-lang-btn:not(.active):hover {
+  transform: scale(1.05);
+}
+
+</style>
+<script>
+window.FK_I18N  = {{I18N_JSON}};
+window.FK_LANG  = "{{LANG}}";
+window.FK_DONUTS = {{DONUTS_JSON}};
+(function () {
+  'use strict';
+
+  function setActive(lang) {
+    var btns = document.querySelectorAll('.fk-lang-btn');
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      var isActive = (b.dataset.lang === lang);
+      b.classList.toggle('active', isActive);
+      if (isActive) b.setAttribute('data-active', '1');
+      else          b.removeAttribute('data-active');
+    }
+  }
+
+  function applyLang(lang) {
+    if (!lang) lang = 'pt';
+    var dict = window.FK_I18N[lang] || window.FK_I18N['pt'];
+    if (!dict) return;
+    document.documentElement.lang = lang;
+
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var key = el.getAttribute('data-i18n');
+      if (dict[key] != null) el.textContent = dict[key];
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+      var k = el.getAttribute('data-i18n-title');
+      if (dict[k] != null) el.title = dict[k];
+    });
+    document.querySelectorAll('[data-i18n-placeholder], [data-i18n-ph]').forEach(function (el) {
+      var k = el.getAttribute('data-i18n-placeholder') || el.getAttribute('data-i18n-ph');
+      if (dict[k] != null) el.placeholder = dict[k];
+    });
+
+    setActive(lang);
+
+    try { localStorage.setItem('fk:report:lang', lang); } catch (_) {}
+  }
+  window.fkSetLang = applyLang;
+
+  // BIND dos botões (delegação + bind directo para segurança)
+  function bindBtns() {
+    document.querySelectorAll('.fk-lang-btn').forEach(function (b) {
+      if (b.dataset.fkBoundLang === '1') return;
+      b.dataset.fkBoundLang = '1';
+      b.addEventListener('click', function (e) {
+        e.preventDefault();
+        applyLang(b.dataset.lang);
+      });
+    });
+  }
+
+  function init() {
+    // Determinar idioma inicial
+    var saved = null;
+    try { saved = localStorage.getItem('fk:report:lang'); } catch (_) {}
+    var initial = saved || window.FK_LANG || (navigator.language || 'pt').slice(0, 2).toLowerCase();
+    if (!window.FK_I18N[initial]) initial = 'pt';
+
+    bindBtns();
+    applyLang(initial);
+  }
+
+  // Correr em vários momentos para garantir
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  window.addEventListener('load', function () { setTimeout(init, 30); });
+})();
+</script>
+</head>
+<body class="{{BODY_CLASSES}}">
+<div class="container">
+
+    <div class="header">
+    <div class="logo" data-i18n-skip="1"><svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" width="72" height="72" aria-hidden="true"><defs><linearGradient id="bvgFrankeiLogo" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FFD79A"/><stop offset="48%" stop-color="#FF9A3C"/><stop offset="100%" stop-color="#FF6B35"/></linearGradient></defs><circle cx="13" cy="17.5" r="7.5" fill="url(#bvgFrankeiLogo)" opacity=".72"/><circle cx="51" cy="17.5" r="7.5" fill="url(#bvgFrankeiLogo)" opacity=".72"/><ellipse cx="32" cy="33" rx="23" ry="21" fill="url(#bvgFrankeiLogo)"/><ellipse cx="32" cy="41" rx="15.5" ry="12" fill="#0A0E14" opacity=".2"/><ellipse cx="32" cy="34.5" rx="4.6" ry="3.2" fill="#1A1208"/><circle cx="22.5" cy="26" r="3.4" fill="#1A1208"/><circle cx="41.5" cy="26" r="3.4" fill="#1A1208"/><circle cx="23.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85"/><circle cx="42.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85"/><rect x="27.3" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8"/><rect x="32.4" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8"/></svg></div>
+    <h1>Frankei</h1>
+    <p class="sub">A consola de testes do Beaver Framework</p>
+    <p class="subtitle" data-i18n="generated_on">Gerado em {{DATE}}</p>
+  
+    <div class="fk-lang-switch" title="Idioma / Language">
+      <button type="button" class="fk-lang-btn active" data-lang="pt" data-active="1" title="Português">🇵🇹 PT</button>
+      <button type="button" class="fk-lang-btn" data-lang="en" title="English">🇬🇧 EN</button>
+      <button type="button" class="fk-lang-btn" data-lang="fr" title="Français">🇫🇷 FR</button>
+      <button type="button" class="fk-lang-btn" data-lang="es" title="Español">🇪🇸 ES</button>
+    </div>
+
+    </div><div class="fk-donuts">{{DONUTS}}</div>
+
+  <div class="cards">
+    {{CARDS}}
+  </div>
+
+  {{SECTIONS}}
+
+  <div class="footer">
+    <span data-i18n="footer">Gerado por Frankei</span> · {{TESTS}} testes · {{ASSERTIONS}} assertions
+  </div>
+
+</div>
+</body>
+</html>

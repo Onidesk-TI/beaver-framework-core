@@ -1,0 +1,433 @@
+/* ============================================================
+ * Frankei — Coverage Drawer (tema claro alinhado)
+ * @package    Beaver\Plugins\Frankei
+ * @subpackage UI\Coverage
+ * @author     Franco <franco@onidesk.local>
+ * @copyright  (c) 2026 Onidesk / Beaver Framework
+ * @license    Proprietary — All rights reserved
+ * @since      Release 2.0.0
+ * @version    4.0.0
+ * ============================================================ */
+
+.cv-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(44, 50, 56, 0.35);
+    backdrop-filter: blur(2px);
+    z-index: 9999;
+    display: flex;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity .2s ease;
+}
+.cv-drawer-backdrop.open { opacity: 1; }
+
+.cv-drawer {
+    width: min(90vw, 900px);
+    height: 100%;
+    background: var(--card, #ffffff);
+    color: var(--text, #2c3238);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    box-shadow: -8px 0 32px rgba(15, 23, 42, .15);
+}
+.cv-drawer-backdrop.open .cv-drawer { transform: translateX(0); }
+
+.cv-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--bg, #f5f6f8);
+    border-bottom: 1px solid var(--border, #d4d8de);
+}
+.cv-drawer-head h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--high, #e07800);   /* laranja Beaver */
+}
+.cv-drawer-path {
+    font-family: ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--muted, #6b7280);
+    margin-top: 4px;
+}
+
+.cv-drawer-close {
+    background: transparent;
+    border: 1px solid var(--border, #d4d8de);
+    color: var(--text, #2c3238);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    transition: background .15s, border-color .15s, color .15s;
+}
+.cv-drawer-close:hover {
+    background: var(--high-bg, #fff4e0);
+    border-color: var(--high, #e07800);
+    color: var(--high, #e07800);
+}
+
+.cv-drawer-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--bg, #f5f6f8);
+}
+.cv-drawer-body iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: var(--card, #ffffff);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cv-drawer, .cv-drawer-backdrop { transition: none !important; }
+}
+
+/* ─── Coverage dentro da Modal B (fkModal) ─── */
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ─── Modal B (fkModal) deve ficar POR CIMA da Modal A (fkReportModal) ─── */
+/* Ambas têm z-index:1000 — a fkModal está antes no DOM, então perde o empate. */
+/* Solução: subir o z-index da fkModal quando aberta. */
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODAL B (fkModal) — layout final
+   Regras com especificidade alta para ganhar ao dashboard.css
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 1) A modal em si — em ecrã inteiro, sem scroll */
+
+
+/* 2) O content — LARGO e ALTO, sem scroll na content */
+body #fkModal.open .fk-modal-content {
+    width: min(96vw, 1500px) !important;
+    max-width: 96vw !important;
+    height: 94vh !important;
+    max-height: 94vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;   /* o scroll vive dentro, não aqui */
+}
+
+/* 3) O body da modal — flex column, sem scroll */
+body #fkModal.open .fk-modal-body {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;   /* limpa padding do dashboard */
+}
+
+/* 4) Header e filtros — fixos no topo */
+body #fkModal.open .cv-modal-head {
+    flex: 0 0 auto !important;
+    padding: 16px 24px !important;
+    border-bottom: 1px solid var(--border-2, #2a2a2a);
+}
+body #fkModal.open .cv-modal-head h3 {
+    margin: 0 0 4px 0;
+    font-size: 17px;
+    font-weight: 600;
+}
+body #fkModal.open .cv-modal-path {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    opacity: 0.6;
+    word-break: break-all;
+}
+
+body #fkModal.open .cv-modal-filters {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    gap: 8px !important;
+    padding: 12px 24px !important;
+    border-bottom: 1px solid var(--border-2, #2a2a2a);
+    flex-wrap: wrap;
+}
+body #fkModal.open .fk-filter-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-2, #2a2a2a);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s, border-color 0.15s;
+}
+body #fkModal.open .fk-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+body #fkModal.open .fk-filter-btn.active {
+    background: rgba(126, 155, 250, 0.15);
+    border-color: rgba(126, 155, 250, 0.5);
+    color: rgb(126, 155, 250);
+}
+
+/* 5) A área do código — ocupa o resto, ÚNICA com scroll */
+body #fkModal.open .cv-modal-code {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+    background: #fff;
+}
+body #fkModal.open .cv-modal-code iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    background: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PÁGINA DE DETALHE (fkDetailView) — full screen dentro do <main>
+   ═══════════════════════════════════════════════════════════════════ */
+
+#fkDetailView {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 180px);   /* topbar + tabs + subtabs */
+    overflow: hidden;
+}
+#fkDetailView[hidden] {
+    display: none !important;
+}
+
+/* Topbar interna — seta + título */
+#fkDetailView .fk-detail-topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-2, #2a2a2a);
+    background: var(--bg-2, rgba(255,255,255,0.02));
+}
+#fkDetailView .fk-detail-back {
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--border-2, #2a2a2a);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+}
+#fkDetailView .fk-detail-back:hover {
+    background: rgba(126, 155, 250, 0.12);
+    border-color: rgba(126, 155, 250, 0.5);
+}
+#fkDetailView .fk-detail-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+#fkDetailView .fk-detail-title h2 {
+    margin: 0 0 2px 0;
+    font-size: 17px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#fkDetailView .fk-detail-path {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Filtros */
+#fkDetailView .fk-detail-filters {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-2, #2a2a2a);
+    flex-wrap: wrap;
+}
+#fkDetailView .fk-filter-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-2, #2a2a2a);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+#fkDetailView .fk-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+#fkDetailView .fk-filter-btn.active {
+    background: rgba(126, 155, 250, 0.15);
+    border-color: rgba(126, 155, 250, 0.5);
+    color: rgb(126, 155, 250);
+}
+
+/* Área do código */
+#fkDetailView .fk-detail-code {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    background: #fff;
+}
+#fkDetailView .fk-detail-code iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    background: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SIDEBAR DIREITA — Navegação dentro da Modal B
+   O .fk-modal-body passa a ter um wrapper .cv-modal-layout (grid 1fr 220px)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* O body da modal já é flex column; o wrapper tem de esticar */
+body #fkModal.open .fk-modal-body {
+    /* mantém display:flex column — ok */
+}
+
+/* Wrapper 2 colunas */
+body #fkModal.open .cv-modal-layout {
+    display: grid !important;
+    grid-template-columns: 1fr 220px !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+}
+
+/* Coluna esquerda (conteúdo) */
+body #fkModal.open .cv-modal-main {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Sidebar direita */
+body #fkModal.open .cv-modal-side {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 20px 14px !important;
+    border-left: 1px solid var(--border-2, #2a2a2a) !important;
+    background: var(--bg-2, rgba(255,255,255,0.02)) !important;
+    overflow-y: auto !important;
+    min-height: 0 !important;
+}
+
+body #fkModal.open .cv-modal-side-title {
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+    letter-spacing: .08em !important;
+    text-transform: uppercase !important;
+    opacity: 0.55 !important;
+    padding: 0 4px 6px !important;
+    margin: 0 !important;
+}
+
+body #fkModal.open .cv-modal-action {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    padding: 10px 12px !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--border-2, #2a2a2a) !important;
+    background: transparent !important;
+    color: inherit !important;
+    font-family: inherit !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    cursor: pointer !important;
+    transition: background .15s, border-color .15s, transform .15s !important;
+}
+
+body #fkModal.open .cv-modal-action:hover {
+    background: rgba(126, 155, 250, 0.12) !important;
+    border-color: rgba(126, 155, 250, 0.5) !important;
+    transform: translateX(-2px) !important;
+}
+
+body #fkModal.open .cv-modal-action .cv-modal-action-icon {
+    font-size: 15px !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+}
+
+/* Botão "Voltar" — destacado como primário */
+body #fkModal.open .cv-modal-action.cv-modal-action-primary {
+    background: rgba(126, 155, 250, 0.15) !important;
+    border-color: rgba(126, 155, 250, 0.5) !important;
+    color: rgb(126, 155, 250) !important;
+    font-weight: 600 !important;
+}
+body #fkModal.open .cv-modal-action.cv-modal-action-primary:hover {
+    background: rgba(126, 155, 250, 0.25) !important;
+    border-color: rgba(126, 155, 250, 0.8) !important;
+}
+
+/* Separador */
+body #fkModal.open .cv-modal-sep {
+    height: 1px !important;
+    background: var(--border-2, #2a2a2a) !important;
+    margin: 8px 0 !important;
+    opacity: 0.6 !important;
+}
+
+/* ── Responsive: sidebar vai para baixo em ecrãs estreitos ── */
+@media (max-width: 900px) {
+    body #fkModal.open .cv-modal-layout {
+        grid-template-columns: 1fr !important;
+        grid-template-rows: 1fr auto !important;
+    }
+    body #fkModal.open .cv-modal-side {
+        border-left: 0 !important;
+        border-top: 1px solid var(--border-2, #2a2a2a) !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        padding: 10px !important;
+        max-height: 40vh !important;
+    }
+    body #fkModal.open .cv-modal-side-title { display: none !important; }
+    body #fkModal.open .cv-modal-action {
+        flex: 1 1 auto !important;
+        min-width: 120px !important;
+        justify-content: center !important;
+    }
+}

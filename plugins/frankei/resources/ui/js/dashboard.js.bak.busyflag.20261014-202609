@@ -1,0 +1,3619 @@
+// FK_STATCARD_APPLY — preencher o card "Estado" em qualquer fluxo
+(function () {
+  'use strict';
+  var KEY = 'fk:statcard:last';
+
+  function aplicar(stats) {
+    if (!stats) return;
+    try {
+      var d = document.getElementById('fkStatDbs');
+      var t = document.getElementById('fkStatTotal');
+      var m = document.getElementById('fkStatTime');
+      if (d) d.textContent = (stats.databases || 0) + ' BD \u00b7 ' + (stats.files_scanned || 0) + ' ficheiros';
+      if (t) t.textContent = stats.total != null ? String(stats.total) : '0';
+      if (m) m.textContent = (stats.elapsed_ms || 0) + 'ms';
+    } catch (e) {}
+  }
+
+  function guardar(stats) {
+    try { localStorage.setItem(KEY, JSON.stringify(stats)); } catch (_) {}
+  }
+
+  // 1) Tentar aplicar do localStorage ao carregar
+  function aplicarDoStorage() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      aplicar(s);
+    } catch (_) {}
+  }
+
+  // 2) Wrapper: interceptar handleScanSuccess quando a funcao for definida
+  //    (ela e interna ao IIFE do dashboard.js, entao usamos polling)
+  var tentativas = 0;
+  var maxTent = 100; // ate ~30s
+  var timer = setInterval(function () {
+    tentativas++;
+
+    // Tentar aplicar do storage (caso a pagina ja tenha carregado antes)
+    if (!document.getElementById('fkStatDbs')) return;
+    if (document.getElementById('fkStatDbs').textContent === '\u2014') {
+      aplicarDoStorage();
+    }
+
+    // Se por acaso o dashboard expuser handleScanSuccess ou state globalmente,
+    // interceptamos
+    if (window.state && window.state.result && window.state.result.stats) {
+      aplicar(window.state.result.stats);
+      guardar(window.state.result.stats);
+    }
+
+    if (tentativas >= maxTent) clearInterval(timer);
+  }, 300);
+
+  // 3) Watch: se o innerText dos stats ficar com valor real, guardar em localStorage
+  //    Assim, na proxima vez que entrar, o card mostra o ultimo resultado
+  document.addEventListener('DOMContentLoaded', function () {
+    var d = document.getElementById('fkStatDbs');
+    if (!d) return;
+
+    var observer = new MutationObserver(function () {
+      var dTxt = document.getElementById('fkStatDbs')?.textContent || '';
+      var tTxt = document.getElementById('fkStatTotal')?.textContent || '';
+      var mTxt = document.getElementById('fkStatTime')?.textContent || '';
+
+      // So guardar quando tiver valores reais (nao "-" nem "TESTE")
+      if (dTxt === '\u2014' || /TESTE/.test(dTxt)) return;
+      if (!/\d/.test(dTxt)) return;
+
+      var m = dTxt.match(/(\d+)\s*BD\s*[\u00b7\u2022]\s*(\d+)/);
+      var stats = {
+        databases: m ? parseInt(m[1]) : 0,
+        files_scanned: m ? parseInt(m[2]) : 0,
+        total: parseInt(tTxt) || 0,
+        elapsed_ms: parseInt(mTxt) || 0
+      };
+      guardar(stats);
+    });
+
+    observer.observe(d, { childList: true, characterData: true, subtree: true });
+    observer.observe(document.getElementById('fkStatTotal') || document.body, { childList: true, characterData: true, subtree: true });
+    observer.observe(document.getElementById('fkStatTime')  || document.body, { childList: true, characterData: true, subtree: true });
+  });
+
+  // 4) Aplicar do storage imediatamente (caso o DOM ja exista)
+  if (document.readyState !== 'loading') {
+    setTimeout(aplicarDoStorage, 200);
+  } else {
+    document.addEventListener('DOMContentLoaded', function () {
+      setTimeout(aplicarDoStorage, 200);
+    });
+  }
+})();
+
+// ─── CoverageView: carregar assets (uma vez) ───
+(function loadCoverageAssets(){
+    if (document.getElementById('coverage-view-css')) return;
+    var link = document.createElement('link');
+    link.id = 'coverage-view-css';
+    link.rel = 'stylesheet';
+    link.href = '/api/frankei/terminal/coverage-view/coverage-view.css?v=' + Date.now();
+    document.head.appendChild(link);
+    var script = document.createElement('script');
+    script.id = 'coverage-view-js';
+    script.src = '/api/frankei/terminal/coverage-view/coverage-view.js?v=' + Date.now();
+    script.defer = true;
+    document.head.appendChild(script);
+})();
+
+/* ============================================================
+   Frankei · Dashboard JS · v2 (com tabs)
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var PATH = window.FK_PATH || '';
+
+  /* ══════════════════════════════════════════════════════
+     CONFIG — TABS PRINCIPAIS
+     ══════════════════════════════════════════════════════ */
+
+  var TABS = [
+    { id: 'all',         label: 'Tudo',                 icon: '📋', enabled: true  },
+    { id: 'db',          label: 'Bases de dados',       icon: '📊', enabled: true  },
+    { id: 'security',    label: 'Segurança',            icon: '🔒', enabled: true  },
+    { id: 'passwords',   label: 'Palavras-passe',       icon: '🔑', enabled: true  },
+    { id: 'quality',     label: 'Código & Qualidade',   icon: '📐', enabled: true  },
+    { id: 'tests',       label: 'Testes',               icon: '🧪', enabled: true  },
+    { id: 'performance', label: 'Desempenho',           icon: '⚡', enabled: true  },
+    { id: 'config',      label: 'Configuração',         icon: '⚙️', enabled: false },
+    { id: 'services',    label: 'Microserviços',        icon: '🔌', enabled: false },
+    { id: 'report',      label: 'Relatório',            icon: '📝', enabled: false }
+  ];
+
+  /* ══════════════════════════════════════════════════════
+     CONFIG — SUB-TABS POR TAB PRINCIPAL
+     ══════════════════════════════════════════════════════ */
+
+  var SUBTABS = {
+    all: [
+      { id: 'all',      label: 'Tudo',           enabled: true  }
+    ],
+    db: [
+      { id: 'all',      label: 'Tudo',           enabled: true  },
+      { id: 'structure',label: 'Estrutura',      enabled: true  },
+      { id: 'quality',  label: 'Qualidade',      enabled: true  },
+      { id: 'indexes',  label: 'Índices',        enabled: true  }
+    ],
+    security: [
+      { id: 'all',         label: 'Tudo',              enabled: true  },
+      { id: 'xss',         label: 'XSS',               enabled: true  },
+      { id: 'sqli',        label: 'SQL Injection',     enabled: true  },
+      { id: 'csrf',        label: 'CSRF',              enabled: true  },
+      { id: 'ssrf',        label: 'SSRF',              enabled: true  },
+      { id: 'xxe',         label: 'XXE',               enabled: true  },
+      { id: 'lfi',         label: 'LFI / RFI',         enabled: true  },
+      { id: 'cmdi',        label: 'Command Injection', enabled: true  },
+      { id: 'pathtraversal',label: 'Path Traversal',   enabled: true  },
+      { id: 'deserialize', label: 'Deserialização',    enabled: true  },
+      { id: 'openredirect',label: 'Open Redirect',     enabled: true  }
+    ],
+    passwords: [
+      { id: 'all',      label: 'Tudo',              enabled: true  },
+      { id: 'hashes',   label: 'Hashes fracos',     enabled: true  },
+      { id: 'policy',   label: 'Política',          enabled: true  },
+      { id: 'incode',   label: 'No código',         enabled: true  },
+      { id: 'env',      label: '.env exposto',      enabled: true  },
+      { id: 'twofa',    label: '2FA',               enabled: true  }
+    ],
+    quality: [
+      { id: 'all',        label: 'Tudo',            enabled: true },
+      { id: 'style',      label: 'Estilo',          enabled: true },
+      { id: 'complexity', label: 'Complexidade',    enabled: true }
+    ],
+    tests: [
+      { id: 'all',      label: 'Tudo',              enabled: true },
+      { id: 'unit',     label: 'Unit',              enabled: true },
+      { id: 'feature',  label: 'Feature',           enabled: true },
+      { id: 'coverage', label: 'Cobertura',         enabled: true }
+    ],
+    performance: [
+      { id: 'all',        label: 'Tudo',            enabled: true },
+      { id: 'nplus1',     label: 'N+1 Queries',     enabled: true },
+      { id: 'selectstar', label: 'SELECT *',        enabled: true },
+      { id: 'heavyloop',  label: 'Loops aninhados', enabled: true }
+    ]
+  };
+
+  /* ══════════════════════════════════════════════════════
+     ESTADO
+     ══════════════════════════════════════════════════════ */
+
+  /* FK_HASH_INIT */
+  var state = {
+    activeTab:    (function(){
+      var _h = (location.hash || '').replace(/^#/, '').split('/')[0];
+      var _ok = ['all','db','security','passwords','quality','tests','performance'];
+      return _ok.indexOf(_h) !== -1 ? _h : 'db';
+    })(),
+    activeSubtab: 'all',
+    result:       null,     // findings agregados
+    filters:      { dbs: {}, sev: {}, cat: {} },
+    busy:         false
+  };
+
+  // (debug) expor state para o console
+  window.__frankeiState = state;
+
+  var $  = function(s, r){ return (r||document).querySelector(s); };
+  var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+
+  /* ══════════════════════════════════════════════════════
+     ROUTING POR HASH
+     ══════════════════════════════════════════════════════ */
+
+  function parseHash(){
+    var h = (location.hash || '').replace(/^#/, '');
+    if (!h) return { tab: 'db', sub: 'all' };
+
+    var parts = h.split('/');
+    var tab   = parts[0] || 'db';
+    var sub   = parts[1] || 'all';
+
+    // Validar
+    var tabOk = TABS.some(function(t){ return t.id === tab && t.enabled; });
+    if (!tabOk) tab = 'db';
+
+    var subOk = SUBTABS[tab] && SUBTABS[tab].some(function(s){ return s.id === sub && s.enabled; });
+    if (!subOk) sub = 'all';
+
+    return { tab: tab, sub: sub };
+  }
+
+  function updateHash(tab, sub){
+    var hash = '#' + tab;
+    if (sub && sub !== 'all') hash += '/' + sub;
+    if (location.hash !== hash) {
+      history.replaceState(null, '', hash);
+    }
+  }
+
+  window.addEventListener('hashchange', function(){
+    var r = parseHash();
+    state.activeTab    = r.tab;
+    state.activeSubtab = r.sub;
+    renderAll();
+  });
+
+
+  /* ══════════════════════════════════════════════════════
+     RENDER — TABS PRINCIPAIS
+     ══════════════════════════════════════════════════════ */
+
+  function renderTabs(){
+    var el = $('#fkTabs');
+    if (!el) return;
+    el.innerHTML = '';
+
+    TABS.forEach(function(tab){
+      var btn = document.createElement('button');
+      // FK_RENDERTABS_LOCK: só 'tests' fica ativo; outras ficam locked+PRO
+      var _soTests = (tab.id === 'tests');
+      btn.className = 'fk-tab'
+        + ((_soTests && tab.id === state.activeTab) ? ' active' : '')
+        + (_soTests ? '' : ' locked');
+      if (!_soTests) {
+        btn.setAttribute('disabled', 'disabled');
+      }
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('data-tab', tab.id);
+      if (!tab.enabled) btn.disabled = true;
+
+      var badgeHtml = '';
+      if (!tab.enabled) {
+        badgeHtml = '<span class="fk-tab-badge soon">soon</span>';
+      } else {
+        var count = countForTab(tab.id);
+        if (count > 0 || tab.id === 'db') {
+          var cls = 'fk-tab-badge';
+          if (count > 0) cls += ' has-crit';
+          badgeHtml = '<span class="' + cls + '">' + count + '</span>';
+        }
+      }
+
+      btn.innerHTML =
+        '<span class="fk-tab-icon">' + tab.icon + '</span>' +
+        '<span>' + tab.label + '</span>' +
+        badgeHtml;
+
+      if (tab.enabled) {
+        btn.addEventListener('click', function(){
+          state.activeTab    = tab.id;
+          state.activeSubtab = 'all';
+          updateHash(tab.id, 'all');
+          renderAll();
+        });
+      }
+
+      el.appendChild(btn);
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════
+     RENDER — SUB-TABS
+     ══════════════════════════════════════════════════════ */
+
+  function renderSubtabs(){
+    var el   = $('#fkSubtabs');
+    var subs = SUBTABS[state.activeTab] || [];
+
+    if (!subs.length){
+      el.style.display = 'none';
+      el.innerHTML = '';
+      return;
+    }
+
+    el.style.display = '';
+    el.innerHTML = '';
+
+    subs.forEach(function(sub){
+      var btn = document.createElement('button');
+      // FK_SUBTABS_LOCK: só 'structure' fica ativo; outras ficam locked
+      var _soStructure = (sub.id === 'structure');
+      btn.className = 'fk-subtab'
+        + ((_soStructure && sub.id === state.activeSubtab) ? ' active' : '')
+        + (_soStructure ? '' : ' locked');
+      if (!_soStructure) {
+        btn.setAttribute('disabled', 'disabled');
+      }
+      btn.setAttribute('data-subtab', sub.id);
+      if (!sub.enabled) btn.disabled = true;
+
+      var badgeHtml = '';
+      if (!sub.enabled) {
+        badgeHtml = '<span class="fk-subtab-badge">soon</span>';
+      } else {
+        var count = countForSubtab(state.activeTab, sub.id);
+        if (count > 0) {
+          badgeHtml = '<span class="fk-subtab-badge">' + count + '</span>';
+        }
+      }
+
+      btn.innerHTML = '<span>' + sub.label + '</span>' + badgeHtml;
+
+      if (sub.enabled) {
+        btn.addEventListener('click', function(){
+          state.activeSubtab = sub.id;
+          updateHash(state.activeTab, sub.id);
+          renderAll();
+        });
+      }
+
+      el.appendChild(btn);
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════
+     RENDER — CONTEÚDO (placeholder ou terminal+findings)
+     ══════════════════════════════════════════════════════ */
+
+  function renderContent(){
+    var tab         = currentTab();
+    var placeholder = $('#fkPlaceholder');
+    var content     = $('#fkTabContent');
+
+    if (!tab || !tab.enabled){
+      // Tab desativada — mostra placeholder
+      content.style.display = 'none';
+      placeholder.style.display = '';
+      renderPlaceholder(tab);
+      return;
+    }
+
+    // Tab ativa — mostra conteúdo normal
+    placeholder.style.display = 'none';
+    content.style.display = '';
+
+    // Título do terminal
+    var termTitle = $('#fkTermTitle');
+    if (termTitle) {
+      termTitle.textContent = 'frankei — ' + tab.label.toLowerCase();
+    }
+  }
+
+  function renderPlaceholder(tab){
+    var el = $('#fkPlaceholder');
+    if (!el) return;
+
+    if (!tab){
+      el.innerHTML =
+        '<div class="fk-placeholder-icon">🚧</div>' +
+        '<h2>Em breve</h2>' +
+        '<p>Esta análise ainda não está disponível. Vai ser adicionada numa próxima atualização.</p>';
+      return;
+    }
+
+    var items = placeholderItems(tab.id);
+    var listHtml = '';
+    if (items.length){
+      listHtml = '<div class="fk-placeholder-list">' +
+        items.map(function(i){ return '<span class="fk-placeholder-item">' + i + '</span>'; }).join('') +
+        '</div>';
+    }
+
+    el.innerHTML =
+      '<div class="fk-placeholder-icon">' + tab.icon + '</div>' +
+      '<h2>' + tab.label + '</h2>' +
+      '<p>Esta análise está planeada. Aqui vais encontrar:</p>' +
+      listHtml;
+  }
+
+  function placeholderItems(tabId){
+    var MAP = {
+      quality:     ['Código morto', 'Complexidade ciclomática', 'Duplicação', 'Code style (PSR-12)', 'Docblocks em falta'],
+      tests:       ['Cobertura de testes', 'Ficheiros sem teste', 'Asserts vazios', 'Testes skipados', 'Config PHPUnit'],
+      performance: ['N+1 queries', 'Loops com queries', 'SELECT *', 'Cache em falta', 'Includes pesados'],
+      config:      ['Variáveis .env', 'Debug em produção', 'HTTPS/Cookies', 'CORS', 'Cabeçalhos de segurança'],
+      services:    ['Endpoints API', 'Timeouts', 'Retries', 'Autenticação entre serviços', 'Rate limiting'],
+      report:      ['Relatório HTML completo', 'Export PDF/JSON', 'Histórico de análises', 'Comparação entre scans']
+    };
+    return MAP[tabId] || [];
+  }
+
+  /* ══════════════════════════════════════════════════════
+     HELPERS — tab/sub atual + contagens
+     ══════════════════════════════════════════════════════ */
+
+  function currentTab(){
+    for (var i = 0; i < TABS.length; i++){
+      if (TABS[i].id === state.activeTab) return TABS[i];
+    }
+    return null;
+  }
+
+  function countForTab(tabId){
+    if (!state.result || !state.result.findings) return 0;
+    return state.result.findings.filter(function(f){
+      return matchesTab(f, tabId);
+    }).length;
+  }
+
+  function countForSubtab(tabId, subId){
+    if (!state.result || !state.result.findings) return 0;
+    return state.result.findings.filter(function(f){
+      return matchesTab(f, tabId) && matchesSubtab(f, tabId, subId);
+    }).length;
+  }
+
+  function matchesTab(f, tabId){
+    var cat = (f.category || '').toLowerCase();
+
+    if (tabId === 'all')       return true;
+    if (tabId === 'db')        return ['structure', 'quality', 'index'].indexOf(cat) !== -1 || !cat;
+    if (tabId === 'security')  return ['security', 'vuln', 'xss', 'sqli', 'csrf', 'ssrf', 'xxe', 'lfi', 'cmdi', 'pathtraversal', 'deserialize', 'openredirect'].indexOf(cat) !== -1;
+    if (tabId === 'passwords') return ['password', 'auth', 'hash'].indexOf(cat) !== -1;
+    if (tabId === 'quality')   return ['style', 'complexity', 'quality'].indexOf(cat) !== -1;
+    if (tabId === 'tests')     return ['test', 'tests', 'unit', 'feature'].indexOf(cat) !== -1;
+    if (tabId === 'performance') return cat === 'performance';
+
+    return false;
+  }
+
+  function matchesSubtab(f, tabId, subId){
+    if (subId === 'all') return true;
+
+    var cat = (f.category || '').toLowerCase();
+    var s   = (f.scanner  || '').toLowerCase();
+
+    // DB
+    if (tabId === 'db'){
+      if (subId === 'structure') return cat === 'structure';
+      if (subId === 'quality')   return cat === 'quality';
+      if (subId === 'indexes')   return cat === 'index' || s.indexOf('index') !== -1 || s.indexOf('fk') !== -1;
+    }
+
+    // Security
+    if (tabId === 'security'){
+      return s.indexOf(subId) !== -1 || cat === subId;
+    }
+
+    // Tests
+    if (tabId === 'tests'){
+      if (subId === 'unit')     return s.indexOf('unit')    !== -1 || cat === 'unit'    || s.indexOf('Unit') !== -1;
+      if (subId === 'feature')  return s.indexOf('feature') !== -1 || cat === 'feature' || s.indexOf('Feature') !== -1;
+      if (subId === 'coverage') return s.indexOf('coverage') !== -1;
+    }
+
+    // Quality
+    if (tabId === 'quality'){
+      if (subId === 'style')      return cat === 'style'      || s.indexOf('style') !== -1      || s.indexOf('todo') !== -1 || s.indexOf('magic') !== -1 || s.indexOf('suppression') !== -1;
+      if (subId === 'complexity') return cat === 'complexity' || s.indexOf('complexity') !== -1 || s.indexOf('long') !== -1 || s.indexOf('nesting') !== -1;
+    }
+
+    // Passwords
+    if (tabId === 'passwords'){
+      if (subId === 'hashes') return s.indexOf('hash') !== -1 || s.indexOf('md5') !== -1;
+      if (subId === 'policy') return s.indexOf('policy') !== -1 || s.indexOf('weak') !== -1;
+      if (subId === 'incode') return s.indexOf('hardcode') !== -1 || s.indexOf('incode') !== -1;
+      if (subId === 'env')    return s.indexOf('env') !== -1;
+      if (subId === 'twofa')  return s.indexOf('2fa') !== -1 || s.indexOf('totp') !== -1;
+    }
+
+    // Performance
+    if (tabId === 'performance'){
+      if (subId === 'nplus1')     return s.indexOf('nplus1') !== -1;
+      if (subId === 'selectstar') return s.indexOf('select-star') !== -1;
+      if (subId === 'heavyloop')  return s.indexOf('heavy-loop') !== -1;
+    }
+
+    return false;
+  }
+
+
+  /* ══════════════════════════════════════════════════════
+     TERMINAL
+     ══════════════════════════════════════════════════════ */
+
+  var termQueue   = [];
+  var termRunning = false;
+
+  function termClear(){ $('#fkTerminal').innerHTML = ''; }
+
+  function termLine(cls, text){
+    termQueue.push({ cls: cls, text: text });
+    if (!termRunning) termFlush();
+  }
+
+  function termFlush(){
+    var term = $('#fkTerminal');
+    if (!termQueue.length){ termRunning = false; return; }
+    termRunning = true;
+
+    var item = termQueue.shift();
+    var el = document.createElement('div');
+    el.className = 'fk-term-line ' + (item.cls || '');
+    el.textContent = item.text;
+    term.appendChild(el);
+    term.scrollTop = term.scrollHeight;
+
+    setTimeout(termFlush, 50);
+  }
+
+  function termStatus(text, cls){
+    var s = $('#fkTermStatus');
+    if (!s) return;
+    s.textContent = text;
+    s.className = 'fk-terminal-status' + (cls ? ' ' + cls : '');
+  }
+
+  // Expor para uso cross-IIFE (o terminal do input está noutro IIFE)
+  window.termLine   = termLine;
+  window.termClear  = termClear;
+  window.termStatus = termStatus;
+  window.fetchJson  = fetchJson;
+  window.escapeHtml = escapeHtml;
+
+  /* ══════════════════════════════════════════════════════
+     SCAN — DB (o único funcional para já)
+     ══════════════════════════════════════════════════════ */
+
+  /* ─── Barra de progresso ─── */
+  function fkScrollLock(fn){
+    // Executa fn() preservando a posicao de scroll
+    var x = window.scrollX;
+    var y = window.scrollY;
+    fn();
+    // Restaura no proximo frame (depois do layout assentar)
+    requestAnimationFrame(function(){
+      window.scrollTo(x, y);
+    });
+  }
+
+  function progressShow(){
+    fkScrollLock(function(){
+      var el = document.getElementById('fkProgressWrap');
+      if (el) el.style.display = '';
+    });
+    progressReset();
+  }
+
+  function progressHide(){
+    setTimeout(function(){
+      fkScrollLock(function(){
+        var el = document.getElementById('fkProgressWrap');
+        if (el) el.style.display = 'none';
+      });
+    }, 5000);
+  }
+
+  function progressReset(){
+    document.querySelectorAll('.fk-progress-step').forEach(function(s){
+      s.classList.remove('fk-step-running', 'fk-step-done', 'fk-step-error');
+    });
+    var fill = document.getElementById('fkProgressFill');
+    if (fill){
+      fill.style.width = '0%';
+      fill.classList.remove('fk-fill-done', 'fk-fill-error');
+    }
+    var label = document.getElementById('fkProgressLabel');
+    if (label) label.textContent = 'A iniciar…';
+  }
+
+  function progressSetStep(stepId, state){
+    var el = document.querySelector('.fk-progress-step[data-step="' + stepId + '"]');
+    if (!el) return;
+    el.classList.remove('fk-step-running', 'fk-step-done', 'fk-step-error');
+    if (state) el.classList.add('fk-step-' + state);
+  }
+
+  function progressSet(percent, label){
+    var fill = document.getElementById('fkProgressFill');
+    if (fill) fill.style.width = percent + '%';
+    var lbl = document.getElementById('fkProgressLabel');
+    if (lbl && label) lbl.textContent = label;
+  }
+
+  function progressFinish(){
+    var fill = document.getElementById('fkProgressFill');
+    if (fill){
+      fill.style.width = '100%';
+      fill.classList.add('fk-fill-done');
+    }
+    document.querySelectorAll('.fk-progress-step').forEach(function(s){
+      s.classList.remove('fk-step-running');
+      s.classList.add('fk-step-done');
+    });
+    var lbl = document.getElementById('fkProgressLabel');
+    if (lbl) lbl.textContent = '✓ Análise concluída';
+    progressHide();
+  }
+
+  function progressError(msg){
+    var fill = document.getElementById('fkProgressFill');
+    if (fill) fill.classList.add('fk-fill-error');
+    var lbl = document.getElementById('fkProgressLabel');
+    if (lbl) lbl.textContent = '✗ ' + (msg || 'Erro');
+  }
+
+  /* ─── Findings corrigidos (persistente) ─── */
+  function getFixedIds(){
+    try {
+      var raw = localStorage.getItem('frankei:fixedFindings');
+      return raw ? JSON.parse(raw) : {};
+    } catch(e){ return {}; }
+  }
+
+  function markAsFixed(finding){
+    var fixed = getFixedIds();
+    var key = (finding.scanner || '') + '|' + (finding.data && finding.data.file ? finding.data.file : '') + '|' + (finding.data && finding.data.line ? finding.data.line : '');
+    fixed[key] = Date.now();
+    try {
+      localStorage.setItem('frankei:fixedFindings', JSON.stringify(fixed));
+    } catch(e){}
+    finding._fixed = true;
+  }
+
+  function isFixed(finding){
+    var fixed = getFixedIds();
+    var key = (finding.scanner || '') + '|' + (finding.data && finding.data.file ? finding.data.file : '') + '|' + (finding.data && finding.data.line ? finding.data.line : '');
+    return !!fixed[key];
+  }
+
+  function runScan(forceMode){
+    if (state.busy) return;
+
+    var tab = currentTab();
+    if (!tab || !tab.enabled){
+      termLine('fk-term-warn', '⚠ Esta análise ainda não está disponível.');
+      return;
+    }
+
+    // Modo: parâmetro > localStorage > inferido pela tab
+    var mode;
+    if (forceMode) {
+      mode = forceMode;
+    } else {
+      mode = 'all';
+      try { mode = localStorage.getItem('frankei:runMode') || 'all'; } catch(e){}
+
+      if (tab.id === 'security')   mode = 'security';
+      if (tab.id === 'passwords')  mode = 'passwords';
+      if (tab.id === 'db')         mode = 'db';
+      if (tab.id === 'performance') mode = 'performance';
+    }
+
+    // Reset do sub-tab
+    state.activeSubtab = 'all';
+    updateHash(state.activeTab, 'all');
+
+    // Opções
+    var sequential = true;
+    var liveBadges = true;
+    try {
+      var s = localStorage.getItem('frankei:sequential');
+      var b = localStorage.getItem('frankei:liveBadges');
+      if (s !== null) sequential = s === '1';
+      if (b !== null) liveBadges = b === '1';
+    } catch(e){}
+
+    state.busy = true;
+    setBusy(true);
+    termClear();
+    termStatus('a correr…', 'running');
+    progressShow();
+    termLine('fk-term-cmd', '$ frankei scan --mode=' + mode + ' --path=' + PATH);
+    termLine('fk-term-info', '→ A iniciar análise (' + mode + ')...');
+    termLine('', '');
+
+    // Reset estados de tabs
+    clearTabStatuses();
+
+    // Definir as tarefas (com tabId para marcar visualmente)
+    var tasks = [];
+
+    if (mode === 'all' || mode === 'db'){
+      tasks.push({
+        tabId: 'db',
+        type: 'db',
+        run: function(){
+          return fetchJson('/api/frankei/scan-path', { path: PATH }).then(function(r){
+            var n = (r.databases || []).length;
+            termLine('fk-term-info', '→ Base de dados: ' + n + ' alvo(s)');
+            return { type: 'db', data: r };
+          });
+        }
+      });
+    }
+
+    if (mode === 'all' || mode === 'security' || mode === 'passwords' || mode === 'performance'){
+      // Recolher TODAS as opções (perf + segurança + pastas)
+      var perfOptions = {
+        // Desempenho
+        skipScripts:       window.FrankeiOpts.skipScripts(),
+        skipDdl:           window.FrankeiOpts.skipDdl(),
+        skipTrivialLoops:  window.FrankeiOpts.skipTrivialLoops(),
+        ignoreSelectById:  window.FrankeiOpts.ignoreSelectById(),
+        skipViews:         window.FrankeiOpts.skipViews(),
+        selectStarAsError: window.FrankeiOpts.selectStarAsError(),
+        // Segurança — scanners ativos
+        runXss:            window.FrankeiOpts.runXss(),
+        runSqli:           window.FrankeiOpts.runSqli(),
+        runCmdi:           window.FrankeiOpts.runCmdi(),
+        runCodeExec:       window.FrankeiOpts.runCodeExec(),
+        runCsrf:           window.FrankeiOpts.runCsrf(),
+        runDeserialize:    window.FrankeiOpts.runDeserialize(),
+        runFileInclusion:  window.FrankeiOpts.runFileInclusion(),
+        runPathTraversal:  window.FrankeiOpts.runPathTraversal(),
+        runOpenRedirect:   window.FrankeiOpts.runOpenRedirect(),
+        runSsrf:           window.FrankeiOpts.runSsrf(),
+        runXxe:            window.FrankeiOpts.runXxe(),
+        // Segurança — pastas ignoradas
+        ignoreVendor:        window.FrankeiOpts.ignoreVendor(),
+        ignoreNodeModules:   window.FrankeiOpts.ignoreNodeModules(),
+        ignoreTestsFixtures: window.FrankeiOpts.ignoreTestsFixtures(),
+        ignoreBackups:       window.FrankeiOpts.ignoreBackups(),
+        ignoreBuild:         window.FrankeiOpts.ignoreBuild(),
+        // Performance
+        runPerfNplus1:       window.FrankeiOpts.runPerfNplus1(),
+        runPerfSelectStar:   window.FrankeiOpts.runPerfSelectStar(),
+        runPerfHeavyLoop:    window.FrankeiOpts.runPerfHeavyLoop(),
+        // Passwords
+        runWeakPasswordHash: window.FrankeiOpts.runWeakPasswordHash(),
+        // Código & Qualidade
+        runCodeTodo:             window.FrankeiOpts.runCodeTodo(),
+        runCodeErrorSuppression: window.FrankeiOpts.runCodeErrorSuppression(),
+        runCodeMagicNumber:      window.FrankeiOpts.runCodeMagicNumber(),
+        runCodeLongFunction:     window.FrankeiOpts.runCodeLongFunction(),
+        runCodeDeepNesting:      window.FrankeiOpts.runCodeDeepNesting(),
+        maxFunctionLines:        window.FrankeiOpts.maxFunctionLines(),
+        maxNestingDepth:         window.FrankeiOpts.maxNestingDepth(),
+        magicNumberMinLength:    window.FrankeiOpts.magicNumberMinLength(),
+        // Avançado
+        contextLines:         window.FrankeiOpts.contextLines(),
+        maxFindings:          window.FrankeiOpts.maxFindings(),
+        scannerTimeout:       window.FrankeiOpts.scannerTimeout(),
+        attentionTables:      window.FrankeiOpts.attentionTables()
+      };
+
+      tasks.push({
+        tabId: mode === 'passwords' ? 'passwords' : (mode === 'performance' ? 'performance' : 'security'),
+        type: 'code',
+        run: function(){
+          // Mapeamento modo -> scanners (vazio = todos)
+          var modeScanners = {
+            'all':         [],
+            'security':    ['php-xss','php-sqli','php-cmdi','php-code-exec','php-csrf',
+                            'php-deserialize','php-fileinclusion','php-pathtraversal',
+                            'php-openredirect','php-ssrf','php-xxe'],
+            'passwords':   ['weak-password-hash'],
+            'performance': ['perf-nplus1','perf-select-star','perf-heavy-loop']
+          };
+          var scanners = modeScanners[mode] || [];
+          return fetchJson('/api/frankei/scan-code', { path: PATH, scanners: scanners, options: perfOptions }).then(function(r){
+            var files = (r.stats && r.stats.files_scanned) || 0;
+            termLine('fk-term-info', '→ Código: ' + files + ' ficheiros lidos');
+            return { type: 'code', data: r };
+          });
+        }
+      });
+    }
+
+    // Execução
+    if (sequential){
+      // Sequencial: uma tab de cada vez
+      (async function(){
+        var results = [];
+
+        for (var i = 0; i < tasks.length; i++){
+          var t = tasks[i];
+
+          // Marcar tab como running
+          setTabStatus(t.tabId, 'running');
+          progressSetStep(t.tabId, 'running');
+
+          var pct = Math.round(((i + 0.1) / tasks.length) * 100);
+          progressSet(pct, 'A analisar ' + t.tabId + '… (' + (i + 1) + '/' + tasks.length + ')');
+
+          try {
+            var r = await t.run();
+            results.push(r);
+
+            // Contar findings desta tab
+            var count = countFindingsInResult(r, t.tabId);
+            setTabStatus(t.tabId, 'done', liveBadges ? count : undefined);
+            progressSetStep(t.tabId, 'done');
+
+            var pctDone = Math.round(((i + 1) / tasks.length) * 100);
+            progressSet(pctDone, '✓ ' + t.tabId + ' concluído');
+          } catch(err){
+            setTabStatus(t.tabId, 'error');
+            progressSetStep(t.tabId, 'error');
+            throw err;
+          }
+        }
+
+        handleScanSuccess(results, mode);
+      })()
+      .catch(function(err){
+        progressError(err.message);
+        handleScanError(err);
+      })
+      .finally(function(){
+        state.busy = false;
+        setBusy(false);
+      });
+    } else {
+      // Paralelo (modo antigo)
+      Promise.all(tasks.map(function(t){ return t.run(); }))
+        .then(function(results){ handleScanSuccess(results, mode); })
+        .catch(handleScanError)
+        .finally(function(){
+          state.busy = false;
+          setBusy(false);
+        });
+    }
+  }
+
+  /* ─── Estados visuais das tabs ─── */
+  function setTabStatus(tabId, status, count){
+    var tabEl = document.querySelector('.fk-tab[data-tab="' + tabId + '"]');
+    if (!tabEl) return;
+
+    tabEl.classList.remove('fk-tab-running', 'fk-tab-done', 'fk-tab-error');
+
+    if (status === 'running') tabEl.classList.add('fk-tab-running');
+    if (status === 'done')    tabEl.classList.add('fk-tab-done');
+    if (status === 'error')   tabEl.classList.add('fk-tab-error');
+
+    // Atualizar badge
+    if (count !== undefined){
+      var badge = tabEl.querySelector('.fk-tab-badge');
+      if (badge){
+        badge.textContent = count;
+        badge.classList.toggle('has-crit', count > 0);
+      }
+    } else if (status === 'running'){
+      var badge2 = tabEl.querySelector('.fk-tab-badge');
+      if (badge2 && !badge2.classList.contains('soon')){
+        badge2.textContent = '...';
+      }
+    }
+  }
+
+  function clearTabStatuses(){
+    document.querySelectorAll('.fk-tab').forEach(function(t){
+      t.classList.remove('fk-tab-running', 'fk-tab-done', 'fk-tab-error');
+    });
+  }
+
+  function countFindingsInResult(r, tabId){
+    if (!r || !r.data || !r.data.findings) return 0;
+
+    var n = 0;
+    r.data.findings.forEach(function(f){
+      if (tabId === 'db'){
+        if (matchesTab(f, 'db')) n++;
+      } else if (tabId === 'security'){
+        if (matchesTab(f, 'security')) n++;
+      } else if (tabId === 'passwords'){
+        if (matchesTab(f, 'passwords')) n++;
+      }
+    });
+    return n;
+  }
+
+  function fetchJson(url, body){
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    .then(function(r){
+      return r.json().then(function(d){
+        if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+        return d;
+      });
+    });
+  }
+
+  function handleScanSuccess(results, mode){
+    termLine('', '');
+    termLine('fk-term-info', '→ A processar resultados...');
+    termLine('', '');
+
+    // Agregar findings de todas as fontes
+    var allFindings = [];
+    var totals = { db: 0, code: 0 };
+    var errors = [];
+    var stats = {
+      total: 0,
+      by_severity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+      by_category: {},
+      elapsed_ms: 0,
+      databases: 0,
+      files_scanned: 0
+    };
+
+    results.forEach(function(r){
+      var d = r.data;
+
+      if (r.type === 'db'){
+        totals.db = (d.findings || []).length;
+        stats.databases = (d.databases || []).length;
+        stats.elapsed_ms += (d.stats && d.stats.elapsed_ms) || 0;
+
+        (d.databases || []).forEach(function(db){
+          var bs = (d.by_database && d.by_database[db.key]) ? d.by_database[db.key] : null;
+          var n  = bs ? bs.findings : 0;
+          var cls = n > 0 ? 'fk-term-warn' : 'fk-term-ok';
+          var ico = n > 0 ? '⚠' : '✓';
+          termLine(cls, '  ' + ico + ' BD · ' + db.label + ' — ' + n + ' finding(s)');
+        });
+
+        (d.findings || []).forEach(function(f){
+          f.database_key   = f.database_key   || 'db';
+          f.database_label = f.database_label || 'Base de dados';
+          allFindings.push(f);
+        });
+
+        (d.errors || []).forEach(function(e){ errors.push(e); });
+      }
+
+      if (r.type === 'code'){
+        totals.code = (d.findings || []).length;
+        stats.files_scanned = (d.stats && d.stats.files_scanned) || 0;
+        stats.elapsed_ms += (d.stats && d.stats.elapsed_ms) || 0;
+
+        // Aviso de truncagem (se o backend cortou findings)
+        var truncInfo = '';
+        if (d.stats && d.stats.truncated && d.stats.total_before_truncation){
+          var removed = d.stats.total_before_truncation - totals.code;
+          truncInfo = ' (mostrando ' + totals.code + ' de ' + d.stats.total_before_truncation + ', ' + removed + ' omitidos)';
+        }
+
+        termLine(totals.code > 0 ? 'fk-term-warn' : 'fk-term-ok',
+          '  ' + (totals.code > 0 ? '⚠' : '✓') + ' Código — ' + totals.code + ' finding(s)' + truncInfo + ' em ' + stats.files_scanned + ' ficheiros');
+
+        (d.findings || []).forEach(function(f){
+          f.database_key   = f.category || 'code';
+          allFindings.push(f);
+        });
+
+        (d.errors || []).forEach(function(e){ errors.push(e); });
+      }
+    });
+
+    // Ordenar por severidade (global, antes de estatisticas)
+    var SEV_ORDER_GLOBAL = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    allFindings.sort(function(a, b){
+      var sa = SEV_ORDER_GLOBAL[a.severity] != null ? SEV_ORDER_GLOBAL[a.severity] : 99;
+      var sb = SEV_ORDER_GLOBAL[b.severity] != null ? SEV_ORDER_GLOBAL[b.severity] : 99;
+      return sa - sb;
+    });
+
+
+    // Estatísticas agregadas
+    stats.total = allFindings.length;
+    allFindings.forEach(function(f){
+      var sev = f.severity || 'info';
+      var cat = f.category || 'other';
+      if (stats.by_severity[sev] != null) stats.by_severity[sev]++;
+      stats.by_category[cat] = (stats.by_category[cat] || 0) + 1;
+    });
+
+    // Erros
+    (errors || []).forEach(function(e){
+      var label = e.database || e.scanner || '?';
+      termLine('fk-term-err', '  ✗ [' + label + '] ' + (e.message || 'erro'));
+    });
+
+    // Resumo final
+    var sev   = stats.by_severity;
+    var total = stats.total;
+    termLine('', '');
+    termLine('fk-term-info', 'Resumo:');
+    termLine('fk-term-err',  '  🔴 Crítico:   ' + (sev.critical || 0));
+    termLine('fk-term-err',  '  🔴 Alto:      ' + (sev.high || 0));
+    termLine('fk-term-warn', '  🟡 Médio:     ' + (sev.medium || 0));
+    termLine('fk-term-ok',   '  🟢 Baixo:     ' + (sev.low || 0));
+    termLine('fk-term-info', '  🟢 Info:      ' + (sev.info || 0));
+    termLine('fk-term-info', '  ─────────────');
+    termLine('fk-term-info', '  📊 Total:     ' + total);
+    termLine('', '');
+    termLine('fk-term-ok', '✓ Análise concluída em ' + stats.elapsed_ms + 'ms');
+
+    termStatus('concluído', 'done');
+
+    // Guardar resultado no estado
+    state.result = {
+      findings: allFindings,
+      stats: stats,
+      errors: errors,
+      mode: mode,
+      scanned_at: new Date().toISOString()
+    };
+
+    // UI
+    document.getElementById('fkStatDbs').textContent   = stats.databases + ' BD · ' + stats.files_scanned + ' ficheiros';
+    document.getElementById('fkStatTotal').textContent = stats.total;
+    document.getElementById('fkStatTime').textContent  = stats.elapsed_ms + 'ms';
+
+    buildFilters(state.result);
+    document.getElementById('fkFiltersCard').style.display = '';
+
+    renderAll();
+    document.getElementById('fkExportBtn').disabled = false;
+
+    // Marcar progresso como concluído (só agora, no fim do terminal)
+    progressFinish();
+  }
+
+  function handleScanError(err){
+    termLine('fk-term-err', '✗ Erro: ' + err.message);
+    termStatus('erro', 'error');
+  }
+
+  function setBusy(busy){
+    var b = $('#fkScanBtn');
+    if (b){ b.disabled = busy; b.innerHTML = busy ? '<span>⏳</span> A correr…' : '<span>▶</span> Correr análise'; }
+  }
+
+  /* ══════════════════════════════════════════════════════
+     FILTROS
+     ══════════════════════════════════════════════════════ */
+
+  function buildFilters(data){
+    var dbsEl = $('#fkFilterDbs');
+    dbsEl.innerHTML = '';
+    state.filters.dbs = {};
+
+    (data.databases || []).forEach(function(db){
+      state.filters.dbs[db.key] = true;
+      var label = document.createElement('label');
+      label.className = 'fk-chip';
+      label.innerHTML = '<input type="checkbox" value="' + db.key + '" checked><span>' + db.label + '</span>';
+      label.querySelector('input').addEventListener('change', onFilterChange);
+      dbsEl.appendChild(label);
+    });
+
+    var catEl = $('#fkFilterCat');
+    catEl.innerHTML = '';
+    state.filters.cat = {};
+
+    var cats = (data.stats && data.stats.by_category) ? Object.keys(data.stats.by_category) : [];
+    cats.sort().forEach(function(cat){
+      state.filters.cat[cat] = true;
+      var label = document.createElement('label');
+      label.className = 'fk-chip';
+      label.innerHTML = '<input type="checkbox" value="' + cat + '" checked><span>' + cat + '</span>';
+      label.querySelector('input').addEventListener('change', onFilterChange);
+      catEl.appendChild(label);
+    });
+
+    $$('#fkFilterSev input').forEach(function(input){
+      input.addEventListener('change', onFilterChange);
+    });
+  }
+
+  function onFilterChange(){
+    state.filters.dbs = {};
+    state.filters.sev = {};
+    state.filters.cat = {};
+
+    $$('#fkFilterDbs input').forEach(function(i){ state.filters.dbs[i.value] = i.checked; });
+    $$('#fkFilterSev input').forEach(function(i){ state.filters.sev[i.value] = i.checked; });
+    $$('#fkFilterCat input').forEach(function(i){ state.filters.cat[i.value] = i.checked; });
+
+    renderFindings();
+  }
+
+
+  /* ══════════════════════════════════════════════════════
+     RENDER FINDINGS (filtrado por tab + subtab)
+     ══════════════════════════════════════════════════════ */
+
+  var SEV_LABEL = { critical:'Crítico', high:'Alto', medium:'Médio', low:'Baixo', info:'Info' };
+  var SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+
+  /* ─── Resumo dos filtros ativos (abaixo do título Findings) ─── */
+  function renderFiltersSummary(){
+    var el = document.getElementById('fkFindingsFilters');
+    if (!el) return;
+
+    var sevOrder = ['critical', 'high', 'medium', 'low', 'info'];
+    var sevIcons = { critical: '🔴', high: '🔴', medium: '🟡', low: '🟢', info: '🟢' };
+    var sevLabels = { critical: 'Crítico', high: 'Alto', medium: 'Médio', low: 'Baixo', info: 'Info' };
+
+    var sevOn  = [];
+    var sevOff = [];
+
+    sevOrder.forEach(function(s){
+      if (state.filters.sev[s] !== false){
+        sevOn.push('<span class="fk-fchip fk-fchip-on">' + sevIcons[s] + ' ' + sevLabels[s] + '</span>');
+      } else {
+        sevOff.push('<span class="fk-fchip fk-fchip-off">' + sevIcons[s] + ' ' + sevLabels[s] + '</span>');
+      }
+    });
+
+    // Sub-tab
+    var subHtml = '';
+    if (state.activeSubtab && state.activeSubtab !== 'all'){
+      subHtml = '<span class="fk-fchip fk-fchip-on">📑 ' + state.activeSubtab + '</span>';
+    } else {
+      subHtml = '<span class="fk-fchip fk-fchip-on">📑 todas</span>';
+    }
+
+    // Tab principal
+    var tabHtml = '';
+    if (state.activeTab && state.activeTab !== 'all'){
+      tabHtml = '<span class="fk-fchip fk-fchip-on">📂 ' + state.activeTab + '</span>';
+    } else {
+      tabHtml = '<span class="fk-fchip fk-fchip-on">📂 todas</span>';
+    }
+
+    var html = '';
+    html += '<div class="fk-filters-line"><span class="fk-filters-key">Filtros:</span> ' +
+            tabHtml + ' ' + subHtml + ' ' + sevOn.join(' ') + '</div>';
+
+    if (sevOff.length){
+      html += '<div class="fk-filters-line fk-filters-line-off"><span class="fk-filters-key">Ocultos:</span> ' +
+              sevOff.join(' ') + '</div>';
+    }
+
+    el.innerHTML = html;
+  }
+
+  /* ─── Bola visual por severidade ─── */
+  function ballFor(finding){
+    var sev = (finding.severity || 'info').toLowerCase();
+    if (sev === 'critical' || sev === 'high') return '🔴';
+    if (sev === 'medium' || finding.attention === true) return '🟡';
+    if (sev === 'low')  return '🟢';
+    return '🟢'; // info sem attention
+  }
+
+  function renderFindings(){
+    var el      = $('#fkFindings');
+    var countEl = $('#fkFindingsCount');
+
+    if (!state.result || !state.result.findings){
+      el.innerHTML =
+        '<div class="fk-empty">' +
+        '  <div class="fk-empty-icon">🔍</div>' +
+        '  <p>Sem resultados ainda</p>' +
+        '  <small>Corre a primeira análise para ver os problemas encontrados.</small>' +
+        '</div>';
+      countEl.textContent = '0';
+      return;
+    }
+
+    // Se a opção "Mostrar corrigidos" está desligada, esconder os fixed
+    var showFixed = true;
+    try {
+      var sf = localStorage.getItem('frankei:showFixed');
+      if (sf !== null) showFixed = sf === '1';
+    } catch(e){}
+
+    var list = state.result.findings.filter(function(f){
+      var tabOk = matchesTab(f, state.activeTab);
+      var subOk = matchesSubtab(f, state.activeTab, state.activeSubtab);
+      var dbOk  = state.filters.dbs[f.database_key] !== false;
+      var sevOk = state.filters.sev[f.severity] !== false;
+      var catOk = state.filters.cat[f.category] !== false;
+
+      if (!(tabOk && subOk && dbOk && sevOk && catOk)) return false;
+
+      // Esconder os já corrigidos (se a opção estiver off)
+      if (!showFixed && isFixed(f)) return false;
+
+      return true;
+    });
+
+    list.sort(function(a, b){
+      var sa = SEV_ORDER[a.severity] != null ? SEV_ORDER[a.severity] : 99;
+      var sb = SEV_ORDER[b.severity] != null ? SEV_ORDER[b.severity] : 99;
+      return sa - sb;
+    });
+
+    countEl.textContent = list.length;
+
+    // Resumo de filtros ativos (mostra o que está incluído/excluído)
+    renderFiltersSummary();
+
+    if (!list.length){
+      el.innerHTML =
+        '<div class="fk-empty">' +
+        '  <div class="fk-empty-icon">✓</div>' +
+        '  <p>Sem findings nesta vista</p>' +
+        '  <small>Ajusta os filtros ou escolhe outra sub-tab.</small>' +
+        '</div>';
+      return;
+    }
+
+    el.innerHTML = '';
+
+    list.forEach(function(f){
+      var row = document.createElement('div');
+      row.className = 'fk-finding';
+
+      var sevLabel = SEV_LABEL[f.severity] || f.severity;
+      var meta = [];
+      if (f.table)  meta.push('<b>' + f.table + '</b>' + (f.column ? '.' + f.column : ''));
+      if (f.data && f.data.file){
+        meta.push('<b>' + f.data.file + '</b>' + (f.data.line ? ':' + f.data.line : ''));
+      }
+      if (f.scanner) meta.push(f.scanner);
+
+      // Verificar se já foi corrigido
+      var alreadyFixed = isFixed(f);
+      if (alreadyFixed) {
+        row.classList.add('fk-finding-fixed');
+      }
+
+      // Verificar se tem auto-fix disponível
+      var fixType = '';
+      if (f.scanner === 'php-csrf' && f.data && f.data.file) fixType = 'csrf';
+      if (f.scanner === 'php-xss'  && f.data && f.data.file) fixType = 'xss';
+
+      var hasAutoFix = (fixType !== '');
+
+      // Findings críticos/altos sem auto-fix → alerta vermelho
+      var needsManualFix = !hasAutoFix
+        && (f.data && f.data.file)
+        && (f.severity === 'critical' || f.severity === 'high');
+
+      var actionsHtml = '';
+      if (hasAutoFix){
+        if (alreadyFixed){
+          actionsHtml = '<span class="fk-fixed-badge-inline">✓ Corrigido</span>';
+        } else {
+          actionsHtml =
+            '<div class="fk-finding-actions">' +
+            '  <button class="fk-action-btn fk-action-fix" title="Corrigir automaticamente">🔧</button>' +
+            '  <button class="fk-action-btn fk-action-view" title="Ver detalhes">👁</button>' +
+            '</div>';
+        }
+      } else if (needsManualFix){
+        actionsHtml =
+          '<div class="fk-finding-actions">' +
+          '  <button class="fk-action-btn fk-action-manual" title="Requer correcao manual — clica para ver detalhes">⚠️</button>' +
+          '</div>';
+      }
+
+      // Icone de atencao (para findings info, distingue os que requerem atencao)
+      var bola    = ballFor(f);
+      var bolaCls = bola === '🔴' ? 'fk-attention-yes' : (bola === '🟡' ? 'fk-attention-med' : 'fk-attention-no');
+      var attIcon = '<span class="fk-attention ' + bolaCls + '">' + bola + '</span> ';
+
+      row.innerHTML =
+        '<span class="fk-sev ' + f.severity + '">' + sevLabel + '</span>' +
+        '<div class="fk-finding-main">' +
+        '  <div class="fk-finding-title">' + attIcon + escapeHtml(f.title || f.description || '—') + '</div>' +
+        '  <div class="fk-finding-meta">' + meta.join(' · ') + '</div>' +
+        '</div>' +
+        actionsHtml;
+
+      // Click na linha (abre modal)
+      row.addEventListener('click', function(e){
+        // Se clicou num botão de ação → não abre modal
+        if (e.target.closest('.fk-action-btn')) return;
+        openModal(f);
+      });
+
+      // Handlers dos botões
+      if (hasAutoFix){
+        var fixBtn  = row.querySelector('.fk-action-fix');
+        var viewBtn = row.querySelector('.fk-action-view');
+
+        if (fixBtn){
+          fixBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            // Aplica direto (com confirmação se skipConfirm estiver OFF)
+            quickFixFromList(f, fixBtn, row);
+          });
+        }
+
+        if (viewBtn){
+          viewBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            openModal(f);
+          });
+        }
+      } else if (needsManualFix){
+        var manualBtn = row.querySelector('.fk-action-manual');
+
+        if (manualBtn){
+          manualBtn.addEventListener('click', function(e){
+            e.stopPropagation();
+            openModal(f);
+          });
+        }
+      }
+
+      el.appendChild(row);
+    });
+  }
+
+  /* ─── Aplicar fix direto na lista ─── */
+  function quickFixFromList(f, btn, row){
+    if (window.FrankeiOpts && !window.FrankeiOpts.skipConfirm()){
+      if (!confirm('Aplicar correcao CSRF em\n' + f.data.file + '\n\nContinuar?')) {
+        return;
+      }
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳';
+
+    window.FrankeiFix.apply(f, function(r){
+      if (!r.ok){
+        btn.textContent = '✗';
+        btn.classList.add('fk-action-error');
+        setTimeout(function(){
+          btn.textContent = '🔧';
+          btn.classList.remove('fk-action-error');
+          btn.disabled = false;
+        }, 2000);
+        return;
+      }
+
+      btn.textContent = '✓';
+      btn.classList.add('fk-action-done');
+      row.classList.add('fk-finding-fixed');
+
+      // Marcar como fixed (persistente)
+      markAsFixed(f);
+
+      // Mostrar badge "Corrigido"
+      var badge = document.createElement('span');
+      badge.className = 'fk-fixed-badge';
+      badge.textContent = '✓ Corrigido';
+      var mainEl = row.querySelector('.fk-finding-main');
+      if (mainEl) mainEl.appendChild(badge);
+
+      // Re-render após 1s para refletir estado
+      setTimeout(function(){
+        renderFindings();
+      }, 1000);
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /* ══════════════════════════════════════════════════════
+     MODAL
+     ══════════════════════════════════════════════════════ */
+
+  function openModal(f){
+    var modal     = $('#fkModal');
+    var modalBody = $('#fkModalBody');
+    if (!modal || !modalBody) return;
+
+    var sevLabel = SEV_LABEL[f.severity] || f.severity;
+
+    var html = '';
+    html += '<span class="fk-modal-sev fk-sev ' + f.severity + '">' + sevLabel + '</span>';
+    html += '<h2 class="fk-modal-title">' + escapeHtml(f.title || '') + '</h2>';
+
+    var sub = [];
+    if (f.table)  sub.push(f.table + (f.column ? '.' + f.column : ''));
+    if (f.data && f.data.file) sub.push(f.data.file + (f.data.line ? ':' + f.data.line : ''));
+    if (f.scanner) sub.push('scanner: ' + f.scanner);
+
+    if (sub.length) html += '<div class="fk-modal-sub">' + escapeHtml(sub.join(' · ')) + '</div>';
+
+    if (f.description){
+      html += '<div class="fk-modal-section">' +
+              '  <div class="fk-modal-label">Descrição</div>' +
+              '  <div class="fk-modal-text">' + escapeHtml(f.description) + '</div>' +
+              '</div>';
+    }
+
+    if (f.impact){
+      html += '<div class="fk-modal-section">' +
+              '  <div class="fk-modal-label">Impacto</div>' +
+              '  <div class="fk-modal-text">' + escapeHtml(f.impact) + '</div>' +
+              '</div>';
+    }
+
+    if (f.suggestion){
+      html += '<div class="fk-modal-section">' +
+              '  <div class="fk-modal-label">Sugestão de correção</div>' +
+              '  <div class="fk-modal-code">' + escapeHtml(f.suggestion) + '</div>' +
+              '</div>';
+    }
+
+    if (f.reference){
+      html += '<div class="fk-modal-section">' +
+              '  <div class="fk-modal-label">Referência</div>' +
+              '  <div class="fk-modal-text"><a href="' + escapeHtml(f.reference) + '" target="_blank" rel="noopener">' + escapeHtml(f.reference) + '</a></div>' +
+              '</div>';
+    }
+
+    // Área de ações (auto-fix)
+    html += '<div class="fk-modal-actions" id="fkModalActions"></div>';
+
+    modalBody.innerHTML = html;
+    modal.classList.add('open');
+      try {
+        if (typeof reportBindCheckboxes === 'function') reportBindCheckboxes();
+        if (typeof reportRebuildTabs === 'function') reportRebuildTabs();
+      } catch(e) {}
+
+    // Botões de auto-fix (só para findings suportados)
+    var actionsEl = document.getElementById('fkModalActions');
+    if (actionsEl){
+      if (f.scanner === 'php-csrf' && window.FrankeiFix && f.data && f.data.file){
+        var btnPreview = document.createElement('button');
+        btnPreview.className = 'fk-btn-fix fk-btn-fix-ghost';
+        btnPreview.innerHTML = '👁 Pré-visualizar';
+        btnPreview.addEventListener('click', function(){
+          runPreviewFix(f, actionsEl);
+        });
+
+        var btnApply = document.createElement('button');
+        btnApply.className = 'fk-btn-fix fk-btn-fix-primary';
+        btnApply.innerHTML = '🔧 Aplicar correção';
+        btnApply.addEventListener('click', function(){
+          runApplyFix(f, actionsEl);
+        });
+
+        actionsEl.appendChild(btnPreview);
+        actionsEl.appendChild(btnApply);
+      } else {
+        actionsEl.innerHTML = '<div style="font-size:12px;color:var(--muted-2)">Auto-fix disponível apenas para CSRF.</div>';
+      }
+    }
+  }
+
+  /* ─── Funções de auto-fix ─── */
+  function runPreviewFix(f, actionsEl){
+    actionsEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">⏳ A gerar preview…</div>';
+
+    window.FrankeiFix.preview(f, function(r){
+      if (!r.ok){
+        actionsEl.innerHTML = '<div style="font-size:12px;color:var(--crit)">✗ ' + escapeHtml(r.error || 'Erro') + '</div>';
+        return;
+      }
+
+      var diffHtml =
+        '<div class="fk-modal-label" style="margin-top:12px">Preview da correção</div>' +
+        '<div class="fk-diff">' + (r.diff || '') + '</div>' +
+        '<div style="display:flex;gap:10px;margin-top:12px">' +
+        '  <button class="fk-btn-fix fk-btn-fix-primary" id="fkConfirmApply">✓ Confirmar e aplicar</button>' +
+        '  <button class="fk-btn-fix fk-btn-fix-ghost" id="fkCancelApply">Cancelar</button>' +
+        '</div>';
+
+      actionsEl.innerHTML = diffHtml;
+
+      var confirmBtn = document.getElementById('fkConfirmApply');
+      var cancelBtn  = document.getElementById('fkCancelApply');
+
+      if (confirmBtn){
+        confirmBtn.addEventListener('click', function(){
+          runApplyFix(f, actionsEl);
+        });
+      }
+      if (cancelBtn){
+        cancelBtn.addEventListener('click', function(){
+          closeModal();
+        });
+      }
+    });
+  }
+
+  function runApplyFix(f, actionsEl){
+    if (!window.FrankeiOpts.skipConfirm() && !actionsEl.querySelector('.fk-diff')){
+      runPreviewFix(f, actionsEl);
+      return;
+    }
+
+    actionsEl.innerHTML = '<div style="font-size:12px;color:var(--muted)">⏳ A aplicar…</div>';
+
+    window.FrankeiFix.apply(f, function(r){
+      if (!r.ok){
+        actionsEl.innerHTML = '<div style="font-size:12px;color:var(--crit)">✗ ' + escapeHtml(r.error || 'Erro') + '</div>';
+        return;
+      }
+
+      f._fixed = true;
+
+      actionsEl.innerHTML =
+        '<div style="font-size:13px;color:var(--green);font-weight:700">✓ Corrigido!</div>' +
+        (r.backup ? '<div style="font-size:11.5px;color:var(--muted-2);margin-top:4px">Backup: ' + escapeHtml(r.backup) + '</div>' : '');
+
+      setTimeout(function(){
+        renderFindings();
+      }, 800);
+    });
+  }
+
+  function closeModal(){
+    var modal = $('#fkModal');
+    if (modal) modal.classList.remove('open');
+  }
+
+  /* ══════════════════════════════════════════════════════
+     EXPORT
+     ══════════════════════════════════════════════════════ */
+
+  function exportJson(){
+    if (!state.result) return;
+    var blob = new Blob([JSON.stringify(state.result, null, 2)], { type: 'application/json' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url;
+    a.download = 'frankei-report-' + new Date().toISOString().slice(0,19).replace(/[:T]/g, '-') + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /* ══════════════════════════════════════════════════════
+     RENDER GLOBAL
+     ══════════════════════════════════════════════════════ */
+
+  function renderTestsTab(){
+    var el = document.getElementById('fkFindings');
+    var countEl = document.getElementById('fkFindingsCount');
+    if (!el) return;
+
+    el.innerHTML = '<div class="fk-empty"><div class="fk-empty-icon">⏳</div><p>A carregar testes…</p></div>';
+    if (countEl) countEl.textContent = '…';
+
+    fetch('/api/frankei/terminal/report/download?file=' + encodeURIComponent('current/junit.xml'),
+          { credentials: 'include' })
+      .then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function(xml){
+        if (!window.JUnitView) {
+          el.innerHTML = '<div class="fk-empty"><p>⚠️ junit-view.js não carregado</p></div>';
+          return;
+        }
+        window.JUnitView.render(el, xml);
+        var data = window.JUnitView.parse(xml);
+        if (countEl) countEl.textContent = data.totals.tests;
+      })
+      .catch(function(e){
+        el.innerHTML =
+          '<div class="fk-empty">' +
+          '  <div class="fk-empty-icon">📭</div>' +
+          '  <p>Sem report de testes</p>' +
+          '  <small>Corre primeiro <b>▶ Correr</b> ou <b>📥 Report</b>.</small>' +
+          '  <small style="opacity:0.5">' + e.message + '</small>' +
+          '</div>';
+        if (countEl) countEl.textContent = '0';
+      });
+  }
+
+  function renderAll(){
+    // FK_GLOBAL_GUARD
+    if (document.body && document.body.classList.contains('fk-trial-body')) return;
+
+    renderTabs();
+    renderSubtabs();
+    renderContent();
+    if (state.activeTab === 'tests') {
+      renderTestsTab();
+    } else {
+      renderFindings();
+    }
+    updateTestActions();
+  }
+
+  /* ─── Barra de ações da tab Testes ─── */
+  function updateTestActions(){
+    var bar = document.getElementById('fkTestActions');
+    if (!bar) return;
+
+    // Só mostrar na tab Testes
+    if (state.activeTab !== 'tests'){
+      bar.style.display = 'none';
+      return;
+    }
+    bar.style.display = 'flex';
+
+    // Mostrar botões do header do terminal na tab tests
+    var _repBtn = document.getElementById('fkTermReportBtn');
+    if (_repBtn) _repBtn.style.display = 'inline-flex';
+    var _createBtn = document.getElementById('fkTermCreateTestBtn');
+    if (_createBtn) _createBtn.style.display = 'inline-flex';
+
+    var sub   = state.activeSubtab || 'all';
+    var label = document.getElementById('fkTestRunSubLabel');
+    var hint  = document.getElementById('fkTestHint');
+    var btn   = document.getElementById('fkTestRunSubBtn');
+
+    // FK_RUN_LABEL_I18N: usar traducao dinamica
+    var t = (window.FrankeiI18n && window.FrankeiI18n.t) ? window.FrankeiI18n.t : function(x){ return x; };
+
+    var map = {
+      'all':      { label: t('tudo'),          cmd: 'beaver test' },
+      'unit':     { label: t('Unit'),          cmd: 'beaver test --testsuite=Unit' },
+      'feature':  { label: t('Feature'),       cmd: 'beaver test --testsuite=Feature' },
+      'coverage': { label: t('com cobertura'), cmd: 'beaver test --coverage-text' }
+    };
+
+    var conf = map[sub] || map.all;
+    if (label) label.textContent = conf.label;
+    if (hint)  hint.textContent  = '\u2192 ' + conf.cmd;
+    if (btn)   btn.dataset.cmd   = conf.cmd;
+  }
+
+  /* ══════════════════════════════════════════════════════
+     BOOT
+     ══════════════════════════════════════════════════════ */
+
+  function boot(){
+        // FK_TRIAL_REPORT_ONLY: se estamos no trial, só ligar o modal do Report
+    if (document.body && document.body.classList.contains('fk-trial-body')) {
+      try {
+        if (typeof reportInit === 'function') {
+          reportInit();
+          console.log('[trial] reportInit() executado');
+        }
+      } catch (e) {
+        console.warn('[trial] reportInit falhou:', e);
+      }
+      return;
+    }
+
+    // Estado inicial do hash
+    var r = parseHash();
+    state.activeTab    = r.tab;
+    state.activeSubtab = r.sub;
+
+    // Eventos
+    if ($('#fkScanBtn')) $('#fkScanBtn').addEventListener('click', function(){
+      // Sincronizar state com hash (fonte de verdade)
+      var hashTab = (window.location.hash || '').replace(/^#/, '').split('/')[0];
+      if (hashTab && hashTab !== state.activeTab) {
+        state.activeTab = hashTab;
+      }
+
+      // Na tab Testes: corre beaver test
+      if (state.activeTab === 'tests') {
+        if (typeof window.execTermCommand !== 'function') {
+          console.error('execTermCommand indisponível');
+          return;
+        }
+        var _sb = $('#fkScanBtn');
+        var _origScan = _sb ? _sb.innerHTML : '';
+        if (_sb) { _sb.disabled = true; _sb.innerHTML = '⏳ A correr…'; }
+        window.execTermCommand('beaver test', {
+          onDone: function(){
+            if (_sb) { _sb.disabled = false; _sb.innerHTML = _origScan; }
+            setTimeout(renderTestsTab, 600);
+          }
+        });
+        return;
+      }
+
+      // Análise normal (BD + código)
+      runScan();
+    });
+    if ($('#fkExportBtn')) $('#fkExportBtn').addEventListener('click', exportJson);
+    if ($('#fkModalClose')) $('#fkModalClose').addEventListener('click', closeModal);
+
+    // Botão secundário da tab Testes (Unit / Feature / Cobertura)
+    var subBtn = document.getElementById('fkTestRunSubBtn');
+    if (subBtn){
+      subBtn.addEventListener('click', function(){
+        var cmd = subBtn.dataset.cmd || 'beaver test';
+        if (typeof window.execTermCommand !== 'function') {
+          console.error('execTermCommand não disponível');
+          return;
+        }
+        var _origSub = subBtn.innerHTML;
+        subBtn.disabled = true;
+        subBtn.innerHTML = '⏳ <span>A correr…</span>';
+        window.execTermCommand(cmd, {
+          onDone: function(){
+            subBtn.disabled = false;
+            subBtn.innerHTML = _origSub;
+            if (state.activeTab === 'tests') setTimeout(renderTestsTab, 600);
+          }
+        });
+      });
+    }
+
+    // Botão "Correr tudo"
+    var runAllBtn = $('#fkRunAllBtn');
+    if (runAllBtn){
+      runAllBtn.addEventListener('click', function(){
+        // Se estamos na tab Testes, corre beaver test
+        if (state.activeTab === 'tests') {
+          if (typeof window.execTermCommand !== 'function') {
+            termLine('fk-term-err', '✗ Terminal não disponível');
+            return;
+          }
+          var _origAll = runAllBtn.innerHTML;
+          runAllBtn.disabled = true;
+          runAllBtn.innerHTML = '⏳ A correr…';
+          window.execTermCommand('beaver test', {
+            onDone: function(){
+              runAllBtn.disabled = false;
+              runAllBtn.innerHTML = _origAll;
+              setTimeout(renderTestsTab, 600);
+            }
+          });
+          return;
+        }
+
+        // Caso contrário, comportamento normal: análise completa
+        try { localStorage.setItem('frankei:runMode', 'all'); } catch(e){}
+
+        state.activeTab    = 'db';
+        state.activeSubtab = 'all';
+        updateHash('db', 'all');
+        renderAll();
+
+        runScan('all');
+      });
+    }
+
+    // Modal — fechar ao clicar fora
+    var modal = $('#fkModal');
+    if (modal){
+      modal.addEventListener('click', function(e){
+        if (e.target === modal) closeModal();
+      });
+    }
+
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape') closeModal();
+    });
+
+    renderAll();
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+
+})();
+
+/* ══════════════════════════════════════════════════════════
+   SETTINGS MENU (⚙️)
+   ══════════════════════════════════════════════════════════ */
+(function(){
+  // Executa depois do DOM estar pronto
+  function initSettings(){
+    // FK_GLOBAL_GUARD: o trial tem a sua própria topbar
+    if (document.body && document.body.classList.contains('fk-trial-body')) return;
+
+    var wrap = document.querySelector('.fk-settings-wrap');
+    var btn  = document.getElementById('fkSettingsBtn');
+    var menu = document.getElementById('fkSettingsMenu');
+
+    if (!wrap || !btn || !menu) return;
+
+    // Toggle
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      var wasOpen = wrap.classList.contains('open');
+      wrap.classList.toggle('open');
+
+      var m = document.getElementById('fkSettingsMenu');
+      if (!wasOpen) {
+        wrap.classList.add('menu-fixed');
+        if (m) {
+          var r = btn.getBoundingClientRect();
+          m.style.top   = (r.bottom + 6) + 'px';
+          m.style.right = (window.innerWidth - r.right) + 'px';
+        }
+      } else {
+        wrap.classList.remove('menu-fixed');
+        if (m) { m.style.top = ''; m.style.right = ''; }
+      }
+    });
+
+    // Fechar ao clicar fora
+    document.addEventListener('click', function(e){
+      if (!wrap.contains(e.target)){
+        wrap.classList.remove('open');
+        wrap.classList.remove('menu-fixed');
+        var m2 = document.getElementById('fkSettingsMenu');
+        if (m2) { m2.style.top = ''; m2.style.right = ''; }
+      }
+    });
+
+    // Fechar com Esc
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape'){
+        wrap.classList.remove('open');
+        wrap.classList.remove('menu-fixed');
+        var m3 = document.getElementById('fkSettingsMenu');
+        if (m3) { m3.style.top = ''; m3.style.right = ''; }
+      }
+    });
+
+    // Botão fechar (✕)
+    var closeBtn = document.getElementById('fkSettingsClose');
+    if (closeBtn){
+      closeBtn.addEventListener('click', function(){
+        wrap.classList.remove('open');
+        wrap.classList.remove('menu-fixed');
+        var m4 = document.getElementById('fkSettingsMenu');
+        if (m4) { m4.style.top = ''; m4.style.right = ''; }
+      });
+    }
+
+    // Tabs do menu (Análise / Auto-fix / Conta)
+    var tabs = document.querySelectorAll('.fk-settings-tab');
+    var panels = document.querySelectorAll('.fk-settings-panel');
+
+    tabs.forEach(function(tab){
+      tab.addEventListener('click', function(){
+        var target = tab.getAttribute('data-settings-tab');
+
+        tabs.forEach(function(t){ t.classList.toggle('active', t === tab); });
+        panels.forEach(function(p){
+          p.classList.toggle('active', p.getAttribute('data-settings-panel') === target);
+        });
+      });
+    });
+
+    // Guardar escolha do modo no localStorage
+    var radios = document.querySelectorAll('input[name="fkRunMode"]');
+    var saved = null;
+    try { saved = localStorage.getItem('frankei:runMode'); } catch(e){}
+
+    if (saved){
+      radios.forEach(function(r){
+        r.checked = (r.value === saved);
+      });
+    }
+
+    radios.forEach(function(r){
+      r.addEventListener('change', function(){
+        if (r.checked){
+          try { localStorage.setItem('frankei:runMode', r.value); } catch(e){}
+          wrap.classList.remove('open');
+        }
+      });
+    });
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initSettings);
+  } else {
+    initSettings();
+  }
+})();
+
+/* ══════════════════════════════════════════════════════════
+   AUTO-FIX (botao Aplicar no modal)
+   ══════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+
+  /* ─── Opções guardadas no localStorage ─── */
+  function getOpt(key, def){
+    try { var v = localStorage.getItem('frankei:' + key); return v === null ? def : v === '1'; } catch(e){ return def; }
+  }
+  function setOpt(key, val){
+    try { localStorage.setItem('frankei:' + key, val ? '1' : '0'); } catch(e){}
+  }
+  // Variantes para números/strings (guardam o valor cru)
+  function getOptRaw(key, def){
+    try { var v = localStorage.getItem('frankei:' + key); return v === null ? def : v; } catch(e){ return def; }
+  }
+  function setOptRaw(key, val){
+    try { localStorage.setItem('frankei:' + key, String(val)); } catch(e){}
+  }
+
+  /* ─── Init: ler checkboxes e ligar eventos ─── */
+  function initOptions(){
+    var opts = [
+      { id: 'fkOptAutoFixCsrf', key: 'autoFixCsrf', def: true },
+      { id: 'fkOptBackup',      key: 'backup',      def: true },
+      { id: 'fkOptSkipConfirm', key: 'skipConfirm', def: false },
+      { id: 'fkOptShowFixed',   key: 'showFixed',   def: false },
+      { id: 'fkOptSequential',  key: 'sequential',  def: true },
+      { id: 'fkOptLiveBadges',  key: 'liveBadges',  def: true },
+      { id: 'fkOptSkipScripts',       key: 'skipScripts',       def: true  },
+      { id: 'fkOptSkipDdl',           key: 'skipDdl',           def: true  },
+      { id: 'fkOptSkipTrivialLoops',  key: 'skipTrivialLoops',  def: true  },
+      { id: 'fkOptIgnoreSelectById',  key: 'ignoreSelectById',  def: true  },
+      { id: 'fkOptSkipViews',         key: 'skipViews',         def: true  },
+      { id: 'fkOptSelectStarAsError', key: 'selectStarAsError', def: false },
+      // Segurança — scanners ativos (default: todos ON)
+      { id: 'fkRunXss',              key: 'runXss',              def: true },
+      { id: 'fkRunSqli',             key: 'runSqli',             def: true },
+      { id: 'fkRunCmdi',             key: 'runCmdi',             def: true },
+      { id: 'fkRunCodeExec',         key: 'runCodeExec',         def: true },
+      { id: 'fkRunCsrf',             key: 'runCsrf',             def: true },
+      { id: 'fkRunDeserialize',      key: 'runDeserialize',      def: true },
+      { id: 'fkRunFileInclusion',    key: 'runFileInclusion',    def: true },
+      { id: 'fkRunPathTraversal',    key: 'runPathTraversal',    def: true },
+      { id: 'fkRunOpenRedirect',     key: 'runOpenRedirect',     def: true },
+      { id: 'fkRunSsrf',             key: 'runSsrf',             def: true },
+      { id: 'fkRunXxe',              key: 'runXxe',              def: true },
+      // Segurança — pastas ignoradas (default: todas ON)
+      { id: 'fkIgnoreVendor',        key: 'ignoreVendor',        def: true },
+      { id: 'fkIgnoreNodeModules',   key: 'ignoreNodeModules',   def: true },
+      { id: 'fkIgnoreTestsFixtures', key: 'ignoreTestsFixtures', def: true },
+      { id: 'fkIgnoreBackups',       key: 'ignoreBackups',       def: true },
+      { id: 'fkIgnoreBuild',         key: 'ignoreBuild',         def: true },
+      // Performance (default: todos ON)
+      { id: 'fkRunPerfNplus1',       key: 'runPerfNplus1',       def: true },
+      { id: 'fkRunPerfSelectStar',   key: 'runPerfSelectStar',   def: true },
+      { id: 'fkRunPerfHeavyLoop',    key: 'runPerfHeavyLoop',    def: true },
+      // Passwords
+      { id: 'fkRunWeakPasswordHash', key: 'runWeakPasswordHash', def: true },
+      // Código & Qualidade — toggles
+      { id: 'fkRunCodeTodo',             key: 'runCodeTodo',             def: true },
+      { id: 'fkRunCodeErrorSuppression', key: 'runCodeErrorSuppression', def: true },
+      { id: 'fkRunCodeMagicNumber',      key: 'runCodeMagicNumber',      def: true },
+      { id: 'fkRunCodeLongFunction',     key: 'runCodeLongFunction',     def: true },
+      { id: 'fkRunCodeDeepNesting',      key: 'runCodeDeepNesting',      def: true },
+      // Avançado — tabelas que requerem atenção
+      { id: 'fkAttUsers',             key: 'attUsers',             def: true  },
+      { id: 'fkAttApiKeys',           key: 'attApiKeys',           def: true  },
+      { id: 'fkAttApiLogs',           key: 'attApiLogs',           def: true  },
+      { id: 'fkAttUserSessions',      key: 'attUserSessions',      def: true  },
+      { id: 'fkAttUserDevices',       key: 'attUserDevices',       def: true  },
+      { id: 'fkAttEmailQueue',        key: 'attEmailQueue',        def: true  },
+      { id: 'fkAttModerationLog',     key: 'attModerationLog',     def: true  },
+      { id: 'fkAttVotes',             key: 'attVotes',             def: true  },
+      { id: 'fkAttJobs',              key: 'attJobs',              def: true  },
+      { id: 'fkAttScheduledJobs',     key: 'attScheduledJobs',     def: true  },
+      { id: 'fkAttImageOptimizerLog', key: 'attImageOptimizerLog', def: true  },
+      { id: 'fkAttTranslationHistory',key: 'attTranslationHistory',def: true  },
+      { id: 'fkAttThreads',           key: 'attThreads',           def: false },
+      { id: 'fkAttReplies',           key: 'attReplies',           def: false },
+      { id: 'fkAttNotifications',     key: 'attNotifications',     def: false },
+      { id: 'fkAttMentions',          key: 'attMentions',          def: false },
+    ];
+
+    opts.forEach(function(o){
+      var el = document.getElementById(o.id);
+      if (!el) return;
+      el.checked = getOpt(o.key, o.def);
+      el.addEventListener('change', function(){
+        setOpt(o.key, el.checked);
+      });
+    });
+  }
+
+  /* ─── Init: ler inputs (number + text) e ligar eventos ─── */
+  function initInputs(){
+    var inputs = [
+      // Código & Qualidade — limites
+      { id: 'fkMaxFunctionLines',       key: 'maxFunctionLines',       def: '50' },
+      { id: 'fkMaxNestingDepth',        key: 'maxNestingDepth',        def: '4'  },
+      { id: 'fkMagicNumberMinLength',   key: 'magicNumberMinLength',   def: '3'  },
+      // Avançado — contexto e limites
+      { id: 'fkContextLines',           key: 'contextLines',           def: '3' },
+      { id: 'fkAttentionTablesCustom',  key: 'attentionTablesCustom',  def: '' },
+      { id: 'fkMaxFindings',            key: 'maxFindings',            def: '500' },
+      { id: 'fkScannerTimeout',         key: 'scannerTimeout',         def: '30' },
+    ];
+
+    inputs.forEach(function(o){
+      var el = document.getElementById(o.id);
+      if (!el) return;
+      el.value = getOptRaw(o.key, o.def);
+      el.addEventListener('input', function(){
+        setOptRaw(o.key, el.value);
+      });
+    });
+  }
+
+  /* ─── Expor funções para o modal usar ─── */
+  window.FrankeiOpts = {
+    autoFixCsrf:  function(){ return getOpt('autoFixCsrf', true); },
+    backup:       function(){ return getOpt('backup', true); },
+    skipConfirm:  function(){ return getOpt('skipConfirm', false); },
+    showFixed:    function(){ return getOpt('showFixed', false); },
+    // Desempenho
+    skipScripts:       function(){ return getOpt('skipScripts', true); },
+    skipDdl:           function(){ return getOpt('skipDdl', true); },
+    skipTrivialLoops:  function(){ return getOpt('skipTrivialLoops', true); },
+    ignoreSelectById:  function(){ return getOpt('ignoreSelectById', true); },
+    skipViews:         function(){ return getOpt('skipViews', true); },
+    selectStarAsError: function(){ return getOpt('selectStarAsError', false); },
+    // Segurança — scanners ativos
+    runXss:            function(){ return getOpt('runXss', true); },
+    runSqli:           function(){ return getOpt('runSqli', true); },
+    runCmdi:           function(){ return getOpt('runCmdi', true); },
+    runCodeExec:       function(){ return getOpt('runCodeExec', true); },
+    runCsrf:           function(){ return getOpt('runCsrf', true); },
+    runDeserialize:    function(){ return getOpt('runDeserialize', true); },
+    runFileInclusion:  function(){ return getOpt('runFileInclusion', true); },
+    runPathTraversal:  function(){ return getOpt('runPathTraversal', true); },
+    runOpenRedirect:   function(){ return getOpt('runOpenRedirect', true); },
+    runSsrf:           function(){ return getOpt('runSsrf', true); },
+    runXxe:            function(){ return getOpt('runXxe', true); },
+    // Segurança — pastas ignoradas
+    ignoreVendor:        function(){ return getOpt('ignoreVendor', true); },
+    ignoreNodeModules:   function(){ return getOpt('ignoreNodeModules', true); },
+    ignoreTestsFixtures: function(){ return getOpt('ignoreTestsFixtures', true); },
+    ignoreBackups:       function(){ return getOpt('ignoreBackups', true); },
+    ignoreBuild:         function(){ return getOpt('ignoreBuild', true); },
+    // Performance
+    runPerfNplus1:       function(){ return getOpt('runPerfNplus1', true); },
+    runPerfSelectStar:   function(){ return getOpt('runPerfSelectStar', true); },
+    runPerfHeavyLoop:    function(){ return getOpt('runPerfHeavyLoop', true); },
+    // Passwords
+    runWeakPasswordHash: function(){ return getOpt('runWeakPasswordHash', true); },
+    // Código & Qualidade — toggles
+    runCodeTodo:             function(){ return getOpt('runCodeTodo', true); },
+    runCodeErrorSuppression: function(){ return getOpt('runCodeErrorSuppression', true); },
+    runCodeMagicNumber:      function(){ return getOpt('runCodeMagicNumber', true); },
+    runCodeLongFunction:     function(){ return getOpt('runCodeLongFunction', true); },
+    runCodeDeepNesting:      function(){ return getOpt('runCodeDeepNesting', true); },
+    // Código & Qualidade — limites
+    maxFunctionLines:     function(){ return parseInt(getOptRaw('maxFunctionLines', '50'), 10) || 50; },
+    maxNestingDepth:      function(){ return parseInt(getOptRaw('maxNestingDepth', '4'), 10) || 4; },
+    magicNumberMinLength: function(){ return parseInt(getOptRaw('magicNumberMinLength', '3'), 10) || 3; },
+    // Avançado — contexto, limites
+    contextLines:         function(){ return parseInt(getOptRaw('contextLines', '3'), 10) || 3; },
+    maxFindings:          function(){ return parseInt(getOptRaw('maxFindings', '500'), 10) || 0; },
+    scannerTimeout:       function(){ return parseInt(getOptRaw('scannerTimeout', '30'), 10) || 30; },
+    attentionTablesCustom:function(){ return String(getOptRaw('attentionTablesCustom', '') || ''); },
+    // Avançado — lista completa de tabelas que requerem atenção
+    attentionTables: function(){
+      var tables = [];
+      var map = {
+        attUsers: 'users', attApiKeys: 'api_keys', attApiLogs: 'api_logs',
+        attUserSessions: 'user_sessions', attUserDevices: 'user_devices',
+        attEmailQueue: 'email_queue', attModerationLog: 'moderation_log',
+        attVotes: 'votes', attJobs: 'jobs', attScheduledJobs: 'scheduled_jobs',
+        attImageOptimizerLog: 'image_optimizer_log', attTranslationHistory: 'translation_history',
+        attThreads: 'threads', attReplies: 'replies',
+        attNotifications: 'notifications', attMentions: 'mentions'
+      };
+      for (var k in map){
+        if (getOpt(k, k === 'attThreads' || k === 'attReplies' || k === 'attNotifications' || k === 'attMentions' ? false : true)){
+          tables.push(map[k]);
+        }
+      }
+      // Adicionar custom (CSV)
+      var custom = String(getOptRaw('attentionTablesCustom', '') || '');
+      if (custom){
+        custom.split(',').forEach(function(t){
+          t = t.trim();
+          if (t && tables.indexOf(t) === -1) tables.push(t);
+        });
+      }
+      return tables;
+    },
+  };
+
+  /* ─── Preview + Apply ─── */
+  window.FrankeiFix = {
+    preview: function(finding, cb){
+      var data = finding.data || {};
+      if (!data.file || !data.line){ cb({ok:false, error:'Sem ficheiro/linha'}); return; }
+
+      // Detetar tipo pelo scanner
+      var tipo = 'csrf';
+      if (finding.scanner === 'php-xss') tipo = 'xss';
+
+      fetch('/api/frankei/preview-fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          type: tipo,
+          file: data.file,
+          line: data.line,
+          path: (window.FK_PATH || '')
+        })
+      })
+      .then(function(r){ return r.json(); })
+      .then(cb)
+      .catch(function(err){ cb({ok:false, error: err.message}); });
+    },
+
+    apply: function(finding, cb){
+      var data = finding.data || {};
+      if (!data.file || !data.line){ cb({ok:false, error:'Sem ficheiro/linha'}); return; }
+
+      // Detetar tipo pelo scanner
+      var tipo = 'csrf';
+      if (finding.scanner === 'php-xss') tipo = 'xss';
+
+      fetch('/api/frankei/fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          type: tipo,
+          file: data.file,
+          line: data.line,
+          path: (window.FK_PATH || ''),
+          backup: window.FrankeiOpts.backup()
+        })
+      })
+      .then(function(r){ return r.json(); })
+      .then(cb)
+      .catch(function(err){ cb({ok:false, error: err.message}); });
+    }
+  };
+
+  function initAll(){
+    initOptions();
+    initInputs();
+    initTerminal();
+    initTermEngine();
+  }
+
+  /* ─── Motor de testes (badge no topo do terminal) ─── */
+  function initTermEngine(){
+    var icon  = document.getElementById('fkTermEngineIcon');
+    var label = document.getElementById('fkTermEngineLabel');
+    var badge = document.getElementById('fkTermEngine');
+    var menu  = document.getElementById('fkTermEngineMenu');
+
+    if (!icon || !label || !badge) return;
+
+    var MAP = {
+      'pest':    { icon: '🐀', label: 'Pest',      color: '#a06ef5' },
+      'phpunit': { icon: '🐘', label: 'PHPUnit',   color: '#7e9bfa' },
+      'none':    { icon: '⚠️', label: 'sem motor', color: '#e88c3a' }
+    };
+
+    function applyBadge(engine){
+      var conf = MAP[engine] || MAP.none;
+      icon.textContent  = conf.icon;
+      label.textContent = conf.label;
+      badge.style.color       = conf.color;
+      badge.style.borderColor = conf.color + '66';
+      badge.style.background  = conf.color + '1a';
+      badge.title = 'Motor de testes: ' + conf.label + ' (clica para alternar)';
+    }
+
+    // 1. Ler preferência local
+    var saved = null;
+    try { saved = localStorage.getItem('frankei:testEngine'); } catch(e){}
+
+    // 2. Pedir metadados
+    fetch('/api/frankei/terminal/metadata', {
+      headers: { 'Accept': 'application/json' },
+      credentials: 'include'
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var meta = (d && d.test_engine) || {};
+      var available = meta.available || {};
+
+      // Desativar opções não disponíveis
+      document.querySelectorAll('.fk-term-engine-opt').forEach(function(btn){
+        var eng = btn.dataset.engine;
+        if (!available[eng]) {
+          btn.disabled = true;
+          btn.title = 'Não instalado';
+        }
+      });
+
+      // Marcar o atual
+      var current = (saved && available[saved]) ? saved : (meta.current || 'none');
+      window.FK_TEST_ENGINE = current;
+      window.FK_TEST_ENGINES_AVAILABLE = available;   // {pest: bool, phpunit: bool}
+      applyBadge(current);
+      markActive(current);
+
+      // Se só um motor está disponível, esconde o toggle (menu)
+      var soUm = (available.pest && !available.phpunit) || (!available.pest && available.phpunit);
+      if (soUm && badge) {
+        badge.style.cursor = 'default';
+        badge.title = 'Motor de testes: ' + (MAP[current] ? MAP[current].label : current);
+      }
+    })
+    .catch(function(e){
+      console.warn('[engine] metadata falhou:', e);
+      applyBadge(saved || 'none');
+    });
+
+    // 3. Marcar a opção ativa no menu
+    function markActive(engine){
+      document.querySelectorAll('.fk-term-engine-opt').forEach(function(btn){
+        btn.setAttribute('aria-current', btn.dataset.engine === engine ? 'true' : 'false');
+      });
+    }
+
+    // 4. Abrir/fechar menu
+    badge.addEventListener('click', function(e){
+      // Se clicou numa opção, não fechar
+      if (e.target.closest('.fk-term-engine-opt')) return;
+      badge.classList.toggle('open');
+    });
+
+    // Fechar ao clicar fora
+    document.addEventListener('click', function(e){
+      if (!badge.contains(e.target)) badge.classList.remove('open');
+    });
+
+    // 5. Escolher motor
+    if (menu) {
+      menu.querySelectorAll('.fk-term-engine-opt').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          var eng = btn.dataset.engine;
+          if (!eng) return;
+
+          try { localStorage.setItem('frankei:testEngine', eng); } catch(e){}
+          window.FK_TEST_ENGINE = eng;   // ✅ atualizar global
+          applyBadge(eng);
+          markActive(eng);
+          badge.classList.remove('open');
+
+          // Linha informativa no terminal
+          if (typeof window.termLine === 'function') {
+            window.termLine('fk-term-info', '# motor de testes: ' + eng);
+          }
+        });
+      });
+    }
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
+  }
+
+  /* ─── Terminal real (input → /api/frankei/terminal/exec) ─── */
+  var termHistory = [];
+  var termHistIdx = -1;
+
+  function initTerminal(){
+    var input = document.getElementById('fkTermInput');
+    var btn   = document.getElementById('fkTermRunBtn');
+    if (!input) return;
+
+    // Enter → executa
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter'){
+        e.preventDefault();
+        execTermCommand(input.value.trim());
+        input.value = '';
+      } else if (e.key === 'ArrowUp'){
+        e.preventDefault();
+        if (termHistory.length && termHistIdx < termHistory.length - 1){
+          termHistIdx++;
+          input.value = termHistory[termHistory.length - 1 - termHistIdx];
+        }
+      } else if (e.key === 'ArrowDown'){
+        e.preventDefault();
+        if (termHistIdx > 0){
+          termHistIdx--;
+          input.value = termHistory[termHistory.length - 1 - termHistIdx];
+        } else {
+          termHistIdx = -1;
+          input.value = '';
+        }
+      } else if (e.ctrlKey && (e.key === 'l' || e.key === 'L')){
+        e.preventDefault();
+        termClear();
+      }
+    });
+
+    // Botão ▶
+    if (btn){
+      btn.addEventListener('click', function(){
+        execTermCommand(input.value.trim());
+        input.value = '';
+      });
+    }
+  }
+
+  // FK_STATCARD_TEST: preencher o card Estado com o resultado de "beaver test"
+  function fkParseBeaverTest(output, elapsed_ms) {
+    output = String(output || '');
+    var stats = { files: 0, passed: 0, failed: 0, duration: '\u2014' };
+
+    // Ficheiros = linhas que comecam com PASS/FAIL (Pest) ou dots (PHPUnit)
+    var mFiles = output.match(/^\s*(PASS|FAIL)\b/gm);
+    if (mFiles) stats.files = mFiles.length;
+
+    // Testes totais (Pest: "Tests: 14 passed" | PHPUnit: "Tests: 14, Assertions:...")
+    var mTests = output.match(/Tests:\s+(\d+)/);
+    if (mTests) stats.passed = parseInt(mTests[1], 10) || 0;
+
+    // Falhas (Pest: "2 failed" | PHPUnit: "Failures: 2")
+    var mFail = output.match(/(\d+)\s+failed/) || output.match(/Failures:\s*(\d+)/);
+    if (mFail) stats.failed = parseInt(mFail[1], 10) || 0;
+
+    // Erros (PHPUnit: "Errors: N") — somar as falhas
+    var mErr = output.match(/Errors:\s*(\d+)/);
+    if (mErr) stats.failed += parseInt(mErr[1], 10) || 0;
+
+    // OK sem erros (PHPUnit: "OK (14 tests, 41 assertions)")
+    var mOk = output.match(/OK\s*\((\d+)\s+tests?/);
+    if (mOk) stats.passed = parseInt(mOk[1], 10) || 0;
+
+    // Duracao: usar elapsed_ms do backend
+    if (elapsed_ms) stats.duration = elapsed_ms + 'ms';
+
+    return stats;
+  }
+
+  function fkAplicarStatCard(stats) {
+    if (!stats) return;
+    try {
+      var d = document.getElementById('fkStatDbs');
+      var t = document.getElementById('fkStatTotal');
+      var m = document.getElementById('fkStatTime');
+
+      var filesTxt = stats.files > 0
+        ? stats.files + ' ficheiro' + (stats.files > 1 ? 's' : '') + ' \u00b7 ' + stats.passed + ' testes'
+        : stats.passed + ' testes';
+      var failsTxt = stats.failed > 0 ? stats.failed + ' falha' + (stats.failed > 1 ? 's' : '') : '0 falhas';
+
+      if (d) d.textContent = filesTxt;
+      if (t) t.textContent = failsTxt;
+      if (m) m.textContent = stats.duration;
+
+      // Cor no card de falhas
+      if (t) {
+        t.style.color = stats.failed > 0 ? '#b91c1c' : '#047857';
+        t.style.fontWeight = '700';
+      }
+
+      try { localStorage.setItem('fk:statcard:last', JSON.stringify(stats)); } catch (_) {}
+    } catch (_) {}
+  }
+
+  function fkCarregarStatCardStorage() {
+    try {
+      var raw = localStorage.getItem('fk:statcard:last');
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      // So aplicar se o card ainda estiver em "—"
+      var d = document.getElementById('fkStatDbs');
+      if (d && d.textContent === '\u2014') fkAplicarStatCard(s);
+    } catch (_) {}
+  }
+
+  function execTermCommand(cmd, opts){
+    opts = opts || {};
+    if (!cmd) return;
+
+    // ─── Comandos locais (nao vao ao backend) ───
+    var fkLocalClearHandled = false;
+    (function handleLocalCommands() {
+      var local = String(cmd).trim().toLowerCase();
+      if (local === 'clear' || local === 'cls') {
+        // Guarda no historico
+        termHistory.push(cmd);
+        termHistIdx = -1;
+        // Limpa o ecra
+        if (typeof termClear === 'function') {
+          termClear();
+        } else {
+          var t = document.getElementById('fkTerminal');
+          if (t) t.innerHTML = '';
+        }
+        fkLocalClearHandled = true;
+      }
+    })();
+    if (fkLocalClearHandled) return;
+
+    // Injetar --engine se for 'beaver test' e houver preferência
+    if (/^beaver\s+test\b/.test(cmd) && !/--engine=/.test(cmd)) {
+      try {
+        // Prioridade: global (escolha atual) → localStorage (fallback)
+        var eng = window.FK_TEST_ENGINE || localStorage.getItem('frankei:testEngine');
+        if (eng === 'pest' || eng === 'phpunit') {
+          cmd = cmd + ' --engine=' + eng;
+        }
+      } catch(e){}
+    }
+
+    // Guardar histórico
+    termHistory.push(cmd);
+    termHistIdx = -1;
+
+    // Echo do comando
+    termLine('fk-term-info', '$ ' + cmd);
+    termStatus('a executar...', 'running');
+
+    var input = document.getElementById('fkTermInput');
+    var btn   = document.getElementById('fkTermRunBtn');
+    if (input) input.disabled = true;
+    if (btn)   btn.disabled = true;
+
+    var _ok = false;
+    fetchJson('/api/frankei/terminal/exec', { command: cmd })
+      .then(function(r){
+        var output = (r && r.output) || '';
+        var lines  = output.split('\n');
+
+        // Escrever cada linha
+
+        // FK_STATCARD_TEST: se for beaver test, preencher o card Estado
+        if (/^beaver\s+test\b/.test(cmd)) {
+          try {
+            var _stats = fkParseBeaverTest(output, r && r.elapsed_ms);
+            fkAplicarStatCard(_stats);
+          } catch (e) { console.warn('[FK_STATCARD_TEST] erro:', e); }
+        }
+        lines.forEach(function(line){
+          if (line === '') {
+            termLine('', '');
+            return;
+          }
+          var cls = termClassForLine(line);
+          termLine(cls, line);
+        });
+
+        // Resumo
+        termLine('', '');
+        if (r && r.ok){
+          _ok = true;
+          termLine('fk-term-ok', '✓ concluído em ' + r.elapsed_ms + 'ms');
+          termStatus('pronto', 'done');
+        } else {
+          var err = (r && r.error) || 'erro desconhecido';
+          termLine('fk-term-err', '✗ ' + err);
+          termStatus('erro', 'err');
+        }
+      })
+      .catch(function(e){
+        termLine('fk-term-err', '✗ Falha: ' + (e.message || e));
+        termStatus('erro', 'err');
+      })
+      .finally(function(){
+        if (input) { input.disabled = false; input.focus(); }
+        if (btn)   { btn.disabled = false; }
+
+        // Se foi um teste, mostrar botão 'Report' com setas blink
+        if (/^beaver\s+test\b/.test(cmd)) {
+          var reportBtn = document.getElementById('fkTermReportBtn');
+          if (reportBtn) {
+            reportBtn.style.display = 'inline-flex';
+            reportBtn.classList.add('fk-arrow-on');
+          }
+        }
+
+        if (typeof opts.onDone === 'function') opts.onDone(_ok);
+      });
+  }
+
+  /* Detetar a "cor" de cada linha conforme o conteúdo */
+  function termClassForLine(line){
+    var t = line.trim();
+    if (t === '') return '';
+    if (/✗|FAIL|Error|error|erro|failed|Exception/.test(line)) return 'fk-term-err';
+    if (/✓|OK|passed|sucesso|passou/.test(line))               return 'fk-term-ok';
+    if (/⚠|Warning|warn|skip/.test(line))                      return 'fk-term-warn';
+    if (/^\$/.test(t))                                         return 'fk-term-info';
+    return '';
+  }
+
+  window.execTermCommand = execTermCommand;
+
+  /* ══════════════════════════════════════════════════════
+     REPORT MODAL
+     ══════════════════════════════════════════════════════ */
+
+  var reportState = {
+    files: [],
+    output: '',
+    dir: '',
+    summary: null,
+    activeView: 'summary'
+  };
+
+  function reportInit(){
+    if (window.__fkReportInitBound) return;
+    window.__fkReportInitBound = true;
+
+    var btn      = document.getElementById('fkTermReportBtn');
+    var modal    = document.getElementById('fkReportModal');
+    var closeBtn = document.getElementById('fkReportClose');
+    var genBtn   = document.getElementById('fkReportGenerate');
+    var dlCurrent = document.getElementById('fkReportDownloadCurrent');
+    var dlZip    = document.getElementById('fkReportDownloadZip');
+    var btnBeaver = document.getElementById('fkReportViewBeaver');
+
+    if (!btn || !modal) return;
+
+    // Abrir modal
+    btn.addEventListener('click', function(){
+      modal.classList.add('open');
+      try { if (typeof reportRebuildTabs === 'function') reportRebuildTabs(); } catch(e) {}
+      btn.classList.remove('fk-arrow-on');
+      try {
+        // Motor real (detetado pelo backend), com fallback
+        var eng = window.FK_TEST_ENGINE || null;
+        var engEl = document.getElementById('fkReportEngine');
+        if (engEl) {
+          if (eng === 'phpunit')      engEl.textContent = '🐘 PHPUnit';
+          else if (eng === 'pest')    engEl.textContent = '🐀 Pest';
+          else if (eng === 'none')    engEl.textContent = '⚠️ Sem motor instalado';
+          else                        engEl.textContent = '⏳ A detetar...';
+        }
+
+        // Se ainda não temos global, pedir metadata e atualizar
+        if (!eng) {
+          fetch('/api/frankei/terminal/metadata', { credentials: 'include' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              var meta = (d && d.test_engine) || {};
+              var cur  = meta.current || 'none';
+              window.FK_TEST_ENGINE = cur;
+              if (engEl) {
+                if (cur === 'phpunit')   engEl.textContent = '🐘 PHPUnit';
+                else if (cur === 'pest') engEl.textContent = '🐀 Pest';
+                else                     engEl.textContent = '⚠️ Sem motor instalado';
+              }
+            })
+            .catch(function(){ /* ignora */ });
+        }
+      } catch(e){}
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', function(){ modal.classList.remove('open'); });
+
+    // FK_BEAVER_BUTTON: gerar e abrir Beaver Report
+    if (btnBeaver) {
+      btnBeaver.addEventListener('click', function () {
+        var original = btnBeaver.innerHTML;
+        btnBeaver.disabled = true;
+        btnBeaver.innerHTML = '\u23f3 A gerar report...';
+
+        fetch('/api/frankei/terminal/report/beaver', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({})
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) {
+            alert('Erro: ' + (d.error || 'desconhecido'));
+            return;
+          }
+          // Abre o report numa nova aba
+          var url = d.url || '/api/frankei/terminal/report/beaver/view';
+          window.open(url + '?t=' + Date.now(), '_blank');
+        })
+        .catch(function (e) {
+          alert('Erro: ' + e.message);
+        })
+        .finally(function () {
+          btnBeaver.disabled = false;
+          btnBeaver.innerHTML = original;
+        });
+      });
+    }
+
+    // Botão ➕ Criar teste (ao lado do 📥 Report)
+    var createTestBtn = document.getElementById('fkTermCreateTestBtn');
+    if (createTestBtn) {
+      createTestBtn.addEventListener('click', function(){
+        if (typeof window.FrankeiTestCreator !== 'object' 
+            || typeof window.FrankeiTestCreator.open !== 'function') {
+          alert('Criador de testes não disponível (frankei-test-creator.js).');
+          return;
+        }
+        // Abre o modal vazio — o input "Classe" tem autocomplete
+        window.FrankeiTestCreator.open({ class: '', file: '' });
+      });
+    }
+    modal.addEventListener('click', function(e){
+      if (e.target === modal) modal.classList.remove('open');
+    });
+
+    // Tabs
+    document.querySelectorAll('.fk-report-tab').forEach(function(tab){
+      tab.addEventListener('click', function(){
+        document.querySelectorAll('.fk-report-tab').forEach(function(t){ t.classList.remove('active'); });
+        tab.classList.add('active');
+        reportState.activeView = tab.dataset.view;
+        reportRenderView();
+        // FK_RV_LOADING - reactivar downloads
+        (function(){
+          var d1 = document.getElementById('fkReportDownloadCurrent');
+          var d2 = document.getElementById('fkReportDownloadZip');
+          if (d1) d1.disabled = false;
+          if (d2) d2.disabled = false;
+        })();
+      });
+    });
+
+    // Gerar Beaver Report
+    var beaverBtn = document.getElementById('fkBeaverReportGenerate');
+    if (beaverBtn) beaverBtn.addEventListener('click', function(){
+      beaverBtn.disabled = true;
+      var orig = beaverBtn.textContent;
+      beaverBtn.textContent = '⏳ A gerar...';
+
+      fetch('/api/frankei/terminal/report/beaver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({})
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        beaverBtn.disabled = false;
+        beaverBtn.textContent = orig;
+
+        if (!d.ok) {
+          alert('Erro: ' + (d.error || 'desconhecido'));
+          return;
+        }
+
+        document.querySelectorAll('.fk-report-tab').forEach(function(t){
+          t.classList.toggle('active', t.dataset.view === 'beaver');
+        });
+        reportState.activeView = 'beaver';
+        reportRenderView();
+      })
+      .catch(function(e){
+        beaverBtn.disabled = false;
+        beaverBtn.textContent = orig;
+        alert('Erro: ' + e.message);
+      });
+    });
+
+    // Gerar
+    if (genBtn) genBtn.addEventListener('click', function(){
+      var types = [];
+      document.querySelectorAll('.fk-report-opt input[type=checkbox]').forEach(function(cb){
+        if (cb.checked) types.push(cb.dataset.type);
+      });
+      if (!types.length) { alert('Escolhe pelo menos um tipo'); return; }
+
+      // FK_REPORT_LOADING - start
+      var _origHtml = genBtn.innerHTML;
+      genBtn.disabled = true;
+      genBtn.classList.add('is-loading');
+      genBtn.innerHTML = '<span class=\"fk-spinner\"></span>A gerar report...';
+      // FK_RV_LOADING - mostrar loading na area principal
+      (function(){
+        var rv = document.getElementById('fkReportView');
+        if (rv) {
+          rv.innerHTML = ''
+            + '<div class="fk-report-loading">'
+            + '  <div class="fk-report-loading-spinner"></div>'
+            + '  <div class="fk-report-loading-text">A gerar report…</div>'
+            + '  <div class="fk-report-loading-sub">Pode demorar alguns segundos</div>'
+            + '</div>';
+        }
+        var foot = document.getElementById('fkReportFootInfo');
+        if (foot) foot.textContent = 'A gerar…';
+        var dl1 = document.getElementById('fkReportDownloadCurrent');
+        var dl2 = document.getElementById('fkReportDownloadZip');
+        if (dl1) dl1.disabled = true;
+        if (dl2) dl2.disabled = true;
+      })();
+
+      var engine = window.FK_TEST_ENGINE || 'pest';
+      try { engine = window.FK_TEST_ENGINE || localStorage.getItem('frankei:testEngine') || 'pest'; } catch(e){}
+
+      fetch('/api/frankei/terminal/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ types: types, engine: engine })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        genBtn.disabled = false;
+        genBtn.classList.remove('is-loading');
+        genBtn.innerHTML = _origHtml; // FK_REPORT_LOADING - end
+
+        if (!d.ok){
+          document.getElementById('fkReportView').innerHTML =
+            '<div class="fk-report-preview-text" style="color:#c33">✗ ' +
+            escapeHtml(d.error || 'erro desconhecido') + '</div>';
+          return;
+        }
+
+        reportState.files  = d.files || [];
+        if (typeof reportRebuildTabs === 'function') reportRebuildTabs();
+        reportState.dir    = d.dir || '';
+        reportState.output = d.output || '';
+        reportState.summary = parseJunitSummary(reportState.files);
+
+        var s = reportState.summary;
+        document.getElementById('fkReportSummary').textContent =
+          s ? '✓ ' + s.tests + ' testes  ·  ' + s.assertions + ' assertions  ·  ⏱ ' + s.time.toFixed(2) + 's' : '';
+
+        document.getElementById('fkReportFootInfo').textContent =
+          reportState.files.length + ' ficheiros · ' + reportState.dir;document.getElementById('fkReportFootInfo').textContent =
+          reportState.files.length + ' ficheiros · ' + reportState.dir;
+        // FK_BEAVER_BUTTON: ativar downloads apos gerar
+        (function(){
+          var d1 = document.getElementById('fkReportDownloadCurrent');
+          var d2 = document.getElementById('fkReportDownloadZip');
+          if (d1) d1.disabled = false;
+          if (d2) d2.disabled = false;
+        })();
+
+        reportRenderView();
+
+        // Gerar Beaver Test Report + ir para a tab automaticamente
+        if (reportState.files.length > 0) {
+          fetch('/api/frankei/terminal/report/beaver', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({})
+          })
+          .then(function(r){ return r.json(); })
+          .then(function(d2){
+            if (d2 && d2.ok) {
+              document.querySelectorAll('.fk-report-tab').forEach(function(t){
+                t.classList.toggle('active', t.dataset.view === 'beaver');
+              });
+              reportState.activeView = 'beaver';
+              reportRenderView();
+            }
+          })
+          .catch(function(){ /* silencioso */ });
+        }
+      })
+      .catch(function(e){
+        try {
+          var _m = (e && e.message) ? e.message : String(e);
+          document.getElementById('fkReportView').innerHTML =
+            '<div class="fk-report-preview-text" style="color:#c33">✗ ' +
+            (typeof escapeHtml === 'function' ? escapeHtml(_m) : _m) + '</div>';
+        } catch(_) {}
+      })
+      .finally(function(){
+        // Reposicao garantida do botao (sempre, mesmo se o .then rebentar)
+        genBtn.disabled = false;
+        genBtn.classList.remove('is-loading');
+        genBtn.innerHTML = _origHtml; // FK_REPORT_LOADING - end
+      });
+    });
+
+    // Download atual
+    if (dlCurrent) dlCurrent.addEventListener('click', function(){
+      var f = pickCurrentFile();
+      if (!f) { alert('Sem ficheiro'); return; }
+      window.location.href = '/api/frankei/terminal/report/download?file=' +
+        encodeURIComponent('current/' + f.path);
+    });
+
+    // Download ZIP
+    if (dlZip) dlZip.addEventListener('click', function(){
+      window.location.href = '/api/frankei/terminal/report/zip?dir=current';
+    });
+  }
+
+  function pickCurrentFile(){
+    var v = reportState.activeView;
+    for (var i = 0; i < reportState.files.length; i++){
+      var p = reportState.files[i].path;
+      if (v === 'html' && /coverage\/index\.html$/.test(p)) return reportState.files[i];
+      if (v === 'xml'  && /junit\.xml$/.test(p))           return reportState.files[i];
+    }
+    return reportState.files[0] || null;
+  }
+
+  function parseJunitSummary(files){
+    for (var i = 0; i < files.length; i++){
+      if (/junit\.xml$/.test(files[i].path)) {
+        var f = files[i];
+        if (f._parsed) return f._parsed;
+        var url = '/api/frankei/terminal/report/download?file=' +
+                  encodeURIComponent('current/' + f.path);
+        fetch(url, { credentials: 'include' })
+          .then(function(r){ return r.text(); })
+          .then(function(xml){
+            try {
+              if (!window.JUnitView) return;
+              var parsed = window.JUnitView.parse(xml);
+              f._parsed = parsed.totals;
+              var el = document.getElementById('fkReportSummary');
+              if (el) el.textContent =
+                '✓ ' + parsed.totals.tests + ' testes  ·  ' +
+                parsed.totals.assertions + ' assertions  ·  ⏱ ' +
+                parsed.totals.time.toFixed(2) + 's';
+            } catch(e){ console.warn('[junit parse]', e); }
+          });
+        return { tests: 0, assertions: 0, failures: 0, errors: 0, time: 0 };
+      }
+    }
+    return null;
+  }
+
+  // FK_TABS_FOLLOW_CHECKBOXES: tabs seguem EXATAMENTE as checkboxes marcadas
+  function reportRebuildTabs() {
+    var tabsEl = document.getElementById('fkReportTabs');
+    if (!tabsEl) return;
+
+    // 1) Ler checkboxes marcadas
+    var marcados = {};
+    document.querySelectorAll('.fk-report-opt input[type=checkbox]').forEach(function (cb) {
+      if (cb.checked && cb.dataset.type) marcados[cb.dataset.type] = true;
+    });
+
+    // 2) Construir lista de tabs com base no que esta marcado
+    var tabs = [];
+    tabs.push({ view: 'summary', label: 'Resumo' });
+    if (marcados.coverage)   tabs.push({ view: 'html',             label: 'HTML' });
+    if (marcados.junit)      tabs.push({ view: 'xml',              label: 'junit.xml' });
+    if (marcados.clover)     tabs.push({ view: 'file:clover.xml',  label: 'clover.xml' });
+    if (marcados.cobertura)  tabs.push({ view: 'file:cobertura.xml', label: 'cobertura.xml' });
+    if (marcados.text)       tabs.push({ view: 'file:coverage.txt',  label: 'coverage.txt' });
+    tabs.push({ view: 'files',  label: 'Ficheiros' });
+    tabs.push({ view: 'beaver', label: '\ud83e\uddab Beaver Test Report' });
+
+    // 3) Determinar qual fica ativa
+    var ativo = reportState.activeView || 'summary';
+    if (!tabs.some(function (t) { return t.view === ativo; })) {
+      ativo = 'summary';
+      reportState.activeView = 'summary';
+    }
+
+    // 4) Reconstruir (mantendo o botao de settings)
+    var settingsBtn = document.getElementById('fkBeaverConfigBtn');
+    tabsEl.innerHTML = '';
+    tabs.forEach(function (t) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fk-report-tab' + (t.view === ativo ? ' active' : '');
+      b.dataset.view = t.view;
+      b.textContent = t.label;
+      b.addEventListener('click', function () {
+        tabsEl.querySelectorAll('.fk-report-tab').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        reportState.activeView = t.view;
+        reportRenderView();
+      });
+      tabsEl.appendChild(b);
+    });
+    if (settingsBtn) tabsEl.appendChild(settingsBtn);
+  }
+
+  // FK_TABS_FOLLOW_CHECKBOXES: escutar mudancas nas checkboxes
+  function reportBindCheckboxes() {
+    var opts = document.querySelectorAll('.fk-report-opt input[type=checkbox]');
+    opts.forEach(function (cb) {
+      if (cb.dataset.fkBound === '1') return;
+      cb.dataset.fkBound = '1';
+      cb.addEventListener('change', function () {
+        // Reconstroi tabs imediatamente
+        if (typeof reportRebuildTabs === 'function') reportRebuildTabs();
+      });
+    });
+  }
+
+
+  function reportRenderView(){
+    var view = document.getElementById('fkReportView');
+    if (!view) return;
+
+    if (reportState.activeView === 'summary'){
+      if (!reportState.files.length){
+        view.innerHTML = '<div class="fk-report-empty"><div style="font-size:32px;opacity:0.4">📊</div><p>Clica em <b>Gerar report</b>.</p></div>';
+        return;
+      }
+      var s = reportState.summary || {};
+      var html = '<div style="font-family:JetBrains Mono,monospace;font-size:12.5px;line-height:1.7">';
+      html += '<div>✓ ' + (s.tests || 0) + ' testes passados</div>';
+      html += '<div>✗ ' + ((s.failures || 0) + (s.errors || 0)) + ' falhas</div>';
+      html += '<div>📊 ' + (s.assertions || 0) + ' assertions</div>';
+      html += '<div>⏱ ' + ((s.time || 0)).toFixed(2) + 's</div>';
+      html += '<hr style="margin:14px 0;border:0;border-top:1px solid var(--border-2)">';
+      html += '<div><b>Diretório:</b> ' + escapeHtml(reportState.dir) + '</div>';
+      html += '<div><b>Ficheiros:</b> ' + reportState.files.length + '</div>';
+      html += '</div>';
+      view.innerHTML = html;
+      return;
+    }
+
+    if (reportState.activeView === 'html'){
+      var htmlFile = null;
+      for (var i = 0; i < reportState.files.length; i++){
+        if (/coverage\/index\.html$/.test(reportState.files[i].path)){ htmlFile = reportState.files[i]; break; }
+      }
+      if (!htmlFile){ view.innerHTML = '<div class="fk-report-empty"><p>Sem coverage HTML</p></div>'; return; }
+
+      // Usa rota coverage-inline (HTML self-contained, CSS/JS inline)
+      var previewUrl = '/api/frankei/terminal/coverage-inline?file=current/coverage/dashboard.html';
+
+      view.innerHTML = '<iframe class="fk-report-preview-html" id="fkReportIframe" src="' +
+        previewUrl + '"></iframe>';
+      return;
+    }
+
+    // FK_DYNAMIC_TABS: tab XML (junit.xml) ou tabs dinamicas por ficheiro
+    if (reportState.activeView === 'xml'){
+      var xmlFile = null;
+      for (var j = 0; j < reportState.files.length; j++){
+        if (/junit\.xml$/.test(reportState.files[j].path)){ xmlFile = reportState.files[j]; break; }
+      }
+      if (!xmlFile){ view.innerHTML = '<div class="fk-report-empty"><p>Sem JUnit XML</p></div>'; return; }
+
+      var url2 = '/api/frankei/terminal/report/download?file=' +
+        encodeURIComponent('current/' + xmlFile.path);
+
+      view.innerHTML = '<div style="padding:40px;text-align:center;color:#8A9099">\u23f3 A carregar resultados...</div>';
+
+      fetch(url2, { credentials: 'include' })
+        .then(function(r){ return r.text(); })
+        .then(function(xml){
+          if (window.JUnitView) {
+            // FK_JUNIT_NO_DUP: limpar TODOS os .junit-view antes de renderizar
+            try {
+              document.querySelectorAll('.junit-view').forEach(function(el){ el.remove(); });
+            } catch (_) {}
+            view.innerHTML = '';
+            window.JUnitView.render(view, xml);
+          } else {
+            var t = xml.length > 20000 ? xml.substring(0, 20000) + '\n\n[... truncado ...]' : xml;
+            view.innerHTML = '<pre class="fk-report-preview-text">' + escapeHtml(t) + '</pre>';
+          }
+        })
+        .catch(function(e){
+          view.innerHTML = '<div class="fk-report-empty"><p>Erro: ' + escapeHtml(e.message) + '</p></div>';
+        });
+      return;
+    }
+
+    // FK_DYNAMIC_TABS: tab generica para clover.xml / cobertura.xml / coverage.txt
+    if (/^file:/.test(reportState.activeView)){
+      var ficheiro = reportState.activeView.replace(/^file:/, '');
+      var f = null;
+      for (var k = 0; k < reportState.files.length; k++){
+        if (reportState.files[k].path === ficheiro){ f = reportState.files[k]; break; }
+      }
+      if (!f){ view.innerHTML = '<div class="fk-report-empty"><p>Ficheiro nao encontrado</p></div>'; return; }
+
+      var urlF = '/api/frankei/terminal/report/download?file=' +
+        encodeURIComponent('current/' + f.path);
+
+      view.innerHTML = '<div style="padding:40px;text-align:center;color:#8A9099">\u23f3 A carregar ' + escapeHtml(f.path) + '...</div>';
+
+      fetch(urlF, { credentials: 'include' })
+        .then(function(r){ return r.text(); })
+        .then(function(txt){
+          var lim = txt.length > 50000 ? txt.substring(0, 50000) + '\n\n[... truncado ...]' : txt;
+          var header = '<div style="padding:8px 12px;background:#faf6ee;border-bottom:1px solid #e8dcc8;font-size:11px;color:#8a7a68;font-weight:700">' +
+                       escapeHtml(f.path) + ' \u00b7 ' + (f.size / 1024).toFixed(1) + ' KB</div>';
+          view.innerHTML = header +
+            '<pre class="fk-report-preview-text" style="margin:0;max-height:70vh;overflow:auto">' +
+            escapeHtml(lim) + '</pre>';
+        })
+        .catch(function(e){
+          view.innerHTML = '<div class="fk-report-empty"><p>Erro: ' + escapeHtml(e.message) + '</p></div>';
+        });
+      return;
+    }
+
+    if (reportState.activeView === 'beaver'){
+      view.innerHTML = '<div class="cv-empty"><div class="cv-empty-icon">⏳</div><p>A carregar coverage...</p></div>';
+
+      fetch('/api/frankei/terminal/coverage/data', { credentials: 'include' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d.ok) {
+            view.innerHTML = '<div class="cv-empty"><div class="cv-empty-icon">⚠️</div><p>Erro: ' + escapeHtml(d.error || 'desconhecido') + '</p></div>';
+            return;
+          }
+          function tryRender(){
+            if (window.CoverageView) {
+              view.innerHTML = '';
+              window.CoverageView.render(view, d);
+            } else {
+              view.innerHTML = '<div class="cv-empty"><div class="cv-empty-icon">⏳</div><p>A carregar componente...</p></div>';
+              setTimeout(tryRender, 400);
+            }
+          }
+          tryRender();
+        })
+        .catch(function(e){
+          view.innerHTML = '<div class="cv-empty"><div class="cv-empty-icon">⚠️</div><p>Erro: ' + escapeHtml(e.message) + '</p></div>';
+        });
+      return;
+    }
+
+    if (reportState.activeView === 'files'){
+      if (!reportState.files.length){ view.innerHTML = '<div class="fk-report-empty"><p>Sem ficheiros</p></div>'; return; }
+      var html2 = '<div class="fk-report-file-list">';
+      reportState.files.forEach(function(f){
+        var url3 = '/api/frankei/terminal/report/download?file=' +
+          encodeURIComponent('current/' + f.path);
+        html2 += '<div class="fk-report-file-item">';
+        html2 += '<span class="name">' + escapeHtml(f.path) + '</span>';
+        html2 += '<span class="size">' + fmtSize(f.size) + '</span>';
+        html2 += '<a href="' + url3 + '" download><button>📥</button></a>';
+        html2 += '</div>';
+      });
+      html2 += '</div>';
+      view.innerHTML = html2;
+    }
+  }
+
+  function fmtSize(b){
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/(1024*1024)).toFixed(1) + ' MB';
+  }
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', reportInit);
+  } else {
+    reportInit();
+  }
+
+})();
+
+// ═══════════════════════════════════════════════════════════
+// Painel de configurações do Beaver Report
+// ═══════════════════════════════════════════════════════════
+(function initBeaverConfig(){
+    // ─── Chaves separadas por tab ───
+    var K_VISUAL = 'frankei:beaverReport:visual';
+    var K_TABLE  = 'frankei:beaverReport:table';
+    var K_THEME  = 'frankei:beaverReport:theme';
+
+    var D_VISUAL = {
+        icons: true, gradient: true, anim: true,
+        count: true, group: false, module: true, tooltip: true
+    };
+    var D_TABLE = {
+        density: 'normal',
+        orderBy: 'coverage',
+        hide100: false, hide0: false,
+        columns: { crap: true, loc: true }
+    };
+    var D_THEME = 'auto';
+
+    function load(key, defaults) {
+        try {
+            var raw = localStorage.getItem(key);
+            if (!raw) return JSON.parse(JSON.stringify(defaults));
+            var parsed = JSON.parse(raw);
+            if (typeof defaults === 'object' && defaults !== null) {
+                return Object.assign({}, defaults, parsed);
+            }
+            return parsed;
+        } catch(e) { return JSON.parse(JSON.stringify(defaults)); }
+    }
+    function save(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){}
+    }
+
+    function applyToCoverageView() {
+        var cv = document.querySelector('.cv');
+        if (!cv) return;
+
+        var visual = load(K_VISUAL, D_VISUAL);
+        var table  = load(K_TABLE,  D_TABLE);
+        var theme  = load(K_THEME,  D_THEME);
+
+        // Limpar classes antigas
+        cv.className = cv.className.replace(/\bcv-opt-\S+/g, '').trim();
+        cv.className = cv.className.replace(/\bcv-density-\S+/g, '').trim();
+        cv.className = cv.className.replace(/\bcv-theme-\S+/g, '').trim();
+
+        // Visual
+        Object.keys(visual).forEach(function(k){
+            if (visual[k]) cv.classList.add('cv-opt-' + k);
+        });
+
+        // Densidade
+        cv.classList.add('cv-density-' + table.density);
+
+        // Tema
+        cv.classList.add('cv-theme-' + theme);
+
+        // Colunas
+        if (!table.columns.crap) cv.classList.add('cv-hide-crap');
+        else cv.classList.remove('cv-hide-crap');
+        if (!table.columns.loc) cv.classList.add('cv-hide-loc');
+        else cv.classList.remove('cv-hide-loc');
+
+        // Filtros
+        if (table.hide100) cv.classList.add('cv-hide-100');
+        else cv.classList.remove('cv-hide-100');
+        if (table.hide0) cv.classList.add('cv-hide-0');
+        else cv.classList.remove('cv-hide-0');
+    }
+
+    // ─── Presets ───
+    var PRESETS = {
+        minimal:  { visual: { icons:false, gradient:false, anim:false, count:false, group:false, module:false, tooltip:false }, table: { density:'normal',   orderBy:'coverage', hide100:false, hide0:false, columns:{ crap:false, loc:false } } },
+        compacto: { visual: { icons:true,  gradient:true,  anim:false, count:true,  group:false, module:false, tooltip:false }, table: { density:'compact',  orderBy:'coverage', hide100:false, hide0:false, columns:{ crap:true,  loc:false } } },
+        completo: { visual: { icons:true,  gradient:true,  anim:true,  count:true,  group:false, module:true,  tooltip:true  }, table: { density:'normal',   orderBy:'coverage', hide100:false, hide0:false, columns:{ crap:true,  loc:true  } } },
+        analitico:{ visual: { icons:true,  gradient:true,  anim:true,  count:true,  group:true,  module:true,  tooltip:true  }, table: { density:'spacious', orderBy:'crap',     hide100:false, hide0:false, columns:{ crap:true,  loc:true  } } }
+    };
+
+    function applyPreset(name) {
+        var p = PRESETS[name];
+        if (!p) return;
+        save(K_VISUAL, p.visual);
+        save(K_TABLE,  p.table);
+        applyToCoverageView();
+    }
+
+    function buildPanel() {
+        if (document.getElementById('fkBeaverConfigPanel')) return;
+
+        var backdrop = document.createElement('div');
+        backdrop.className = 'fk-beaver-config-backdrop';
+        backdrop.id = 'fkBeaverConfigBackdrop';
+
+        var panel = document.createElement('div');
+        panel.className = 'fk-beaver-config-panel';
+        panel.id = 'fkBeaverConfigPanel';
+
+        var visual = load(K_VISUAL, D_VISUAL);
+        var table  = load(K_TABLE,  D_TABLE);
+        var theme  = load(K_THEME,  D_THEME);
+
+        // ─── Toggles visuais ───
+        var toggles = [
+            { key: 'icons',    label: 'Ícones coloridos',          desc: 'Bolinha 🟢 🟡 🔴 antes do nome' },
+            { key: 'gradient', label: 'Gradiente nas barras',      desc: 'Transição de cor suave' },
+            { key: 'anim',     label: 'Animação de preenchimento', desc: 'Slide-in ao carregar' },
+            { key: 'count',    label: 'Contagem de linhas',        desc: 'Ex: 235 / 296 ao lado da barra' },
+            { key: 'group',    label: 'Agrupar por faixa',         desc: 'Alto (≥80%) / Médio (50-79%) / Baixo (<50%)' },
+            { key: 'module',   label: 'Módulo em destaque',        desc: 'Namespace a bold antes da classe' },
+            { key: 'tooltip',  label: 'Tooltip com path',          desc: 'Hover mostra caminho completo' }
+        ];
+
+        var visualHtml = toggles.map(function(t){
+            return '<label class="fk-beaver-opt">'
+                 + '<input type="checkbox" data-visual="' + t.key + '"' + (visual[t.key] ? ' checked' : '') + '>'
+                 + '<span class="fk-beaver-check"></span>'
+                 + '<span class="fk-beaver-label">' + t.label
+                 +   '<span class="fk-beaver-desc">' + t.desc + '</span>'
+                 + '</span>'
+                 + '</label>';
+        }).join('');
+
+        // ─── Tabela ───
+        var tableHtml = ''
+            + '<div class="fk-beaver-group">'
+            +   '<div class="fk-beaver-group-title">Densidade</div>'
+            +   '<div class="fk-beaver-density">'
+            +     '<input type="radio" name="density" id="dens-compact"  value="compact"'  + (table.density === 'compact'  ? ' checked' : '') + '><label for="dens-compact">🔽<br>Compacta</label>'
+            +     '<input type="radio" name="density" id="dens-normal"   value="normal"'   + (table.density === 'normal'   ? ' checked' : '') + '><label for="dens-normal">▶<br>Normal</label>'
+            +     '<input type="radio" name="density" id="dens-spacious" value="spacious"' + (table.density === 'spacious' ? ' checked' : '') + '><label for="dens-spacious">🔼<br>Espaçosa</label>'
+            +   '</div>'
+            + '</div>'
+            + '<div class="fk-beaver-group">'
+            +   '<div class="fk-beaver-group-title">Colunas</div>'
+            +   '<label class="fk-beaver-opt"><input type="checkbox" data-table="colCrap"' + (table.columns.crap ? ' checked' : '') + '><span class="fk-beaver-check"></span><span class="fk-beaver-label">Coluna CRAP<span class="fk-beaver-desc">Índice de risco</span></span></label>'
+            +   '<label class="fk-beaver-opt"><input type="checkbox" data-table="colLoc"'  + (table.columns.loc  ? ' checked' : '') + '><span class="fk-beaver-check"></span><span class="fk-beaver-label">Coluna LOC<span class="fk-beaver-desc">Linhas de código</span></span></label>'
+            + '</div>'
+            + '<div class="fk-beaver-group">'
+            +   '<div class="fk-beaver-group-title">Ordenação por defeito</div>'
+            +   '<label class="fk-beaver-opt"><input type="radio" name="orderBy" data-table-order="coverage"' + (table.orderBy === 'coverage' ? ' checked' : '') + '><span class="fk-beaver-check"></span><span class="fk-beaver-label">Cobertura (pior primeiro)</span></label>'
+            +   '<label class="fk-beaver-opt"><input type="radio" name="orderBy" data-table-order="crap"' + (table.orderBy === 'crap' ? ' checked' : '') + '><span class="fk-beaver-check"></span><span class="fk-beaver-label">CRAP (maior primeiro)</span></label>'
+            +   '<label class="fk-beaver-opt"><input type="radio" name="orderBy" data-table-order="name"' + (table.orderBy === 'name' ? ' checked' : '') + '><span class="fk-beaver-check"></span><span class="fk-beaver-label">Nome (A→Z)</span></label>'
+            + '</div>'
+            + '<div class="fk-beaver-group">'
+            +   '<div class="fk-beaver-group-title">Filtros rápidos</div>'
+            +   '<label class="fk-beaver-opt"><input type="checkbox" data-table="hide100"' + (table.hide100 ? ' checked' : '') + '><span class="fk-beaver-check"></span><span class="fk-beaver-label">Esconder 100% cobertos</span></label>'
+            +   '<label class="fk-beaver-opt"><input type="checkbox" data-table="hide0"'   + (table.hide0   ? ' checked' : '') + '><span class="fk-beaver-check"></span><span class="fk-beaver-label">Esconder 0% cobertos</span></label>'
+            + '</div>';
+
+        // ─── Tema ───
+        var themeHtml = ''
+            + '<div class="fk-beaver-group">'
+            +   '<div class="fk-beaver-group-title">Tema</div>'
+            +   '<div class="fk-beaver-theme">'
+            +     '<input type="radio" name="theme" id="theme-light" value="light"' + (theme === 'light' ? ' checked' : '') + '><label for="theme-light"><span class="theme-icon">☀️</span>Claro</label>'
+            +     '<input type="radio" name="theme" id="theme-dark"  value="dark"'  + (theme === 'dark'  ? ' checked' : '') + '><label for="theme-dark"><span class="theme-icon">🌙</span>Escuro</label>'
+            +     '<input type="radio" name="theme" id="theme-auto"  value="auto"'  + (theme === 'auto'  ? ' checked' : '') + '><label for="theme-auto"><span class="theme-icon">🌗</span>Auto</label>'
+            +   '</div>'
+            + '</div>';
+
+        // ─── Presets ───
+        var presetsHtml = ''
+            + '<div class="fk-beaver-group">'
+            +   '<div class="fk-beaver-group-title">Presets rápidos</div>'
+            +   '<div class="fk-beaver-presets">'
+            +     '<div class="fk-beaver-preset" data-preset="minimal">'
+            +       '<div class="fk-beaver-preset-icon">⬜</div>'
+            +       '<div class="fk-beaver-preset-name">Minimal</div>'
+            +       '<div class="fk-beaver-preset-desc">Só tabela, sem extras</div>'
+            +     '</div>'
+            +     '<div class="fk-beaver-preset" data-preset="compacto">'
+            +       '<div class="fk-beaver-preset-icon">📦</div>'
+            +       '<div class="fk-beaver-preset-name">Compacto</div>'
+            +       '<div class="fk-beaver-preset-desc">Tudo pequeno</div>'
+            +     '</div>'
+            +     '<div class="fk-beaver-preset" data-preset="completo">'
+            +       '<div class="fk-beaver-preset-icon">✨</div>'
+            +       '<div class="fk-beaver-preset-name">Completo</div>'
+            +       '<div class="fk-beaver-preset-desc">Visual equilibrado</div>'
+            +     '</div>'
+            +     '<div class="fk-beaver-preset" data-preset="analitico">'
+            +       '<div class="fk-beaver-preset-icon">🔬</div>'
+            +       '<div class="fk-beaver-preset-name">Analítico</div>'
+            +       '<div class="fk-beaver-preset-desc">Tudo detalhado</div>'
+            +     '</div>'
+            +     '<div class="fk-beaver-preset fk-beaver-preset-reset" data-preset="__reset">'
+            +       '<div class="fk-beaver-preset-icon">↺</div>'
+            +       '<div class="fk-beaver-preset-name">Reset tudo</div>'
+            +       '<div class="fk-beaver-preset-desc">Voltar ao default</div>'
+            +     '</div>'
+            +   '</div>'
+            + '</div>';
+
+        panel.innerHTML = ''
+            + '<div class="fk-beaver-config-head">'
+            +   '<h3>⚙️ Configurações</h3>'
+            +   '<button class="fk-beaver-config-close" aria-label="Fechar">×</button>'
+            + '</div>'
+            + '<nav class="fk-beaver-config-tabs">'
+            +   '<button class="fk-beaver-config-tab active" data-cfg-tab="visual">👁️ Visual</button>'
+            +   '<button class="fk-beaver-config-tab" data-cfg-tab="table">📊 Tabela</button>'
+            +   '<button class="fk-beaver-config-tab" data-cfg-tab="theme">🎨 Tema</button>'
+            +   '<button class="fk-beaver-config-tab" data-cfg-tab="presets">💾 Presets</button>'
+            + '</nav>'
+            + '<div class="fk-beaver-config-body">'
+            +   '<div class="fk-beaver-config-panel-tab active" data-cfg-panel="visual">' + visualHtml + '</div>'
+            +   '<div class="fk-beaver-config-panel-tab" data-cfg-panel="table">' + tableHtml + '</div>'
+            +   '<div class="fk-beaver-config-panel-tab" data-cfg-panel="theme">' + themeHtml + '</div>'
+            +   '<div class="fk-beaver-config-panel-tab" data-cfg-panel="presets">' + presetsHtml + '</div>'
+            + '</div>';
+
+        document.body.appendChild(backdrop);
+        document.body.appendChild(panel);
+
+        // ─── Eventos ───
+        var closeBtn = panel.querySelector('.fk-beaver-config-close');
+        var btn      = document.getElementById('fkBeaverConfigBtn');
+
+        function closePanel() {
+            backdrop.classList.remove('open');
+            panel.classList.remove('open');
+            if (btn) btn.classList.remove('active');
+        }
+
+        closeBtn.addEventListener('click', closePanel);
+        backdrop.addEventListener('click', closePanel);
+        document.addEventListener('keydown', function(e){
+            if (e.key === 'Escape' && panel.classList.contains('open')) closePanel();
+        });
+
+        // Tabs
+        panel.querySelectorAll('.fk-beaver-config-tab').forEach(function(tab){
+            tab.addEventListener('click', function(){
+                panel.querySelectorAll('.fk-beaver-config-tab').forEach(function(t){ t.classList.remove('active'); });
+                panel.querySelectorAll('.fk-beaver-config-panel-tab').forEach(function(p){ p.classList.remove('active'); });
+                tab.classList.add('active');
+                var target = panel.querySelector('[data-cfg-panel="' + tab.dataset.cfgTab + '"]');
+                if (target) target.classList.add('active');
+            });
+        });
+
+        // Visual toggles
+        panel.querySelectorAll('input[data-visual]').forEach(function(cb){
+            cb.addEventListener('change', function(){
+                var v = load(K_VISUAL, D_VISUAL);
+                v[cb.dataset.visual] = cb.checked;
+                save(K_VISUAL, v);
+                applyToCoverageView();
+            });
+        });
+
+        // Table: densidade
+        panel.querySelectorAll('input[name="density"]').forEach(function(r){
+            r.addEventListener('change', function(){
+                var t = load(K_TABLE, D_TABLE);
+                t.density = r.value;
+                save(K_TABLE, t);
+                applyToCoverageView();
+            });
+        });
+
+        // Table: colunas
+        panel.querySelectorAll('input[data-table="colCrap"]').forEach(function(cb){
+            cb.addEventListener('change', function(){
+                var t = load(K_TABLE, D_TABLE);
+                t.columns = t.columns || {};
+                t.columns.crap = cb.checked;
+                save(K_TABLE, t);
+                applyToCoverageView();
+            });
+        });
+        panel.querySelectorAll('input[data-table="colLoc"]').forEach(function(cb){
+            cb.addEventListener('change', function(){
+                var t = load(K_TABLE, D_TABLE);
+                t.columns = t.columns || {};
+                t.columns.loc = cb.checked;
+                save(K_TABLE, t);
+                applyToCoverageView();
+            });
+        });
+
+        // Table: ordenação
+        panel.querySelectorAll('input[data-table-order]').forEach(function(r){
+            r.addEventListener('change', function(){
+                var t = load(K_TABLE, D_TABLE);
+                t.orderBy = r.dataset.tableOrder;
+                save(K_TABLE, t);
+                applyToCoverageView();
+            });
+        });
+
+        // Table: filtros
+        panel.querySelectorAll('input[data-table="hide100"]').forEach(function(cb){
+            cb.addEventListener('change', function(){
+                var t = load(K_TABLE, D_TABLE);
+                t.hide100 = cb.checked;
+                save(K_TABLE, t);
+                applyToCoverageView();
+            });
+        });
+        panel.querySelectorAll('input[data-table="hide0"]').forEach(function(cb){
+            cb.addEventListener('change', function(){
+                var t = load(K_TABLE, D_TABLE);
+                t.hide0 = cb.checked;
+                save(K_TABLE, t);
+                applyToCoverageView();
+            });
+        });
+
+        // Tema
+        panel.querySelectorAll('input[name="theme"]').forEach(function(r){
+            r.addEventListener('change', function(){
+                save(K_THEME, r.value);
+                applyToCoverageView();
+            });
+        });
+
+        // Presets
+        panel.querySelectorAll('[data-preset]').forEach(function(card){
+            card.addEventListener('click', function(){
+                var p = card.dataset.preset;
+                if (p === '__reset') {
+                    save(K_VISUAL, D_VISUAL);
+                    save(K_TABLE,  D_TABLE);
+                    save(K_THEME,  D_THEME);
+                    applyToCoverageView();
+                    // Recarregar painel
+                    closePanel();
+                    var old = document.getElementById('fkBeaverConfigPanel');
+                    var oldBd = document.getElementById('fkBeaverConfigBackdrop');
+                    if (old) old.remove();
+                    if (oldBd) oldBd.remove();
+                    buildPanel();
+                    var newPanel = document.getElementById('fkBeaverConfigPanel');
+                    var newBd = document.getElementById('fkBeaverConfigBackdrop');
+                    if (newPanel && newBd) {
+                        newPanel.classList.add('open');
+                        newBd.classList.add('open');
+                        if (btn) btn.classList.add('active');
+                    }
+                } else {
+                    applyPreset(p);
+                    closePanel();
+                    var old2 = document.getElementById('fkBeaverConfigPanel');
+                    var oldBd2 = document.getElementById('fkBeaverConfigBackdrop');
+                    if (old2) old2.remove();
+                    if (oldBd2) oldBd2.remove();
+                    buildPanel();
+                    var newPanel2 = document.getElementById('fkBeaverConfigPanel');
+                    var newBd2 = document.getElementById('fkBeaverConfigBackdrop');
+                    if (newPanel2 && newBd2) {
+                        newPanel2.classList.add('open');
+                        newBd2.classList.add('open');
+                        if (btn) btn.classList.add('active');
+                    }
+                }
+            });
+        });
+
+        // Expor global
+        window.__applyBeaverOptions = applyToCoverageView;
+    }
+
+    // Botão ⚙️
+    document.addEventListener('click', function(e){
+        if (e.target && e.target.id === 'fkBeaverConfigBtn') {
+            buildPanel();
+            var backdrop = document.getElementById('fkBeaverConfigBackdrop');
+            var panel    = document.getElementById('fkBeaverConfigPanel');
+            backdrop.classList.add('open');
+            panel.classList.add('open');
+            e.target.classList.add('active');
+        }
+    });
+
+    // Aplicar sempre que o CoverageView renderizar
+    var origRender = window.CoverageView && window.CoverageView.render;
+    if (origRender) {
+        window.CoverageView.render = function(container, data) {
+            origRender.call(window.CoverageView, container, data);
+            setTimeout(applyToCoverageView, 50);
+        };
+    }
+})();
+
+// FK_STATCARD_BOOT: aplicar valor guardado ao carregar
+(function () {
+  function boot() {
+    try {
+      var raw = localStorage.getItem('fk:statcard:last');
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      var d = document.getElementById('fkStatDbs');
+      if (d && (d.textContent === '\u2014' || d.textContent === '')) {
+        // Copiar a logica do fkAplicarStatCard
+        var t = document.getElementById('fkStatTotal');
+        var m = document.getElementById('fkStatTime');
+        var filesTxt = s.files > 0
+          ? s.files + ' ficheiro' + (s.files > 1 ? 's' : '') + ' \u00b7 ' + s.passed + ' testes'
+          : s.passed + ' testes';
+        var failsTxt = s.failed > 0 ? s.failed + ' falha' + (s.failed > 1 ? 's' : '') : '0 falhas';
+        if (d) d.textContent = filesTxt;
+        if (t) {
+          t.textContent = failsTxt;
+          t.style.color = s.failed > 0 ? '#b91c1c' : '#047857';
+          t.style.fontWeight = '700';
+        }
+        if (m) m.textContent = s.duration;
+      }
+    } catch (_) {}
+  }
+  // FK_TABS_RESET_BOOT: garantir tabs base quando ainda nao ha ficheiros
+  (function () {
+    function init() {
+      try {
+        if (typeof reportRebuildTabs === 'function' && (!reportState || !reportState.files || reportState.files.length === 0)) {
+          reportRebuildTabs();
+        }
+      } catch (_) {}
+    }
+    // FK_TABS_BIND_BOOT
+  (function () {
+    function init() {
+      try {
+        if (typeof reportBindCheckboxes === 'function') reportBindCheckboxes();
+        if (typeof reportRebuildTabs === 'function') reportRebuildTabs();
+      } catch (_) {}
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 500); });
+    } else {
+      setTimeout(init, 500);
+    }
+  })();
+
+  if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 600); });
+    } else {
+      setTimeout(init, 600);
+    }
+  })();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 400); });
+  } else {
+    setTimeout(boot, 400);
+  }
+})();
+
+// FK_RENDERTABS_BOOT: reforço em runtime + bloqueio de cliques
+(function () {
+  'use strict';
+  var KEEP = 'tests';
+
+  function reforcar() {
+    var tabs = document.querySelectorAll('#fkTabs .fk-tab');
+    if (!tabs.length) return;
+    tabs.forEach(function (t) {
+      if (t.dataset.tab === KEEP) {
+        t.classList.add('active');
+        t.classList.remove('locked');
+        t.removeAttribute('disabled');
+      } else {
+        t.classList.remove('active');
+        t.classList.add('locked');
+        t.setAttribute('disabled', 'disabled');
+        if (!t.querySelector('.fk-tab-badge.pro')) {
+          // Remover badge antigo (não-pro)
+          var old = t.querySelector('.fk-tab-badge');
+          if (old && !old.classList.contains('pro')) old.remove();
+          if (!t.querySelector('.fk-tab-badge.pro')) {
+            var b = document.createElement('span');
+            b.className = 'fk-tab-badge pro';
+            b.textContent = 'PRO';
+            t.appendChild(b);
+          }
+        }
+      }
+    });
+  }
+
+  // Aplicar múltiplas vezes (cobre reconstruções)
+  var i = 0;
+  var iv = setInterval(function () {
+    reforcar();
+    if (++i > 40) clearInterval(iv);
+  }, 500);
+
+  // MutationObserver focado em #fkTabs
+  function observar() {
+    var el = document.getElementById('fkTabs');
+    if (!el) { setTimeout(observar, 300); return; }
+    var obs = new MutationObserver(function () { reforcar(); });
+    obs.observe(el, { childList: true, subtree: true });
+  }
+  observar();
+
+  // Bloquear cliques (capture)
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('#fkTabs .fk-tab');
+    if (t && t.dataset.tab !== KEEP) {
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      t.style.transition = 'none';
+      t.style.boxShadow = '0 0 0 3px rgba(239,68,68,.5) inset';
+      setTimeout(function () { t.style.transition = ''; t.style.boxShadow = ''; }, 300);
+    }
+  }, true);
+})();
+
+// FK_SUBTABS_BOOT: reforço em runtime + bloqueio de cliques
+(function () {
+  'use strict';
+  var KEEP = 'structure';
+
+  function reforcar() {
+    var tabs = document.querySelectorAll('#fkSubtabs .fk-subtab, nav.fk-subtabs .fk-subtab');
+    if (!tabs.length) return;
+    tabs.forEach(function (t) {
+      if (t.dataset.subtab === KEEP) {
+        t.classList.remove('locked');
+        t.removeAttribute('disabled');
+      } else {
+        t.classList.add('locked');
+        t.setAttribute('disabled', 'disabled');
+      }
+    });
+  }
+
+  // Aplicar várias vezes
+  var i = 0;
+  var iv = setInterval(function () {
+    reforcar();
+    if (++i > 40) clearInterval(iv);
+  }, 500);
+
+  // MutationObserver
+  function observar() {
+    var el = document.getElementById('fkSubtabs');
+    if (!el) { setTimeout(observar, 300); return; }
+    var obs = new MutationObserver(function () { reforcar(); });
+    obs.observe(el, { childList: true, subtree: true });
+  }
+  observar();
+
+  // Bloquear cliques com blink
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('#fkSubtabs .fk-subtab, nav.fk-subtabs .fk-subtab');
+    if (!t) return;
+    if (t.dataset.subtab !== KEEP) {
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      // Blink vermelho
+      t.classList.remove('fk-blink-denied');
+      void t.offsetWidth;
+      t.classList.add('fk-blink-denied');
+      setTimeout(function () { t.classList.remove('fk-blink-denied'); }, 400);
+      return false;
+    }
+  }, true);
+})();

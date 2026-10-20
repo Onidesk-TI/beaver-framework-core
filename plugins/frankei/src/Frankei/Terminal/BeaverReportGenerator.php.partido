@@ -1,0 +1,771 @@
+<?php
+declare(strict_types=1);
+
+namespace Beaver\Plugins\Frankei\Frankei\Terminal;
+
+use Beaver\Foundation\Application;
+
+/**
+ * Gera um relatório HTML próprio do Beaver a partir do JUnit + Clover XML.
+ * Output: 1 ficheiro HTML self-contained (CSS + SVG inline).
+ */
+class BeaverReportGenerator
+{
+    private string $root;
+    private string $reportDir;
+
+    public function __construct()
+    {
+        $this->root      = Application::getInstance()->basePath ?? getcwd();
+        $this->reportDir = $this->root . '/storage/frankei-reports';
+    }
+
+    /**
+     * @return array{ok: bool, path?: string, html?: string, error?: string}
+     */
+    public function generate(int $userId, string $plan): array
+    {
+        $currentDir = $this->reportDir . '/' . $userId . '/current';
+
+        if (!is_dir($currentDir)) {
+            return ['ok' => false, 'error' => 'Sem reports anteriores. Gera o report primeiro.'];
+        }
+
+        $junit   = $currentDir . '/junit.xml';
+        $clover  = $currentDir . '/clover.xml';
+
+        if (!is_file($junit)) {
+            return ['ok' => false, 'error' => 'junit.xml não encontrado'];
+        }
+
+        $testes  = $this->parseJunit($junit);
+        $coverage = is_file($clover) ? $this->parseClover($clover) : null;
+
+        $html = $this->renderHtml($testes, $coverage);
+
+        // Guardar
+        $outPath = $currentDir . '/beaver-test-report.html';
+        @file_put_contents($outPath, $html);
+
+        return ['ok' => true, 'path' => $outPath, 'html' => $html];
+    }
+
+    private function parseJunit(string $file): array
+    {
+        $xml = @simplexml_load_file($file);
+        if ($xml === false) return ['tests' => 0, 'assertions' => 0, 'failures' => 0, 'errors' => 0, 'time' => 0, 'suites' => []];
+
+        $out = [
+            'tests' => 0, 'assertions' => 0, 'failures' => 0, 'errors' => 0, 'time' => 0.0,
+            'suites' => [],
+        ];
+
+        // <testsuites> → <testsuite> → <testsuite> (nested)
+        foreach ($xml->testsuite as $suite) {
+            foreach ($suite->testsuite as $inner) {
+                $name = (string) $inner['name'];
+                $tests = (int) $inner['tests'];
+                $assertions = (int) $inner['assertions'];
+                $failures = (int) $inner['failures'];
+                $errors = (int) $inner['errors'];
+                $time = (float) $inner['time'];
+
+                $out['tests'] += $tests;
+                $out['assertions'] += $assertions;
+                $out['failures'] += $failures;
+                $out['errors'] += $errors;
+                $out['time'] += $time;
+
+                $out['suites'][] = [
+                    'name'       => $this->shortName($name),
+                    'tests'      => $tests,
+                    'assertions' => $assertions,
+                    'failures'   => $failures,
+                    'errors'     => $errors,
+                    'time'       => $time,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    private function parseClover(string $file): ?array
+    {
+        $xml = @simplexml_load_file($file);
+        if ($xml === false) return null;
+
+        $metrics = $xml->project->metrics ?? null;
+        if ($metrics === null) return null;
+
+        $total = [
+            'statements' => (int) $metrics['statements'],
+            'covered'    => (int) $metrics['coveredstatements'],
+            'elements'   => (int) $metrics['elements'],
+            'coveredEle' => (int) $metrics['coveredelements'],
+        ];
+
+        $total['percent'] = $total['statements'] > 0
+            ? round(100 * $total['covered'] / $total['statements'], 1)
+            : 0;
+
+        // Por ficheiro
+        $files = [];
+        foreach ($xml->project->file as $f) {
+            $m = $f->metrics ?? null;
+            if ($m === null) continue;
+
+            $st = (int) $m['statements'];
+            $cv = (int) $m['coveredstatements'];
+            if ($st === 0) continue;
+
+            $files[] = [
+                'name'    => (string) $f['name'],
+                'short'   => $this->shortPath((string) $f['name']),
+                'stmts'   => $st,
+                'covered' => $cv,
+                'percent' => round(100 * $cv / $st, 1),
+            ];
+        }
+
+        usort($files, fn($a, $b) => $b['percent'] <=> $a['percent']);
+
+        return ['total' => $total, 'files' => $files];
+    }
+
+    private function shortName(string $name): string
+    {
+        $parts = explode('\\', $name);
+        return end($parts);
+    }
+
+    private function shortPath(string $path): string
+    {
+        $path = str_replace($this->root, '', $path);
+        return ltrim($path, '/');
+    }
+
+    private function renderHtml(array $testes, ?array $coverage): string
+    {
+        $tests    = $testes['tests'];
+        $failures = $testes['failures'] + $testes['errors'];
+        $passed   = $tests - $failures;
+        $time     = number_format($testes['time'], 3);
+        $covPct   = $coverage['total']['percent'] ?? 0;
+
+        $topCovered = array_slice($coverage['files'] ?? [], 0, 5);
+        $lowCovered = array_slice(array_reverse($coverage['files'] ?? []), 0, 5);
+
+        // Estado inicial dos toggles (default: tudo ON excepto agrupar)
+        $opts = [
+            'icons'    => true,
+            'gradient' => true,
+            'anim'     => true,
+            'count'    => true,
+            'group'    => false,
+            'module'   => true,
+            'tooltip'  => true,
+        ];
+
+        $bodyClasses = [];
+        foreach ($opts as $k => $v) {
+            $bodyClasses[] = 'beaver-' . $k . '-' . ($v ? 'on' : 'off');
+        }
+        $bodyClass = implode(' ', $bodyClasses);
+
+        $html = <<<HTML
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>🦫 Beaver Test Report</title>
+<style>
+  :root {
+    --bg: #fdf8ef;
+    --card: #ffffff;
+    --text: #2E1A10;
+    --muted: #6b5544;
+    --border: #e8dcc8;
+    --accent: #c25a1f;
+    --accent-2: #e8a44f;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --grad-green: linear-gradient(90deg, #34d399, #10b981);
+    --grad-yellow: linear-gradient(90deg, #fbbf24, #f59e0b);
+    --grad-red: linear-gradient(90deg, #f87171, #ef4444);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1410;
+      --card: #241c16;
+      --text: #f5ede0;
+      --muted: #b8a896;
+      --border: #3a2e24;
+      --accent: #e8a44f;
+      --accent-2: #c25a1f;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    padding: 32px 24px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  /* HEADER */
+  .header { text-align: center; margin-bottom: 40px; }
+  .logo {
+    font-size: 48px; margin-bottom: 8px;
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  h1 {
+    font-size: 28px; font-weight: 800; letter-spacing: -.03em;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 6px;
+  }
+  .subtitle { color: var(--muted); font-size: 14px; }
+
+  /* CARDS */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 32px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px 22px;
+    position: relative; overflow: hidden;
+    transition: transform .2s;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  }
+  .card-icon { font-size: 24px; margin-bottom: 8px; }
+  .card-value {
+    font-size: 32px; font-weight: 800;
+    letter-spacing: -.02em; line-height: 1; margin-bottom: 4px;
+  }
+  .card-label {
+    font-size: 12px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .05em; font-weight: 600;
+  }
+  .card.pass .card-value { color: var(--green); }
+  .card.fail .card-value { color: var(--red); }
+
+  /* SECTIONS */
+  .section {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; margin-bottom: 20px;
+  }
+  .section h2 {
+    font-size: 16px; font-weight: 700;
+    margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
+  }
+
+  /* BARS */
+  .bar-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px; font-size: 13px;
+    transition: opacity .15s;
+  }
+  .bar-icon {
+    width: 10px; height: 10px; border-radius: 50%;
+    flex-shrink: 0; transition: transform .15s;
+  }
+  .bar-icon.g { background: var(--green); box-shadow: 0 0 6px rgba(16,185,129,.4); }
+  .bar-icon.y { background: var(--yellow); box-shadow: 0 0 6px rgba(245,158,11,.4); }
+  .bar-icon.r { background: var(--red); box-shadow: 0 0 6px rgba(239,68,68,.4); }
+  .bar-row:hover .bar-icon { transform: scale(1.3); }
+
+  .bar-name {
+    flex: 1; font-family: "JetBrains Mono", monospace; font-size: 12px;
+    color: var(--text); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .bar-name .module {
+    font-weight: 700; color: var(--accent);
+  }
+  .bar-name .class {
+    color: var(--muted);
+  }
+
+  .bar-track {
+    width: 220px; height: 10px;
+    background: var(--border); border-radius: 99px;
+    overflow: hidden; flex-shrink: 0; position: relative;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 99px;
+    transition: width 1s cubic-bezier(.2,.8,.2,1);
+  }
+  .bar-fill.g { background: var(--grad-green); }
+  .bar-fill.y { background: var(--grad-yellow); }
+  .bar-fill.r { background: var(--grad-red); }
+
+  .bar-count {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px; color: var(--muted-2, #999);
+    width: 66px; text-align: right; flex-shrink: 0;
+  }
+  .bar-pct {
+    width: 52px; text-align: right;
+    font-weight: 800; font-size: 12.5px; flex-shrink: 0;
+  }
+  .bar-pct.g { color: var(--green); }
+  .bar-pct.y { color: var(--yellow); }
+  .bar-pct.r { color: var(--red); }
+
+  /* TESTES */
+  .test-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+  .test-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--bg); border-radius: 10px;
+    font-size: 12.5px; border-left: 3px solid var(--green);
+    transition: transform .15s;
+  }
+  .test-item:hover { transform: translateX(2px); }
+  .test-item.fail { border-left-color: var(--red); }
+  .test-item .name { font-weight: 600; }
+  .test-item .time { color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 11px; }
+
+  /* FOOTER */
+  .footer {
+    text-align: center; color: var(--muted);
+    font-size: 11.5px; margin-top: 40px; padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .footer strong { color: var(--accent); }
+
+  /* ══════════════════════════════════════════════════════
+     REGRAS CONDICIONAIS (toggles)
+     ══════════════════════════════════════════════════════ */
+
+  /* Ícones coloridos */
+  body.beaver-icons-off .bar-icon { display: none; }
+
+  /* Gradiente */
+  body.beaver-gradient-off .bar-fill.g { background: var(--green); }
+  body.beaver-gradient-off .bar-fill.y { background: var(--yellow); }
+  body.beaver-gradient-off .bar-fill.r { background: var(--red); }
+
+  /* Animação */
+  body.beaver-anim-off .bar-fill { transition: none; }
+  body.beaver-anim-off .logo { animation: none; }
+  body.beaver-anim-off .card { transition: none; }
+
+  /* Contagem de linhas */
+  body.beaver-count-off .bar-count { display: none; }
+
+  /* Módulo em destaque */
+  body.beaver-module-off .bar-name .module { font-weight: 400; color: var(--text); }
+
+  /* Tooltip */
+  body.beaver-tooltip-off .bar-row[title] { pointer-events: none; }
+  body.beaver-tooltip-off .bar-name { cursor: default; }
+  body.beaver-tooltip-on .bar-name { cursor: help; }
+</style>
+</head>
+<body class="{$bodyClass}">
+<div class="container">
+
+  <div class="header">
+    <div class="logo">🦫</div>
+    <h1>Beaver Test Report</h1>
+    <p class="subtitle">Gerado em {$this->now()}</p>
+  </div>
+
+  <div class="cards">
+    <div class="card pass">
+      <div class="card-icon">✅</div>
+      <div class="card-value">{$passed}</div>
+      <div class="card-label">Testes passados</div>
+    </div>
+    <div class="card fail">
+      <div class="card-icon">❌</div>
+      <div class="card-value">{$failures}</div>
+      <div class="card-label">Falhas / Erros</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📊</div>
+      <div class="card-value">{$testes['assertions']}</div>
+      <div class="card-label">Assertions</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚡</div>
+      <div class="card-value">{$time}s</div>
+      <div class="card-label">Duração</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📈</div>
+      <div class="card-value">{$covPct}%</div>
+      <div class="card-label">Cobertura</div>
+    </div>
+  </div>
+
+HTML;
+
+        // Top cobertura
+        if ($topCovered) {
+            $html .= '  <div class="section">' . "\n";
+            $html .= '    <h2>🏆 Top classes mais cobertas</h2>' . "\n";
+            foreach ($topCovered as $f) {
+                $html .= $this->renderBar($f);
+            }
+            $html .= "  </div>\n";
+        }
+
+        // Sem cobertura
+        if ($lowCovered) {
+            $html .= '  <div class="section">' . "\n";
+            $html .= '    <h2>⚠️ Classes sem cobertura</h2>' . "\n";
+            foreach ($lowCovered as $f) {
+                $html .= $this->renderBar($f);
+            }
+            $html .= "  </div>\n";
+        }
+
+        // Suites
+        if ($testes['suites']) {
+            $html .= '  <div class="section">' . "\n";
+            $html .= '    <h2>🧪 Suites de testes</h2>' . "\n";
+            $html .= '    <div class="test-list">' . "\n";
+            foreach ($testes['suites'] as $s) {
+                $cls = ($s['failures'] + $s['errors']) > 0 ? 'fail' : '';
+                $icon = ($s['failures'] + $s['errors']) > 0 ? '❌' : '✅';
+                $html .= '      <div class="test-item ' . $cls . '">' . "\n";
+                $html .= '        <span class="name">' . $icon . ' ' . htmlspecialchars($s['name']) . '</span>' . "\n";
+                $html .= '        <span class="time">' . number_format($s['time'], 3) . 's</span>' . "\n";
+                $html .= '      </div>' . "\n";
+            }
+            $html .= "    </div>\n";
+            $html .= "  </div>\n";
+        }
+
+        $html .= <<<HTML
+  <div class="footer">
+    Gerado por <strong>🦫 Beaver Test Report</strong> · {$tests} testes · {$testes['assertions']} assertions
+  </div>
+
+</div>
+</body>
+</html>
+HTML;
+
+        return $html;
+    }
+
+    /** Barra individual com todos os elementos */
+    private function renderBar(array $f): string
+    {
+        $pct = $f['percent'];
+        $cls = $pct >= 80 ? 'g' : ($pct >= 50 ? 'y' : 'r');
+
+        // Separar módulo e classe (ex: Frankei\PhpXssScanner)
+        $short = $f['short'];
+        $parts = explode('\\', $short);
+        $class = array_pop($parts);
+        $module = implode('\\', $parts);
+
+        $moduleHtml = $module !== ''
+            ? '<span class="module">' . htmlspecialchars($module) . '\\</span>'
+            : '';
+        $classHtml = '<span class="class">' . htmlspecialchars($class) . '</span>';
+
+        $stmts = $f['stmts'] ?? 0;
+        $covered = $f['covered'] ?? 0;
+
+        $title = htmlspecialchars($f['name']);
+
+        $html  = '    <div class="bar-row" title="' . $title . '">' . "\n";
+        $html .= '      <span class="bar-icon ' . $cls . '"></span>' . "\n";
+        $html .= '      <span class="bar-name">' . $moduleHtml . $classHtml . '</span>' . "\n";
+        $html .= '      <div class="bar-track">' . "\n";
+        $html .= '        <div class="bar-fill ' . $cls . '" style="width:' . $pct . '%"></div>' . "\n";
+        $html .= '      </div>' . "\n";
+        $html .= '      <span class="bar-count">' . $covered . ' / ' . $stmts . '</span>' . "\n";
+        $html .= '      <span class="bar-pct ' . $cls . '">' . $pct . '%</span>' . "\n";
+        $html .= '    </div>' . "\n";
+
+        return $html;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+    padding: 32px 24px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+
+  /* HEADER */
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .logo {
+    font-size: 48px;
+    margin-bottom: 8px;
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -.03em;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+  }
+  .subtitle { color: var(--muted); font-size: 14px; }
+
+  /* CARDS */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  }
+  .card-icon { font-size: 24px; margin-bottom: 8px; }
+  .card-value {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .card-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  .card.pass .card-value { color: var(--green); }
+  .card.fail .card-value { color: var(--red); }
+
+  /* SECTIONS */
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .section h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* BARS */
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .bar-name {
+    flex: 1;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar-track {
+    width: 220px;
+    height: 8px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 1s ease-out;
+  }
+  .bar-pct {
+    width: 48px;
+    text-align: right;
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  /* TESTES */
+  .test-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+  }
+  .test-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: 10px;
+    font-size: 12.5px;
+    border-left: 3px solid var(--green);
+  }
+  .test-item.fail { border-left-color: var(--red); }
+  .test-item .name { font-weight: 600; }
+  .test-item .time { color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 11px; }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11.5px;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .footer strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="logo">🦫</div>
+    <h1>Beaver Test Report</h1>
+    <p class="subtitle">Gerado em {$this->now()}</p>
+  </div>
+
+  <div class="cards">
+    <div class="card pass">
+      <div class="card-icon">✅</div>
+      <div class="card-value">{$passed}</div>
+      <div class="card-label">Testes passados</div>
+    </div>
+    <div class="card fail">
+      <div class="card-icon">❌</div>
+      <div class="card-value">{$failures}</div>
+      <div class="card-label">Falhas / Erros</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📊</div>
+      <div class="card-value">{$testes['assertions']}</div>
+      <div class="card-label">Assertions</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚡</div>
+      <div class="card-value">{$time}s</div>
+      <div class="card-label">Duração</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📈</div>
+      <div class="card-value">{$covPct}%</div>
+      <div class="card-label">Cobertura</div>
+    </div>
+  </div>
+
+HTML;
+
+        // Top cobertura
+        if ($topCovered) {
+            $html .= '  <div class="section">' . "\n";
+            $html .= '    <h2>🏆 Top classes mais cobertas</h2>' . "\n";
+            foreach ($topCovered as $f) {
+                $color = $f['percent'] >= 80 ? 'var(--green)' : ($f['percent'] >= 50 ? 'var(--yellow)' : 'var(--red)');
+                $html .= '    <div class="bar-row">' . "\n";
+                $html .= '      <span class="bar-name" title="' . htmlspecialchars($f['name']) . '">' . htmlspecialchars($f['short']) . '</span>' . "\n";
+                $html .= '      <div class="bar-track"><div class="bar-fill" style="width:' . $f['percent'] . '%;background:' . $color . '"></div></div>' . "\n";
+                $html .= '      <span class="bar-pct" style="color:' . $color . '">' . $f['percent'] . '%</span>' . "\n";
+                $html .= '    </div>' . "\n";
+            }
+            $html .= "  </div>\n";
+        }
+
+        // Sem cobertura
+        if ($lowCovered) {
+            $html .= '  <div class="section">' . "\n";
+            $html .= '    <h2>⚠️ Classes sem cobertura</h2>' . "\n";
+            foreach ($lowCovered as $f) {
+                $color = $f['percent'] >= 80 ? 'var(--green)' : ($f['percent'] >= 50 ? 'var(--yellow)' : 'var(--red)');
+                $html .= '    <div class="bar-row">' . "\n";
+                $html .= '      <span class="bar-name" title="' . htmlspecialchars($f['name']) . '">' . htmlspecialchars($f['short']) . '</span>' . "\n";
+                $html .= '      <div class="bar-track"><div class="bar-fill" style="width:' . $f['percent'] . '%;background:' . $color . '"></div></div>' . "\n";
+                $html .= '      <span class="bar-pct" style="color:' . $color . '">' . $f['percent'] . '%</span>' . "\n";
+                $html .= '    </div>' . "\n";
+            }
+            $html .= "  </div>\n";
+        }
+
+        // Suites
+        if ($testes['suites']) {
+            $html .= '  <div class="section">' . "\n";
+            $html .= '    <h2>🧪 Suites de testes</h2>' . "\n";
+            $html .= '    <div class="test-list">' . "\n";
+            foreach ($testes['suites'] as $s) {
+                $cls = ($s['failures'] + $s['errors']) > 0 ? 'fail' : '';
+                $icon = ($s['failures'] + $s['errors']) > 0 ? '❌' : '✅';
+                $html .= '      <div class="test-item ' . $cls . '">' . "\n";
+                $html .= '        <span class="name">' . $icon . ' ' . htmlspecialchars($s['name']) . '</span>' . "\n";
+                $html .= '        <span class="time">' . number_format($s['time'], 3) . 's</span>' . "\n";
+                $html .= '      </div>' . "\n";
+            }
+            $html .= "    </div>\n";
+            $html .= "  </div>\n";
+        }
+
+        $html .= <<<HTML
+  <div class="footer">
+    Gerado por <strong>🦫 Beaver Test Report</strong> · {$tests} testes · {$testes['assertions']} assertions
+  </div>
+
+</div>
+</body>
+</html>
+HTML;
+
+        return $html;
+    }
+
+    private function now(): string
+    {
+        return date('d/m/Y H:i:s');
+    }
+}

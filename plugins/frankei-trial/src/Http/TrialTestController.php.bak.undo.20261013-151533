@@ -1,0 +1,787 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial\Http;
+
+use Beaver\Http\Request;
+use Beaver\Http\Response;
+use Beaver\Plugins\FrankeiTrial\Support\TrialLimits;
+
+class TrialTestController
+{
+    public function list(Request $req): Response
+    {
+        if (!$this->autenticado()) {
+            return Response::json(['ok' => false, 'error' => 'Não autenticado'], 401);
+        }
+
+        $root = $this->projectRoot();
+        $all  = [];
+        $porSuite = [];
+
+        foreach (TrialLimits::allowedSuites() as $suite) {
+            $dir = $root . '/tests/' . $suite;
+            $files = is_dir($dir) ? (glob($dir . '/*Test.php') ?: []) : [];
+            sort($files);
+            $porSuite[$suite] = count($files);
+
+            foreach ($files as $f) {
+                $name = basename($f, '.php');
+                $all[] = [
+                    'name'  => $name,
+                    'suite' => $suite,
+                    'class' => 'Tests\\' . $suite . '\\' . $name,
+                    'path'  => 'tests/' . $suite . '/' . basename($f),
+                    'size'  => filesize($f) ?: 0,
+                    'mtime' => date('c', filemtime($f) ?: time()),
+                ];
+            }
+        }
+
+        $total = count($all);
+        $limit = TrialLimits::maxTests();
+        $shown = ($limit === PHP_INT_MAX) ? $all : array_slice($all, 0, $limit);
+
+        return Response::json([
+            'ok'        => true,
+            'plan'      => TrialLimits::plan(),
+            'total'     => $total,
+            'shown'     => count($shown),
+            'limit'     => $limit === PHP_INT_MAX ? null : $limit,
+            'truncated' => $total > $limit,
+            'tests'     => $shown,
+            'suites'    => TrialLimits::allowedSuites(),
+            'por_suite' => $porSuite,
+        ]);
+    }
+
+    public function run(Request $req): Response
+    {
+        if (!$this->autenticado()) {
+            return Response::json(['ok' => false, 'error' => 'Não autenticado'], 401);
+        }
+
+        $body   = $req->body ?? [];
+        $suite  = (string) ($body['suite']  ?? 'all');
+        $engine = (string) ($body['engine'] ?? 'pest');
+
+        if (!in_array($engine, ['pest', 'phpunit'], true)) {
+            $engine = 'pest';
+        }
+
+        $cmd = 'beaver test --engine=' . $engine;
+        if ($suite !== 'all' && in_array($suite, TrialLimits::allowedSuites(), true)) {
+            $cmd .= ' --testsuite=' . $suite;
+        }
+
+        $result = $this->executar($cmd);
+        if ($result === null) {
+            return Response::json([
+                'ok'    => false,
+                'error' => 'Terminal indisponível.',
+            ], 503);
+        }
+
+        $output    = (string) ($result['output'] ?? '');
+        $allLines  = explode("\n", $output);
+        $maxLines  = max(200, TrialLimits::maxFindings() * 8);
+        $truncated = count($allLines) > $maxLines;
+        $lines     = $truncated ? array_slice($allLines, 0, $maxLines) : $allLines;
+
+        return Response::json([
+            'ok'          => (bool) ($result['ok'] ?? false),
+            'plan'        => TrialLimits::plan(),
+            'suite'       => $suite,
+            'engine'      => $engine,
+            'command'     => $cmd,
+            'elapsed_ms'  => (int) ($result['elapsed_ms'] ?? 0),
+            'exit_code'   => (int) ($result['exit_code'] ?? -1),
+            'lines'       => $lines,
+            'truncated'   => $truncated,
+            'total_lines' => count($allLines),
+            'error'       => $result['error'] ?? null,
+        ]);
+    }
+
+
+    /**
+     * GET /api/frankei-trial/tests/classes?page=1&perPage=25
+     * Lê o junit.xml e agrega por classe.
+     */
+    public function classes(Request $req): Response
+    {
+        if (!$this->autenticado()) {
+            return Response::json(['ok' => false, 'error' => 'Não autenticado'], 401);
+        }
+
+        $userId = $this->userId();
+        $root   = $this->projectRoot();
+        $file   = $root . '/storage/frankei-reports/' . $userId . '/current/junit.xml';
+
+        if (!is_file($file)) {
+            return Response::json([
+                'ok'      => true,
+                'total'   => 0,
+                'page'    => 1,
+                'perPage' => 25,
+                'pages'   => 0,
+                'classes' => [],
+                'message' => 'Sem resultados. Corre os testes primeiro.',
+            ]);
+        }
+
+        $xml = @simplexml_load_file($file);
+        if ($xml === false) {
+            return Response::json(['ok' => false, 'error' => 'junit.xml inválido'], 500);
+        }
+
+        // Agregar por className
+        $porClasse = [];
+
+        // Percorrer recursivamente
+        $walk = function ($suites, $suitePai) use (&$walk, &$porClasse) {
+            foreach ($suites as $suite) {
+                $name = (string) ($suite['name'] ?? '');
+                $temFilhos = isset($suite->testsuite) && count($suite->testsuite) > 0;
+                $temTests  = isset($suite->testcase)  && count($suite->testcase) > 0;
+
+                if ($temFilhos) {
+                    $walk($suite->testsuite, $name ?: $suitePai);
+                    continue;
+                }
+                if (!$temTests) continue;
+
+                // Esta é uma classe de teste
+                $className = $name;
+                if (!isset($porClasse[$className])) {
+                    $porClasse[$className] = [
+                        'classname'  => $className,
+                        'shortname'  => self::calcShortName($className),
+                        'suite'      => $suitePai ?: 'Unit',
+                        'tests'      => 0,
+                        'assertions' => 0,
+                        'failures'   => 0,
+                        'errors'     => 0,
+                        'skipped'    => 0,
+                        'time'       => 0.0,
+                        'testcases'  => [],
+                    ];
+                }
+
+                foreach ($suite->testcase as $tc) {
+                    $tcName  = (string) ($tc['name'] ?? '');
+                    $tcTime  = (float) ($tc['time'] ?? 0);
+                    $tcAssrt = (int) ($tc['assertions'] ?? 0);
+                    $isSkip  = isset($tc->skipped);
+                    $isFail  = isset($tc->failure);
+                    $isError = isset($tc->error);
+
+                    $status = 'pass';
+                    if ($isFail)       $status = 'fail';
+                    elseif ($isError)  $status = 'error';
+                    elseif ($isSkip)   $status = 'skip';
+
+                    $porClasse[$className]['tests']++;
+                    $porClasse[$className]['assertions'] += $tcAssrt;
+                    $porClasse[$className]['time']       += $tcTime;
+                    if ($isFail)  $porClasse[$className]['failures']++;
+                    if ($isError) $porClasse[$className]['errors']++;
+                    if ($isSkip)  $porClasse[$className]['skipped']++;
+
+                    $porClasse[$className]['testcases'][] = [
+                        'name'       => $tcName,
+                        'status'     => $status,
+                        'time'       => $tcTime,
+                        'assertions' => $tcAssrt,
+                        'file'       => (string) ($tc['file'] ?? ''),
+                    ];
+                }
+            }
+        };
+
+        $walk($xml->testsuite, '');
+
+        // Determinar status final
+        foreach ($porClasse as &$c) {
+            if ($c['failures'] > 0 || $c['errors'] > 0) $c['status'] = 'failed';
+            elseif ($c['skipped'] === $c['tests'])       $c['status'] = 'skipped';
+            elseif ($c['skipped'] > 0)                    $c['status'] = 'partial';
+            else                                          $c['status'] = 'passed';
+        }
+        unset($c);
+
+        // Ordenar por nome
+        $classes = array_values($porClasse);
+        usort($classes, function ($a, $b) {
+            return strcmp($a['classname'], $b['classname']);
+        });
+
+        // Paginação
+        $page    = max(1, (int) ($req->query['page']    ?? 1));
+        $perPage = max(5, min(100, (int) ($req->query['perPage'] ?? 25)));
+        $total   = count($classes);
+        $pages   = $total > 0 ? (int) ceil($total / $perPage) : 0;
+        $offset  = ($page - 1) * $perPage;
+        $slice   = array_slice($classes, $offset, $perPage);
+
+        return Response::json([
+            'ok'      => true,
+            'total'   => $total,
+            'page'    => $page,
+            'perPage' => $perPage,
+            'pages'   => $pages,
+            'classes' => $slice,
+        ]);
+    }
+
+
+    /**
+     * POST /api/frankei-trial/tests/run-class
+     * Corre apenas uma classe específica (via --filter).
+     */
+    public function runClass(Request $req): Response
+    {
+        if (!$this->autenticado()) {
+            return Response::json(['ok' => false, 'error' => 'Não autenticado'], 401);
+        }
+
+        $body   = $req->body ?? [];
+        $class  = trim((string) ($body['class']  ?? ''));
+        $engine = (string) ($body['engine'] ?? 'pest');
+
+        if ($class === '') {
+            return Response::json(['ok' => false, 'error' => 'class obrigatória'], 422);
+        }
+
+        // Sanitizar: só letras, números, \ e _
+        if (!preg_match('/^[A-Za-z0-9_\\\\]+$/', $class)) {
+            return Response::json(['ok' => false, 'error' => 'class inválida'], 422);
+        }
+
+        if (!in_array($engine, ['pest', 'phpunit'], true)) {
+            $engine = 'pest';
+        }
+
+        $cmd = 'beaver test --engine=' . $engine . ' --filter=' . escapeshellarg($class);
+
+        $result = $this->executar($cmd);
+        if ($result === null) {
+            return Response::json([
+                'ok'    => false,
+                'error' => 'Terminal indisponível.',
+            ], 503);
+        }
+
+        $output    = (string) ($result['output'] ?? '');
+        $allLines  = explode("\n", $output);
+        $maxLines  = max(200, TrialLimits::maxFindings() * 8);
+        $truncated = count($allLines) > $maxLines;
+        $lines     = $truncated ? array_slice($allLines, 0, $maxLines) : $allLines;
+
+        return Response::json([
+            'ok'          => (bool) ($result['ok'] ?? false),
+            'class'       => $class,
+            'engine'      => $engine,
+            'command'     => $cmd,
+            'elapsed_ms'  => (int) ($result['elapsed_ms'] ?? 0),
+            'exit_code'   => (int) ($result['exit_code'] ?? -1),
+            'lines'       => $lines,
+            'truncated'   => $truncated,
+            'total_lines' => count($allLines),
+            'error'       => $result['error'] ?? null,
+        ]);
+    }
+
+    private static function calcShortName(string $fqcn): string
+    {
+        // FQCN completo: "Tests\\Unit\\ForumControllerTest"
+        // Precisa de calcular o último segmento após o backslash
+        $ns = strrpos($fqcn, '\\');
+        if ($ns === false) {
+            return $fqcn;  // sem namespace
+        }
+        return substr($fqcn, $ns + 1);
+    }
+
+
+    /**
+     * POST /api/frankei-trial/tests/convert
+     * Converte um teste Pest <-> PHPUnit.
+     * Devolve o código convertido SEM gravar (o user revê no editor).
+     */
+    public function convert(Request $req): Response
+    {
+        if (!$this->autenticado()) {
+            return Response::json(['ok' => false, 'error' => 'Não autenticado'], 401);
+        }
+
+        $body    = $req->body ?? [];
+        $class   = trim((string) ($body['class']  ?? ''));
+        $toEngine = (string) ($body['engine'] ?? 'phpunit');
+
+        if ($class === '') {
+            return Response::json(['ok' => false, 'error' => 'class obrigatória'], 422);
+        }
+        if (!in_array($toEngine, ['pest', 'phpunit'], true)) {
+            return Response::json(['ok' => false, 'error' => 'engine inválido'], 422);
+        }
+
+        // 1. Encontrar ficheiro
+        $file = $this->findTestFile($class);
+        if (!$file) {
+            return Response::json(['ok' => false, 'error' => 'Ficheiro do teste não encontrado'], 404);
+        }
+
+        $code = (string) file_get_contents($file);
+        if ($code === '') {
+            return Response::json(['ok' => false, 'error' => 'Ficheiro vazio'], 422);
+        }
+
+        // 2. Detectar engine de origem
+        $fromEngine = $this->detectEngine($code);
+        if ($fromEngine === null) {
+            return Response::json([
+                'ok'     => false,
+                'error'  => 'Não consegui detectar o motor do teste actual',
+            ], 422);
+        }
+
+        if ($fromEngine === $toEngine) {
+            return Response::json([
+                'ok'      => true,
+                'code'    => $code,
+                'from'    => $fromEngine,
+                'to'      => $toEngine,
+                'warnings' => ['O teste já está em ' . strtoupper($toEngine) . '. Nada a converter.'],
+            ]);
+        }
+
+        // 3. Converter
+        if ($fromEngine === 'pest' && $toEngine === 'phpunit') {
+            $result = $this->convertPestToPhpunit($code, $class);
+        } else {
+            $result = $this->convertPhpunitToPest($code);
+        }
+
+        return Response::json([
+            'ok'       => true,
+            'code'     => $result['code'],
+            'from'     => $fromEngine,
+            'to'       => $toEngine,
+            'warnings' => $result['warnings'],
+            'class'    => $class,
+        ]);
+    }
+
+    /* ────────────────────────────────────────────────────────────
+     HELPERS DE CONVERSÃO
+     ──────────────────────────────────────────────────────────── */
+
+    private function findTestFile(string $classname): ?string
+    {
+        $root = $this->projectRoot();
+
+        // Tentar caminho directo: tests/Unit/{Classe}.php
+        $short = substr($classname, strrpos($classname, '\\') !== false
+            ? strrpos($classname, '\\') + 1
+            : 0);
+
+        $candidatos = [
+            $root . '/tests/Unit/' . $short . '.php',
+            $root . '/tests/Feature/' . $short . '.php',
+            $root . '/tests/' . $short . '.php',
+        ];
+
+        foreach ($candidatos as $c) {
+            if (is_file($c)) return $c;
+        }
+
+        // Busca recursiva
+        try {
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root . '/tests', \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $f) {
+                if ($f->getExtension() !== 'php') continue;
+                if ($f->getBasename('.php') === $short) return $f->getPathname();
+            }
+        } catch (\Throwable $e) {}
+
+        return null;
+    }
+
+    private function detectEngine(string $code): ?string
+    {
+        if (preg_match('/use\s+function\s+Pest/i', $code) ||
+            preg_match('/^\s*it\s*\(/m', $code) ||
+            preg_match('/^\s*test\s*\(/m', $code) ||
+            preg_match('/\bexpect\s*\(/', $code)) {
+            return 'pest';
+        }
+        if (preg_match('/extends\s+[\w\\\\]*TestCase\b/i', $code) ||
+            preg_match('/public\s+function\s+test[A-Z_]/i', $code) ||
+            preg_match('/\$this->assert[A-Z]/', $code)) {
+            return 'phpunit';
+        }
+        return null;
+    }
+
+    /**
+     * Extrai o bloco { ... } a partir da posição de uma chaveta de abertura.
+     * Devolve [conteudo, posicao_final_da_chaveta_de_fecho] ou [null, -1].
+     */
+    private function extractBlock(string $code, int $start): array
+    {
+        if ($start < 0 || $start >= strlen($code) || $code[$start] !== '{') {
+            return [null, -1];
+        }
+        $depth = 0;
+        $i = $start;
+        $len = strlen($code);
+        $inString = false;
+        $stringChar = '';
+        while ($i < $len) {
+            $ch = $code[$i];
+            // Ignorar strings (simplificado)
+            if (!$inString && ($ch === "'" || $ch === '"')) {
+                $inString = true;
+                $stringChar = $ch;
+            } elseif ($inString && $ch === $stringChar && $code[$i-1] !== '\\') {
+                $inString = false;
+            }
+            if (!$inString) {
+                if ($ch === '{') $depth++;
+                elseif ($ch === '}') {
+                    $depth--;
+                    if ($depth === 0) {
+                        return [substr($code, $start + 1, $i - $start - 1), $i];
+                    }
+                }
+            }
+            $i++;
+        }
+        return [null, -1];
+    }
+
+    /** Extrai as asserções Pest → PHPUnit dentro de um bloco de código */
+    private function convertAssertionsPestToPhpunit(string $body, array &$warnings): string
+    {
+        $map = [
+            '/expect\(\s*([^;]+?)\s*\)->toBeTrue\(\)/'      => '$this->assertTrue($1)',
+            '/expect\(\s*([^;]+?)\s*\)->toBeFalse\(\)/'     => '$this->assertFalse($1)',
+            '/expect\(\s*([^;]+?)\s*\)->toBeNull\(\)/'      => '$this->assertNull($1)',
+            '/expect\(\s*([^;]+?)\s*\)->not->toBeNull\(\)/' => '$this->assertNotNull($1)',
+            '/expect\(\s*([^;]+?)\s*\)->toBeEmpty\(\)/'     => '$this->assertEmpty($1)',
+            '/expect\(\s*([^;]+?)\s*\)->not->toBeEmpty\(\)/' => '$this->assertNotEmpty($1)',
+            '/expect\(\s*([^;]+?)\s*\)->toBe\(([^;]+?)\)/'  => '$this->assertSame($2, $1)',
+            '/expect\(\s*([^;]+?)\s*\)->toEqual\(([^;]+?)\)/' => '$this->assertEquals($2, $1)',
+            '/expect\(\s*([^;]+?)\s*\)->toHaveCount\(([^;]+?)\)/' => '$this->assertCount($2, $1)',
+            '/expect\(\s*([^;]+?)\s*\)->toBeInstanceOf\(([^;]+?)\)/' => '$this->assertInstanceOf($2, $1)',
+            '/expect\(\s*([^;]+?)\s*\)->toBeGreaterThan\(([^;]+?)\)/' => '$this->assertGreaterThan($2, $1)',
+            '/expect\(\s*([^;]+?)\s*\)->toBeLessThan\(([^;]+?)\)/' => '$this->assertLessThan($2, $1)',
+            '/expect\(\s*([^;]+?)\s*\)->toContain\(([^;]+?)\)/' => '$this->assertContains($2, $1)',
+            '/expect\(\s*([^;]+?)\s*\)->toHaveKey\(([^;]+?)\)/' => '$this->assertArrayHasKey($2, $1)',
+        ];
+
+        $resultado = $body;
+        $convertidas = 0;
+        foreach ($map as $pat => $rep) {
+            $count = 0;
+            $resultado = preg_replace($pat, $rep, $resultado, -1, $count);
+            $convertidas += $count;
+        }
+
+        // Contar quantas expect() sobraram
+        $sobraram = preg_match_all('/\bexpect\s*\(/', $resultado);
+        if ($sobraram > 0) {
+            $warnings[] = $sobraram . ' chamada(s) expect() não convertida(s) (padrão complexo)';
+        }
+
+        return $resultado;
+    }
+
+    /** Pest → PHPUnit */
+    private function convertPestToPhpunit(string $code, string $classname): array
+    {
+        $warnings = [];
+        $tests = [];
+
+        // Encontrar it()/test() { ... }
+        $offset = 0;
+        while (preg_match(
+            '/\b(it|test)\s*\(\s*([\'"])(.*?)\2\s*,\s*function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?\{/s',
+            $code,
+            $m,
+            PREG_OFFSET_CAPTURE,
+            $offset
+        )) {
+            $matchStr = $m[0][0];
+            $matchPos = $m[0][1];
+            $testName = $m[3][0];
+
+            // Posição da chaveta de abertura no código original
+            $bracePos = $matchPos + strlen($matchStr) - 1;
+
+            [$body, $endBracePos] = $this->extractBlock($code, $bracePos);
+            if ($body === null) {
+                $warnings[] = 'Bloco de "' . $testName . '" não fechou correctamente';
+                $offset = $bracePos + 1;
+                continue;
+            }
+
+            // Converter asserções
+            $bodyConv = $this->convertAssertionsPestToPhpunit($body, $warnings);
+
+            // Nome do método
+            $metodo = 'test_' . preg_replace('/[^a-z0-9]+/i', '_', $testName);
+            $metodo = strtolower(trim($metodo, '_'));
+
+            $tests[] = "    public function {$metodo}(): void\n    {\n" . $this->indent($bodyConv, 8) . "\n    }";
+
+            $offset = $endBracePos + 1;
+        }
+
+        if (empty($tests)) {
+            $warnings[] = 'Nenhum teste it()/test() encontrado';
+            return ['code' => $code, 'warnings' => $warnings];
+        }
+
+        // Nome da classe final
+        $shortClass = substr($classname, strrpos($classname, '\\') !== false
+            ? strrpos($classname, '\\') + 1
+            : 0);
+        if ($shortClass === '') $shortClass = 'ConvertedTest';
+
+        $bodyClasses = implode("\n\n", $tests);
+
+        $out = "<?php\n\ndeclare(strict_types=1);\n\n";
+        $out .= "namespace Tests\\Unit;\n\n";
+        $out .= "use Tests\\TestCase;\n\n";
+        $out .= "class {$shortClass} extends TestCase\n{\n";
+        $out .= $bodyClasses . "\n";
+        $out .= "}\n";
+
+        return ['code' => $out, 'warnings' => $warnings];
+    }
+
+    /** PHPUnit → Pest */
+    private function convertPhpunitToPest(string $code): array
+    {
+        $warnings = [];
+        $tests = [];
+
+        // Encontrar public function test_xxx(): void { ... }
+        $offset = 0;
+        while (preg_match(
+            '/public\s+function\s+(test[A-Z_]\w*)\s*\([^)]*\)\s*(?::\s*[^{]+)?\{/s',
+            $code,
+            $m,
+            PREG_OFFSET_CAPTURE,
+            $offset
+        )) {
+            $matchStr = $m[0][0];
+            $matchPos = $m[0][1];
+            $methodName = $m[1][0];
+
+            $bracePos = $matchPos + strlen($matchStr) - 1;
+            [$body, $endBracePos] = $this->extractBlock($code, $bracePos);
+            if ($body === null) {
+                $warnings[] = 'Método ' . $methodName . ' não fechou correctamente';
+                $offset = $bracePos + 1;
+                continue;
+            }
+
+            $bodyConv = $this->convertAssertionsPhpunitToPest($body, $warnings);
+
+            // test_soma_corretamente → "soma corretamente"
+            $humanName = preg_replace('/^test_?/', '', $methodName);
+            $humanName = str_replace('_', ' ', $humanName);
+
+            $tests[] = "it('" . addslashes($humanName) . "', function () {\n" . $this->indent($bodyConv, 4) . "\n});";
+
+            $offset = $endBracePos + 1;
+        }
+
+        if (empty($tests)) {
+            $warnings[] = 'Nenhum método test*() encontrado';
+            return ['code' => $code, 'warnings' => $warnings];
+        }
+
+        $out = "<?php\n\n";
+        $out .= implode("\n\n", $tests) . "\n";
+
+        return ['code' => $out, 'warnings' => $warnings];
+    }
+
+    /** Converte asserções PHPUnit → Pest */
+    private function convertAssertionsPhpunitToPest(string $body, array &$warnings): string
+    {
+        $map = [
+            '/\$this->assertTrue\(\s*([^;]+?)\s*\)/'      => 'expect($1)->toBeTrue()',
+            '/\$this->assertFalse\(\s*([^;]+?)\s*\)/'     => 'expect($1)->toBeFalse()',
+            '/\$this->assertNull\(\s*([^;]+?)\s*\)/'      => 'expect($1)->toBeNull()',
+            '/\$this->assertNotNull\(\s*([^;]+?)\s*\)/'   => 'expect($1)->not->toBeNull()',
+            '/\$this->assertEmpty\(\s*([^;]+?)\s*\)/'     => 'expect($1)->toBeEmpty()',
+            '/\$this->assertNotEmpty\(\s*([^;]+?)\s*\)/'  => 'expect($1)->not->toBeEmpty()',
+            '/\$this->assertSame\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/' => 'expect($2)->toBe($1)',
+            '/\$this->assertEquals\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/' => 'expect($2)->toEqual($1)',
+            '/\$this->assertCount\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/' => 'expect($2)->toHaveCount($1)',
+            '/\$this->assertInstanceOf\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/' => 'expect($2)->toBeInstanceOf($1)',
+        ];
+
+        $resultado = $body;
+        foreach ($map as $pat => $rep) {
+            $resultado = preg_replace($pat, $rep, $resultado);
+        }
+
+        $sobraram = preg_match_all('/\$this->assert[A-Z]/', $resultado);
+        if ($sobraram > 0) {
+            $warnings[] = $sobraram . ' assertion(s) não convertida(s)';
+        }
+
+        return $resultado;
+    }
+
+    private function indent(string $text, int $spaces): string
+    {
+        $pad = str_repeat(' ', $spaces);
+        $linhas = explode("\n", $text);
+        return implode("\n", array_map(function ($l) use ($pad) {
+            return $l === '' ? '' : $pad . $l;
+        }, $linhas));
+    }
+
+    /**
+     * POST /api/frankei-trial/tests/save
+     * Guarda o teste no sítio certo, com backup identificável.
+     * Body: { class, content, from_engine, to_engine }
+     */
+    public function save(Request $req): Response
+    {
+        if (!$this->autenticado()) {
+            return Response::json(['ok' => false, 'error' => 'Não autenticado'], 401);
+        }
+
+        $body       = $req->body ?? [];
+        $class      = trim((string) ($body['class']  ?? ''));
+        $content    = (string) ($body['content'] ?? '');
+        $fromEngine = (string) ($body['from_engine'] ?? '');
+        $toEngine   = (string) ($body['to_engine']   ?? '');
+
+        if ($class === '') {
+            return Response::json(['ok' => false, 'error' => 'class obrigatória'], 422);
+        }
+        if (trim($content) === '') {
+            return Response::json(['ok' => false, 'error' => 'conteúdo vazio'], 422);
+        }
+        if (strpos(ltrim($content), '<?php') !== 0) {
+            return Response::json(['ok' => false, 'error' => 'ficheiro tem de começar por <?php'], 422);
+        }
+
+        // ─── Encontrar ficheiro ───
+        $file = $this->findTestFile($class);
+        if (!$file) {
+            return Response::json(['ok' => false, 'error' => 'Ficheiro não encontrado: ' . $class], 404);
+        }
+
+        $real = realpath($file);
+        $root = $this->projectRoot();
+        if ($real === false || strpos($real, $root . '/tests/') !== 0) {
+            return Response::json(['ok' => false, 'error' => 'Path inválido'], 403);
+        }
+
+        // ─── Backup identificável ───
+        $sufixo = '';
+        if ($fromEngine && $toEngine && $fromEngine !== $toEngine) {
+            $sufixo = '.bak.' . $fromEngine . '-para-' . $toEngine;
+        } else {
+            $sufixo = '.bak';
+        }
+        $bak = $real . $sufixo . '.' . date('Ymd-His') . '.php';
+
+        // ─── Lint ANTES de gravar ───
+        $tmp = tempnam(sys_get_temp_dir(), 'fk-save-');
+        if ($tmp === false || file_put_contents($tmp, $content) === false) {
+            return Response::json(['ok' => false, 'error' => 'Falha ao preparar validação'], 500);
+        }
+        $lintOut = [];
+        $lintCode = 0;
+        @exec('php -l ' . escapeshellarg($tmp) . ' 2>&1', $lintOut, $lintCode);
+        @unlink($tmp);
+
+        if ($lintCode !== 0) {
+            return Response::json([
+                'ok'    => false,
+                'error' => 'Erro de sintaxe — NÃO gravado',
+                'lint'  => trim(implode("\n", $lintOut)),
+            ], 422);
+        }
+
+        // ─── Backup ───
+        if (!@copy($real, $bak)) {
+            return Response::json(['ok' => false, 'error' => 'Falha ao criar backup'], 500);
+        }
+
+        // ─── Gravar ───
+        $bytes = @file_put_contents($real, $content);
+        if ($bytes === false) {
+            // Restaurar backup
+            @copy($bak, $real);
+            return Response::json(['ok' => false, 'error' => 'Falha ao gravar — backup restaurado'], 500);
+        }
+
+        return Response::json([
+            'ok'           => true,
+            'file'         => ltrim(substr($real, strlen($root)), '/'),
+            'backup'       => basename($bak),
+            'bytes'        => $bytes,
+            'mtime'        => date('c'),
+            'from_engine'  => $fromEngine,
+            'to_engine'    => $toEngine,
+        ]);
+    }
+
+    private function autenticado(): bool
+    {
+        try { return \App\Services\UserService::autenticado(); }
+        catch (\Throwable $e) { return false; }
+    }
+
+    private function userId(): int
+    {
+        try { return (int) (\App\Services\UserService::id() ?? 0); }
+        catch (\Throwable $e) { return 0; }
+    }
+
+    private function projectRoot(): string
+    {
+        try {
+            return \Beaver\Foundation\Application::getInstance()->basePath ?? getcwd();
+        } catch (\Throwable $e) {
+            return getcwd();
+        }
+    }
+
+    private function executar(string $command): ?array
+    {
+        $class = '\\Beaver\\Plugins\\Frankei\\Frankei\\Terminal\\TerminalRunner';
+
+        if (!class_exists($class)) {
+            $file = $this->projectRoot() . '/plugins/frankei/src/Frankei/Terminal/TerminalRunner.php';
+            if (is_file($file)) require_once $file;
+        }
+
+        if (!class_exists($class)) return null;
+
+        try {
+            $runner = new $class($this->projectRoot());
+            return $runner->run($command);
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false, 'output' => '', 'exit_code' => -1, 'elapsed_ms' => 0,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "name": "Translations",
+    "slug": "translations",
+    "version": "0.1.0",
+    "author": "Onidesk",
+    "description": "Tradução multi-idioma — pt, es, en, fr, de, it com dropdown e persistência via cookie.",
+    "namespace": "Beaver\\Plugins\\Translations",
+    "main": "src/TranslationsPlugin.php",
+    "beaver_version": ">=0.1.0",
+    "requires": { "php": ">=8.1" },
+    "routes": "routes/web.php",
+    "enabled": true
+}

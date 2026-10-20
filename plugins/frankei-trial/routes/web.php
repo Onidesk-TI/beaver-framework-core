@@ -1,0 +1,205 @@
+<?php
+
+/**
+ * Rotas do plugin Frankei Trial.
+ */
+
+use Beaver\Plugins\FrankeiTrial\Http\TrialController;
+use Beaver\Plugins\FrankeiTrial\Http\TrialTestController;
+use Beaver\Plugins\FrankeiTrial\Http\TrialReportController;
+use Beaver\Plugins\FrankeiTrial\Http\TrialAiController;
+
+// Página principal
+$router->get('/frankei-trial', function ($req) {
+    return (new TrialController())->index($req);
+});
+
+// ── Página de planos ──
+$router->get('/frankei-trial/prices', function ($req) {
+    return (new TrialController())->prices($req);
+});
+
+// Health
+$router->get('/api/frankei-trial/health', function ($req) {
+    return (new TrialController())->health($req);
+});
+
+// ── Testes Unit (Fase 2A) ──
+$router->get('/api/frankei-trial/tests/list', function ($req) {
+    return (new TrialTestController())->list($req);
+});
+$router->post('/api/frankei-trial/tests/run', function ($req) {
+    return (new TrialTestController())->run($req);
+});
+
+// ═══════════════════════════════════════════════════════
+//  Assets (CSS / JS)
+// ═══════════════════════════════════════════════════════
+$router->get('/plugins/frankei-trial/css/{file}', function ($req, $file) use ($plugin) {
+    return fk_trial_serve_asset($plugin, 'css', (string) $file);
+});
+$router->get('/plugins/frankei-trial/js/{file}', function ($req, $file) use ($plugin) {
+    return fk_trial_serve_asset($plugin, 'js', (string) $file);
+});
+
+if (!function_exists('fk_trial_serve_asset')) {
+    function fk_trial_serve_asset($plugin, string $folder, string $file): \Beaver\Http\Response
+    {
+        if (
+            !preg_match('/^[A-Za-z0-9_-]+$/', $folder) ||
+            !preg_match('/^[A-Za-z0-9_.-]+$/', $file)
+        ) {
+            return \Beaver\Http\Response::text('Forbidden', 403);
+        }
+
+        $path = $plugin->path . '/resources/ui/' . $folder . '/' . $file;
+        if (!is_file($path)) {
+            return \Beaver\Http\Response::text('Not found: ' . $folder . '/' . $file, 404);
+        }
+
+        $ext  = pathinfo($path, PATHINFO_EXTENSION);
+        $mime = match ($ext) {
+            'css'   => 'text/css; charset=utf-8',
+            'js'    => 'application/javascript; charset=utf-8',
+            'svg'   => 'image/svg+xml',
+            'png'   => 'image/png',
+            default => 'application/octet-stream',
+        };
+
+        return (new \Beaver\Http\Response(file_get_contents($path)))
+            ->withHeader('Content-Type', $mime)
+            ->withHeader('Cache-Control', 'public, max-age=300');
+    }
+}
+
+// ── Report Beaver (Fase 3D) ──
+$router->post('/api/frankei-trial/report/beaver', function ($req) {
+    return (new TrialReportController())->generate($req);
+});
+$router->get('/api/frankei-trial/report/beaver/view', function ($req) {
+    return (new TrialReportController())->view($req);
+});
+
+// ── Lista de classes (Fase 4C) ──
+$router->get('/api/frankei-trial/tests/classes', function ($req) {
+    return (new TrialTestController())->classes($req);
+});
+
+// ── Correr classe específica (Fase 4D) ──
+$router->post('/api/frankei-trial/tests/run-class', function ($req) {
+    return (new TrialTestController())->runClass($req);
+});
+
+$router->post('/api/frankei-trial/tests/run-editor', function ($req) {
+    return (new TrialTestController())->runEditor($req);
+});
+
+// ── Conversão de testes (Fase 4E) ──
+$router->post('/api/frankei-trial/tests/convert', function ($req) {
+    return (new TrialTestController())->convert($req);
+});
+
+// ── Guardar teste com backup identificável ──
+$router->post('/api/frankei-trial/tests/save', function ($req) {
+    return (new TrialTestController())->save($req);
+});
+
+$router->post('/api/frankei-trial/tests/save-llm', function ($req) {
+    return (new TrialTestController())->saveLlm($req);
+});
+
+$router->post('/api/frankei-trial/tests/compare', function ($req) {
+    return (new TrialTestController())->compare($req);
+});
+
+// ── Undo da conversão (restaura backup) ──
+$router->post('/api/frankei-trial/tests/undo-conversion', function ($req) {
+    return (new TrialTestController())->undoConversion($req);
+});
+
+// ── Criar teste novo ──
+$router->post('/api/frankei-trial/tests/php-check', function ($req) {
+    return (new TrialTestController())->phpCheck($req);
+});
+
+$router->post('/api/frankei-trial/tests/create', function ($req) {
+    return (new TrialTestController())->create($req);
+});
+
+// ── Config do plugin (limites, etc.) ──
+$router->get('/api/frankei-trial/tests/config', function ($req) {
+    return (new TrialTestController())->config($req);
+});
+
+// ── Ficheiros de teste existentes para o mesmo target ──
+$router->get('/api/frankei-trial/tests/for-target', function ($req) {
+    return (new TrialTestController())->forTarget($req);
+});
+
+// ── Engines por classe (para filtro na tabela) ──
+$router->get('/api/frankei-trial/tests/engines', function ($req) {
+    return (new TrialTestController())->engines($req);
+});
+
+// -- IA DeepSeek (geracao de testes) --
+$router->get('/api/frankei-trial/ai/status', function ($req) {
+    return (new TrialAiController())->status($req);
+});
+
+$router->post('/api/frankei-trial/ai/suggest-improvements', function ($req) {
+    return (new TrialAiController())->suggestImprovements($req);
+});
+
+$router->post('/api/frankei-trial/ai/generate-test', function ($req) {
+    return (new TrialAiController())->generateTest($req);
+});
+
+// DIAG TEMPORARIO
+$router->get('/api/frankei-trial/ai/diag', function ($req) {
+    try {
+        $root = dirname(__DIR__, 4);
+
+        $ctrlFile = __DIR__ . '/../src/Http/TrialAiController.php';
+
+        // Tentar instanciar o controller
+        $ctrlClass = 'Beaver\\Plugins\\FrankeiTrial\\Http\\TrialAiController';
+        $ctrlOk    = class_exists($ctrlClass);
+        $ctrlObj   = null;
+        $ctrlErr   = null;
+
+        if ($ctrlOk) {
+            try {
+                $ctrlObj = new $ctrlClass();
+            } catch (\Throwable $e) {
+                $ctrlErr = $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine();
+            }
+        }
+
+        // Tentar chamar o status via reflexao sem injecao
+        $statusOk = $ctrlObj !== null && method_exists($ctrlObj, 'status');
+
+        return \Beaver\Http\Response::json([
+            'ok'         => true,
+            'diag'       => [
+                'class_exists'  => $ctrlOk,
+                'class_file'    => $ctrlFile,
+                'file_exists'   => is_file($ctrlFile),
+                'instantiated'  => $ctrlObj !== null,
+                'instant_err'   => $ctrlErr,
+                'status_method' => $statusOk,
+                'php'           => PHP_VERSION,
+                'curl'          => function_exists('curl_init'),
+                'root'          => $root,
+                'env_exists'    => is_file($root . '/.env'),
+                'env_readable'  => is_readable($root . '/.env'),
+            ],
+        ]);
+    } catch (\Throwable $e) {
+        return \Beaver\Http\Response::json([
+            'ok'    => false,
+            'error' => $e->getMessage(),
+            'file'  => $e->getFile(),
+            'line'  => $e->getLine(),
+        ], 500);
+    }
+});

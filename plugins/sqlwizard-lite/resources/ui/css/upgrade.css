@@ -1,0 +1,522 @@
+/* ═══════════════════════════════════════════════════════
+   UPGRADE — página de planos (claro + dark)
+   ═══════════════════════════════════════════════════════ */
+.upgrade-page {
+    background: linear-gradient(180deg, #FAF6EE 0%, #F4F5F7 100%);
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #2B2F36;
+}
+
+
+/* MAIN */
+.up-main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+}
+
+/* HERO */
+.up-hero {
+    text-align: center;
+    margin-bottom: 40px;
+}
+.up-hero h1 {
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #2B2F36;
+    margin: 0 0 10px;
+    letter-spacing: -0.02em;
+}
+.up-hero p {
+    font-size: 1.02rem;
+    color: #6B5B3E;
+    margin: 0 0 20px;
+}
+.up-trial-banner {
+    display: inline-block;
+    padding: 10px 20px;
+    background: rgba(245, 166, 35, 0.15);
+    border: 1px solid rgba(245, 166, 35, 0.4);
+    border-radius: 999px;
+    font-size: 0.88rem;
+    color: #8A4A00;
+    margin-top: 8px;
+}
+.up-trial-banner-pro {
+    background: rgba(46, 155, 92, 0.12);
+    border-color: rgba(46, 155, 92, 0.4);
+    color: #1E7A48;
+}
+
+/* PLANS GRID */
+.up-plans {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 60px;
+}
+@media (max-width: 900px) {
+    .up-plans { grid-template-columns: 1fr; }
+}
+
+/* PLAN CARD */
+.up-plan {
+    background: #fff;
+    border: 2px solid #E5E0D3;
+    border-radius: 20px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.up-plan:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -20px rgba(20, 15, 5, 0.15);
+}
+.up-plan-featured {
+    border-color: #FF9A3C;
+    box-shadow: 0 20px 50px -20px rgba(224, 120, 0, 0.35);
+    background: linear-gradient(180deg, #FFFDF8, #FFF8EC);
+}
+.up-plan-current {
+    border-color: #2E9B5C;
+    background: linear-gradient(180deg, #F0FDF4, #DCFCE7);
+}
+
+/* RIBBON */
+.up-ribbon {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #FFB86B, #FF9A3C);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 4px 14px;
+    border-radius: 999px;
+    letter-spacing: 0.08em;
+    box-shadow: 0 8px 18px -8px rgba(224, 120, 0, 0.8);
+}
+
+/* PLAN HEADER */
+.up-plan-header {
+    text-align: center;
+}
+.up-plan-icon {
+    display: inline-block;
+    font-size: 2rem;
+    margin-bottom: 8px;
+}
+.up-plan h2 {
+    font-size: 1.4rem;
+    font-weight: 900;
+    margin: 0 0 8px;
+    color: #2B2F36;
+    letter-spacing: -0.01em;
+}
+.up-plan-price {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+}
+.up-price {
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: #2B2F36;
+    letter-spacing: -0.02em;
+}
+.up-plan-featured .up-price { color: #B84500; }
+.up-period {
+    font-size: 0.86rem;
+    color: #8A9099;
+    font-weight: 600;
+}
+
+/* FEATURES */
+.up-features {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+.up-features li {
+    font-size: 0.88rem;
+    color: #2B2F36;
+    padding: 6px 0 6px 24px;
+    position: relative;
+    line-height: 1.4;
+}
+.up-features li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(46, 155, 92, 0.15);
+    display: grid;
+    place-items: center;
+}
+.up-features li.on::before {
+    content: '✓';
+    color: #2E9B5C;
+    font-weight: 900;
+    font-size: 0.7rem;
+    line-height: 16px;
+    text-align: center;
+}
+.up-features li.off {
+    color: #8A9099;
+    text-decoration: line-through;
+}
+.up-features li.off::before {
+    content: '×';
+    color: #D0483A;
+    font-weight: 900;
+    font-size: 0.75rem;
+    background: rgba(208, 72, 58, 0.15);
+    line-height: 16px;
+    text-align: center;
+}
+
+/* FOOTER */
+.up-plan-footer {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid #E5E0D3;
+}
+.up-btn {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 0.92rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.18s;
+    border: 0;
+    letter-spacing: 0.01em;
+}
+.up-btn-primary {
+    background: linear-gradient(150deg, #FFB86B, #FF9A3C 50%, #FF7A1A);
+    color: #fff;
+    box-shadow: 0 8px 20px -8px rgba(224, 120, 0, 0.8);
+}
+.up-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px -8px rgba(224, 120, 0, 0.9);
+}
+.up-btn-current {
+    background: rgba(46, 155, 92, 0.15);
+    color: #1E7A48;
+    border: 1.5px solid rgba(46, 155, 92, 0.4);
+    cursor: default;
+}
+.up-btn-ghost {
+    background: #FAFAFB;
+    color: #8A9099;
+    border: 1.5px solid #E5E0D3;
+    cursor: default;
+}
+
+/* FAQ */
+.up-faq {
+    max-width: 700px;
+    margin: 0 auto;
+}
+.up-faq h3 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    text-align: center;
+    color: #2B2F36;
+    margin: 0 0 20px;
+}
+.up-faq details {
+    background: #fff;
+    border: 1px solid #E5E0D3;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+.up-faq summary {
+    padding: 14px 20px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    cursor: pointer;
+    color: #2B2F36;
+    list-style: none;
+    position: relative;
+    transition: background 0.15s;
+}
+.up-faq summary:hover { background: #FAFAFB; }
+.up-faq summary::-webkit-details-marker { display: none; }
+.up-faq summary::after {
+    content: '+';
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+    color: #FF9A3C;
+    font-weight: 800;
+}
+.up-faq details[open] summary::after { content: '−'; }
+.up-faq details p {
+    padding: 0 20px 16px;
+    margin: 0;
+    color: #6B5B3E;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+.up-faq a {
+    color: #B87800;
+    font-weight: 700;
+}
+
+/* DARK MODE */
+body[data-theme="dark"].upgrade-page,
+body[data-theme="dark"] .upgrade-page {
+    background: linear-gradient(180deg, #0F1419 0%, #1A1D22 100%);
+    color: #E8EEF6;
+}
+body[data-theme="dark"] .up-header {
+    background: rgba(26, 29, 34, 0.85);
+    border-bottom-color: #2B2F36;
+}
+body[data-theme="dark"] .up-back { color: #B8BDC4; }
+body[data-theme="dark"] .up-back:hover { color: #FF9A3C; }
+body[data-theme="dark"] .up-user { color: #E8EEF6; }
+body[data-theme="dark"] .up-hero h1 { color: #E8EEF6; }
+body[data-theme="dark"] .up-hero p { color: #B8BDC4; }
+body[data-theme="dark"] .up-trial-banner {
+    background: rgba(255, 154, 60, 0.15);
+    border-color: rgba(255, 154, 60, 0.4);
+    color: #FFD79A;
+}
+body[data-theme="dark"] .up-plan {
+    background: #1A1D22;
+    border-color: #2B2F36;
+}
+body[data-theme="dark"] .up-plan:hover {
+    box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.6);
+}
+body[data-theme="dark"] .up-plan-featured {
+    background: linear-gradient(180deg, #1A1D22, #2B2518);
+    border-color: #FF9A3C;
+}
+body[data-theme="dark"] .up-plan-current {
+    background: linear-gradient(180deg, #1A1D22, #1A2E20);
+    border-color: #2E9B5C;
+}
+body[data-theme="dark"] .up-plan h2 { color: #E8EEF6; }
+body[data-theme="dark"] .up-price { color: #E8EEF6; }
+body[data-theme="dark"] .up-plan-featured .up-price { color: #FFD79A; }
+body[data-theme="dark"] .up-period { color: #8A9099; }
+body[data-theme="dark"] .up-features li { color: #B8BDC4; }
+body[data-theme="dark"] .up-features li.off { color: #6B7078; }
+body[data-theme="dark"] .up-plan-footer { border-top-color: #2B2F36; }
+body[data-theme="dark"] .up-btn-ghost {
+    background: #2B2F36;
+    color: #8A9099;
+    border-color: #3F444B;
+}
+body[data-theme="dark"] .up-faq h3 { color: #E8EEF6; }
+body[data-theme="dark"] .up-faq details {
+    background: #1A1D22;
+    border-color: #2B2F36;
+}
+body[data-theme="dark"] .up-faq summary { color: #E8EEF6; }
+body[data-theme="dark"] .up-faq summary:hover { background: #2B2F36; }
+body[data-theme="dark"] .up-faq details p { color: #B8BDC4; }
+body[data-theme="dark"] .up-faq a { color: #FFD79A; }
+
+
+/* ═══════════════════════════════════════════════════════
+   NOVO LAYOUT — header + footer partilhados
+   ═══════════════════════════════════════════════════════ */
+
+/* O body deixa de ter o padding do antigo header */
+body.upgrade-page {
+    padding-top: 0;
+}
+
+/* Botão "← Voltar ao canvas" — flutuante no canto */
+.up-back-floating {
+    position: fixed;
+    top: 84px;
+    left: 24px;
+    z-index: 50;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1.5px solid #E5E0D3;
+    color: #6B5B3E;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-decoration: none;
+    box-shadow: 0 6px 20px -8px rgba(20, 15, 5, 0.15);
+    transition: all 0.18s;
+}
+.up-back-floating:hover {
+    border-color: #FF9A3C;
+    color: #B84500;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px -10px rgba(224, 120, 0, 0.35);
+}
+
+/* Ajustar o main para não colidir com o header fixo */
+.up-main {
+    padding-top: 100px; /* header partilhado ~70px + margem */
+}
+
+/* ═══ FOOTER PARTILHADO (beaver-footer) ═══ */
+.beaver-footer {
+    margin-top: 80px;
+    padding: 40px 24px 20px;
+    background: linear-gradient(180deg, transparent, #F4F5F7);
+    border-top: 1px solid #E4E6EA;
+    color: #5F656D;
+    font-size: 0.88rem;
+}
+.beaver-footer-inner {
+    max-width: 1100px;
+    margin: 0 auto 32px;
+    display: grid;
+    grid-template-columns: 1.4fr 2fr;
+    gap: 60px;
+}
+@media (max-width: 900px) {
+    .beaver-footer-inner { grid-template-columns: 1fr; gap: 32px; }
+}
+.beaver-footer-logo {
+    display: inline-block;
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: #2B2F36;
+    text-decoration: none;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+}
+.beaver-footer-logo .accent { color: #E07800; }
+.beaver-footer-tagline {
+    color: #5F656D;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 0;
+    max-width: 300px;
+}
+.beaver-footer-links {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
+@media (max-width: 700px) {
+    .beaver-footer-links { grid-template-columns: repeat(2, 1fr); }
+}
+.beaver-footer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.beaver-footer-col strong {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #7A3F00;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+}
+.beaver-footer-col a {
+    color: #5F656D;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: color 0.15s;
+}
+.beaver-footer-col a:hover {
+    color: #E07800;
+}
+.beaver-footer-bottom {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding-top: 20px;
+    border-top: 1px solid #E4E6EA;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #8A9099;
+    letter-spacing: 0.02em;
+}
+.beaver-footer-bottom .accent { color: #E07800; }
+
+/* Dark mode */
+body[data-theme="dark"] .up-back-floating {
+    background: #1A1D22;
+    border-color: #2B2F36;
+    color: #B8BDC4;
+}
+body[data-theme="dark"] .up-back-floating:hover {
+    border-color: #FF9A3C;
+    color: #FFD79A;
+}
+body[data-theme="dark"] .beaver-footer {
+    background: linear-gradient(180deg, transparent, #0F1419);
+    border-top-color: #2B2F36;
+    color: #B8BDC4;
+}
+body[data-theme="dark"] .beaver-footer-logo { color: #E8EEF6; }
+body[data-theme="dark"] .beaver-footer-tagline { color: #8A9099; }
+body[data-theme="dark"] .beaver-footer-col strong { color: #FFD79A; }
+body[data-theme="dark"] .beaver-footer-col a { color: #B8BDC4; }
+body[data-theme="dark"] .beaver-footer-col a:hover { color: #FF9A3C; }
+body[data-theme="dark"] .beaver-footer-bottom {
+    border-top-color: #2B2F36;
+    color: #8A9099;
+}
+
+/* Esconder o .up-header antigo (já não usado) */
+.up-header { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════
+   FIX: forçar scroll na página de upgrade
+   (o canvas.css tem overflow:hidden para o canvas,
+    mas a página de upgrade precisa de scroll)
+   ═══════════════════════════════════════════════════════ */
+
+html:has(body.upgrade-page) {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+body.upgrade-page {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+/* Garantir que o footer aparece sempre */
+body.upgrade-page .beaver-footer {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 1 !important;
+}

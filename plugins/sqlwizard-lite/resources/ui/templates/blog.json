@@ -1,0 +1,212 @@
+{
+  "name": "Blog",
+  "icon": "📝",
+  "description": "Users, posts, comments, tags",
+  "tables": [
+    {
+      "id": "t_users",
+      "name": "users",
+      "x": 60,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "password",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_posts",
+      "name": "posts",
+      "x": 420,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "body",
+          "type": "TEXT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "published_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_comments",
+      "name": "comments",
+      "x": 780,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "post_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "body",
+          "type": "TEXT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_tags",
+      "name": "tags",
+      "x": 420,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "VARCHAR(100)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "t_post_tags",
+      "name": "post_tags",
+      "x": 780,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "post_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "tag_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "t_posts",
+      "to": "t_users",
+      "card": "n:1"
+    },
+    {
+      "from": "t_comments",
+      "to": "t_posts",
+      "card": "n:1"
+    },
+    {
+      "from": "t_comments",
+      "to": "t_users",
+      "card": "n:1"
+    },
+    {
+      "from": "t_post_tags",
+      "to": "t_posts",
+      "card": "n:1"
+    },
+    {
+      "from": "t_post_tags",
+      "to": "t_tags",
+      "card": "n:1"
+    }
+  ]
+}

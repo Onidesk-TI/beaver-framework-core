@@ -1,0 +1,243 @@
+/* Frankei Trial — UI logic */
+(function () {
+  'use strict';
+
+  var state = {
+    plan: 'trial',
+    total: 0,
+    shown: 0,
+    limit: null,
+    tests: [],
+    suites: [],
+    porSuite: {},
+    engine: 'pest',
+    suite: 'all',
+    running: false,
+  };
+
+  var $list      = document.getElementById('fkTrialList');
+  var $btnRun    = document.getElementById('fkTrialRun');
+  var $terminal  = document.getElementById('fkTrialTerminal');
+  var $counter   = document.getElementById('fkTrialCounter');
+  var $ballNum   = document.getElementById('fkTrialBallNum');
+  var $ballHint  = document.getElementById('fkTrialBallHint');
+  var $cardCounter = document.getElementById('fkTrialCardCounter');
+  var $engineSel = document.getElementById('fkTrialEngine');
+  var $suiteSel  = document.getElementById('fkTrialSuite');
+  var $status    = document.getElementById('fkTrialStatus');
+  var $btnReport = document.getElementById('fkTrialReport');
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function t(key) {
+    return (window.FrankeiI18n && window.FrankeiI18n.t) ? window.FrankeiI18n.t(key) : key;
+  }
+
+  function setStatus(msg, cls) {
+    if (!$status) return;
+    $status.textContent = msg || '';
+    $status.className = 'fk-trial-term-status' + (cls ? ' ' + cls : '');
+  }
+
+  function setRunning(on) {
+    state.running = on;
+    if (!$btnRun) return;
+    $btnRun.disabled = on;
+    if (on) {
+      $btnRun.dataset.orig = $btnRun.innerHTML;
+      $btnRun.innerHTML = '<span class="fk-trial-spinner"></span> RUN';
+      setStatus(t('A correr...'), 'run');
+    } else if ($btnRun.dataset.orig) {
+      $btnRun.innerHTML = $btnRun.dataset.orig;
+    }
+  }
+
+  function renderList(data) {
+    state.plan     = data.plan;
+    state.total    = data.total;
+    state.shown    = data.shown;
+    state.limit    = data.limit;
+    state.tests    = data.tests || [];
+    state.suites   = data.suites || ['Unit'];
+    state.porSuite = data.por_suite || {};
+
+    // Popular suite selector
+    if ($suiteSel && $suiteSel.options.length <= 1) {
+      $suiteSel.innerHTML = '<option value="all">' + esc(t('Todas')) + '</option>';
+      state.suites.forEach(function (s) {
+        var opt = document.createElement('option');
+        opt.value = s;
+        var count = state.porSuite[s] || 0;
+        opt.textContent = s + ' (' + count + ')';
+        $suiteSel.appendChild(opt);
+      });
+    }
+
+    // Ball
+    if ($ballNum)  $ballNum.textContent = state.total;
+    if ($ballHint) {
+      $ballHint.textContent = state.limit === null
+        ? t('Testes disponíveis')
+        : t('Testes disponíveis') + ' / máx ' + state.limit;
+    }
+
+    if ($counter) {
+      $counter.textContent = state.limit === null
+        ? state.total + ' ' + t('testes')
+        : state.total + ' ' + t('testes') + ' · máx ' + state.limit;
+    }
+
+    if ($cardCounter) {
+      $cardCounter.textContent = state.shown + ' / ' + state.total;
+    }
+
+    if (!$list) return;
+
+    if (state.tests.length === 0) {
+      $list.innerHTML = '<div class="fk-trial-empty">' +
+        '<div class="fk-trial-empty-icon">🧪</div>' +
+        '<p>' + esc(t('Sem testes Unit.')) + '</p>' +
+      '</div>';
+      return;
+    }
+
+    $list.innerHTML = '<div class="fk-trial-test-list">' +
+      state.tests.map(function (t) {
+        var kb = Math.round((t.size || 0) / 1024 * 10) / 10;
+        var suiteTag = '<span style="font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;margin-right:6px">' +
+          esc(t.suite || 'Unit') + '</span>';
+        return '<div class="fk-trial-test">' +
+          '<div>' +
+            '<div class="fk-trial-test-name">' + suiteTag + esc(t.name) + '</div>' +
+            '<div class="fk-trial-test-meta">' + kb + ' KB</div>' +
+          '</div>' +
+          '<div class="fk-trial-test-check">✓</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  function loadList() {
+    if (!$list) return;
+    setStatus(t('A carregar testes...'), '');
+    $list.innerHTML = '<div class="fk-trial-empty">' +
+      '<span class="fk-trial-spinner"></span> ' + esc(t('A carregar testes...')) +
+    '</div>';
+
+    fetch('/api/frankei-trial/tests/list', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          $list.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+            esc(d.error || 'Erro') + '</div>';
+          return;
+        }
+        renderList(d);
+        setStatus('✓ ' + d.total + ' ' + t('testes') + ' prontos', 'ok');
+      })
+      .catch(function (e) {
+        $list.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+          'Erro: ' + esc(e.message) + '</div>';
+        setStatus('✗ Erro', 'err');
+      });
+  }
+
+  function runTests() {
+    if (state.running) return;
+    setRunning(true);
+
+    state.engine = $engineSel ? $engineSel.value : 'pest';
+    state.suite  = $suiteSel  ? $suiteSel.value  : 'all';
+
+    if ($terminal) {
+      $terminal.textContent = '→ beaver test --engine=' + state.engine +
+        (state.suite !== 'all' ? ' --testsuite=' + state.suite : '') + '\n\n';
+    }
+
+    fetch('/api/frankei-trial/tests/run', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suite: state.suite, engine: state.engine })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        // Atualizar status no header
+        setStatus(
+          (d.ok ? '✓ Sucesso' : '✗ Falha') + ' · ' + d.elapsed_ms + 'ms',
+          d.ok ? 'ok' : 'err'
+        );
+
+        if (!$terminal) return;
+        var head = '═══ ' + (d.ok ? '✓ Sucesso' : '✗ Falha') + ' ═══\n' +
+                   'Suite:  ' + (d.suite || 'all') + '  |  Engine: ' + (d.engine || '?') + '\n' +
+                   'Tempo:  ' + d.elapsed_ms + 'ms  |  Exit: ' + d.exit_code + '\n' +
+                   (d.truncated ? 'Output truncado\n' : '') +
+                   '─────────────────────────────\n\n';
+        $terminal.textContent = head + (d.lines || []).join('\n');
+      })
+      .catch(function (e) {
+        setStatus('✗ Erro', 'err');
+        if ($terminal) $terminal.textContent = '✗ Erro: ' + (e.message || e) + '\n';
+      })
+      .finally(function () { setRunning(false); });
+  }
+
+
+  function gerarReport() {
+    if (!$btnReport) return;
+    var orig = $btnReport.innerHTML;
+    $btnReport.disabled = true;
+    $btnReport.innerHTML = '<span class="fk-spinner-inline"></span> A gerar...';
+    setStatus(t('A gerar report...'), 'run');
+
+    fetch('/api/frankei-trial/report/beaver', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          setStatus('✗ ' + (d.error || 'Erro'), 'err');
+          return;
+        }
+        // Abrir em nova aba
+        window.open(d.url + '?t=' + Date.now(), '_blank');
+        setStatus('✓ Report aberto', 'ok');
+      })
+      .catch(function (e) {
+        setStatus('✗ ' + (e.message || 'Erro'), 'err');
+      })
+      .finally(function () {
+        $btnReport.disabled = false;
+        $btnReport.innerHTML = orig;
+      });
+  }
+
+  if ($btnReport) $btnReport.addEventListener('click', gerarReport);
+
+  if ($btnRun) $btnRun.addEventListener('click', runTests);
+
+  // Re-render ao mudar idioma
+  window.addEventListener('frankei:lang', function () {
+    renderList({
+      plan: state.plan, total: state.total, shown: state.shown,
+      limit: state.limit, tests: state.tests, suites: state.suites,
+      por_suite: state.porSuite,
+    });
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadList);
+  } else {
+    loadList();
+  }
+})();

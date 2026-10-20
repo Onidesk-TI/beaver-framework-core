@@ -1,0 +1,900 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\Frankei\Http;
+
+use Beaver\Http\Request;
+use Beaver\Http\Response;
+use Beaver\Auth\Auth;
+use Beaver\Foundation\Application;
+use Beaver\Plugins\Frankei\Frankei\Terminal\TerminalRunner;
+use Beaver\Plugins\Frankei\Frankei\Terminal\ReportRunner;
+use Beaver\Plugins\Frankei\Frankei\Terminal\BeaverReportGenerator;
+use Beaver\Plugins\Frankei\Support\CoverageReportInjector;
+
+class TerminalController
+{
+    private TerminalRunner $runner;
+
+    public function __construct()
+    {
+        $root = Application::getInstance()->basePath ?? getcwd();
+        $this->runner = new TerminalRunner($root);
+    }
+
+    /**
+     * POST /api/frankei/terminal/exec
+     * Body: { command: "beaver test" }
+     */
+    public function exec(Request $request): Response
+    {
+        // 1. Auth
+        //    - Em produção: exige admin
+        //    - Em dev/test: permite (para curl/testes)
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production';
+
+        if ($env === 'production') {
+            if (!\App\Services\UserService::autenticado()) {
+                return Response::json(['error' => 'Não autenticado'], 401);
+            }
+            $user = \App\Services\UserService::atual();
+            $role = $user['role'] ?? 'user';
+            if ($role !== 'admin') {
+                return Response::json(['error' => 'Acesso restrito a admin'], 403);
+            }
+        }
+
+        // 2. Body
+        $body    = $request->body ?? [];
+        $command = trim((string) ($body['command'] ?? ''));
+
+        if ($command === '') {
+            return Response::json(['error' => 'Comando vazio'], 422);
+        }
+
+        // 3. Executar
+        $result = $this->runner->run($command);
+
+        return Response::json($result);
+    }
+
+    /**
+     * GET /api/frankei/terminal/metadata
+     * Devolve whitelist para autocomplete
+     */
+    public function metadata(): Response
+    {
+        $meta = TerminalRunner::metadata();
+
+        // Detetar motor de testes (Pest tem prioridade)
+        $root    = Application::getInstance()->basePath ?? getcwd();
+        $hasPest = is_file($root . '/vendor/bin/pest');
+        $hasUnit = is_file($root . '/vendor/bin/phpunit');
+
+        $engine = 'none';
+        if ($hasPest)      $engine = 'pest';
+        elseif ($hasUnit)  $engine = 'phpunit';
+
+        $meta['test_engine'] = [
+            'current'   => $engine,
+            'available' => [
+                'pest'    => $hasPest,
+                'phpunit' => $hasUnit,
+            ],
+        ];
+
+        return Response::json($meta);
+    }
+
+    /**
+     * POST /api/frankei/terminal/report
+     * Body: { types: ["junit","coverage"], engine: "pest|phpunit|auto" }
+     */
+    public function report(Request $request): Response
+    {
+        // Auth
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production';
+
+        if ($env === 'production' && !Auth::check()) {
+            return Response::json(['error' => 'Não autenticado'], 401);
+        }
+
+        $userId = (int) (Auth::id() ?? 0);
+        $plan   = 'free';
+
+        if ($userId > 0) {
+            $user = Auth::user();
+            $plan = is_object($user) ? ($user->plan ?? 'free') : 'free';
+        }
+
+        $body  = $request->body ?? [];
+        $types = (array) ($body['types']  ?? ['junit', 'coverage']);
+        $engine = (string) ($body['engine'] ?? 'auto');
+
+        try {
+            $result = (new ReportRunner())->generate($userId, (string) $plan, $types, $engine);
+        } catch (\Throwable $e) {
+            return Response::json(['error' => $e->getMessage()], 500);
+        }
+
+        return Response::json($result);
+    }
+
+    /**
+     * GET /api/frankei/terminal/report/download?file=current/junit.xml
+     */
+    public function downloadReport(Request $request): Response
+    {
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production';
+
+        if ($env === 'production' && !Auth::check()) {
+            return Response::json(['error' => 'Não autenticado'], 401);
+        }
+
+        $userId = (int) (Auth::id() ?? 0);
+        $file   = (string) ($request->query['file'] ?? '');
+
+        if ($file === '') {
+            return Response::json(['error' => 'file obrigatório'], 422);
+        }
+
+        $path = (new ReportRunner())->resolveFile($userId, $file);
+        if ($path === null) {
+            return Response::json(['error' => 'Ficheiro não encontrado'], 404);
+        }
+
+        $content = @file_get_contents($path);
+        if ($content === false) {
+            return Response::json(['error' => 'Falha ao ler ficheiro'], 500);
+        }
+
+        $ext  = pathinfo($path, PATHINFO_EXTENSION);
+        $mime = match (strtolower($ext)) {
+            'html', 'htm' => 'text/html; charset=utf-8',
+            'xml'         => 'application/xml; charset=utf-8',
+            'json'        => 'application/json; charset=utf-8',
+            'txt'         => 'text/plain; charset=utf-8',
+            'css'         => 'text/css; charset=utf-8',
+            'js'          => 'application/javascript; charset=utf-8',
+            'svg'         => 'image/svg+xml',
+            default       => 'application/octet-stream',
+        };
+
+        $filename = basename($path);
+
+        return Response::text($content)
+            ->withHeader('Content-Type', $mime)
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"');
+    }
+
+    /**
+     * GET /api/frankei/terminal/report/zip?dir=current
+     * Gera ZIP com tudo dentro da pasta.
+     */
+    public function downloadZip(Request $request): Response
+    {
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production';
+
+        if ($env === 'production' && !Auth::check()) {
+            return Response::json(['error' => 'Não autenticado'], 401);
+        }
+
+        if (!class_exists('ZipArchive')) {
+            return Response::json(['error' => 'Extensão zip não disponível'], 500);
+        }
+
+        $userId = (int) (Auth::id() ?? 0);
+        $subdir = (string) ($request->query['dir'] ?? 'current');
+
+        // Sanitizar
+        $subdir = preg_replace('#[^A-Za-z0-9_\-]#', '', $subdir);
+        if ($subdir === '') $subdir = 'current';
+
+        $root     = Application::getInstance()->basePath ?? getcwd();
+        $baseDir  = $root . '/storage/frankei-reports/' . $userId . '/' . $subdir;
+
+        if (!is_dir($baseDir)) {
+            return Response::json(['error' => 'Pasta não encontrada'], 404);
+        }
+
+        // Criar ZIP temporário
+        $tmpZip = tempnam(sys_get_temp_dir(), 'frankei-report-') . '.zip';
+        $zip    = new \ZipArchive();
+
+        if ($zip->open($tmpZip, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            return Response::json(['error' => 'Falha a criar ZIP'], 500);
+        }
+
+        $baseLen = strlen($baseDir) + 1;
+
+        $it = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($baseDir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ($it as $f) {
+            if (!$f->isFile()) continue;
+            $rel = substr($f->getPathname(), $baseLen);
+            $zip->addFile($f->getPathname(), $rel);
+        }
+
+        $zip->close();
+
+        $content = @file_get_contents($tmpZip);
+        @unlink($tmpZip);
+
+        if ($content === false) {
+            return Response::json(['error' => 'Falha a ler ZIP'], 500);
+        }
+
+        $filename = 'frankei-report-' . $userId . '-' . $subdir . '.zip';
+
+        return Response::text($content)
+            ->withHeader('Content-Type', 'application/zip')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"');
+    }
+
+    /**
+     * GET /api/frankei/terminal/report/asset?file=coverage/_css/style.css
+     * Serve ficheiros do report SEM Content-Disposition (renderiza inline).
+     */
+    public function serveAsset(Request $request): Response
+    {
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production';
+
+        if ($env === 'production' && !Auth::check()) {
+            return Response::json(['error' => 'Não autenticado'], 401);
+        }
+
+        $userId = (int) (Auth::id() ?? 0);
+        $file   = (string) ($request->query['file'] ?? '');
+
+        if ($file === '') {
+            return Response::json(['error' => 'file obrigatório'], 422);
+        }
+
+        $path = (new ReportRunner())->resolveFile($userId, $file);
+        if ($path === null) {
+            return Response::text('Not found', 404);
+        }
+
+        $content = @file_get_contents($path);
+        if ($content === false) {
+            return Response::text('Read error', 500);
+        }
+
+        $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'html', 'htm' => 'text/html; charset=utf-8',
+            'xml'         => 'application/xml; charset=utf-8',
+            'json'        => 'application/json; charset=utf-8',
+            'txt'         => 'text/plain; charset=utf-8',
+            'css'         => 'text/css; charset=utf-8',
+            'js'          => 'application/javascript; charset=utf-8',
+            'svg'         => 'image/svg+xml',
+            'png'         => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif'         => 'image/gif',
+            'ico'         => 'image/x-icon',
+            'woff'        => 'font/woff',
+            'woff2'       => 'font/woff2',
+            'ttf'         => 'font/ttf',
+            default       => 'application/octet-stream',
+        };
+
+        // --- Reescrita de paths relativos no HTML ---
+        if ($ext === 'html' || $ext === 'htm') {
+            $baseDir = dirname($file);
+
+            $content = preg_replace_callback(
+                '/(href|src)=(["\'])(?!https?:|\/\/|data:|#|mailto:|javascript:|asset\?)([^"\']+)\2/i',
+                function ($m) use ($baseDir) {
+                    $rel = ltrim($m[3], '/');
+
+                    $qs = '';
+                    if (($p = strpos($rel, '?')) !== false) {
+                        $qs  = substr($rel, $p);
+                        $rel = substr($rel, 0, $p);
+                    }
+
+                    if ($rel === '') {
+                        return $m[0];
+                    }
+
+                    $target = ($baseDir && $baseDir !== '.' ? $baseDir . '/' : '') . $rel;
+
+                    return $m[1] . '=' . $m[2]
+                        . 'asset?file=' . rawurlencode($target) . $qs
+                        . $m[2];
+                },
+                $content
+            );
+        }
+
+        // --- Response crua, sem escape ---
+        $response = new Response($content);
+        $response = $response->withHeader('Content-Type', $mime);
+        $response = $response->withHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+
+        return $response;
+    }
+
+    /**
+     * GET /api/frankei/terminal/report/preview?file=current/coverage/index.html
+     * Devolve o HTML do coverage com CSS inline (self-contained).
+     */
+    public function previewHtml(Request $request): Response
+    {
+
+        try {
+            return $this->previewHtmlInner($request);
+        } catch (\Throwable $e) {
+            error_log('[previewHtml] ERRO: ' . $e->getMessage());
+            error_log('[previewHtml] FILE: ' . $e->getFile() . ':' . $e->getLine());
+            error_log('[previewHtml] TRACE: ' . $e->getTraceAsString());
+            return Response::text('ERRO: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine(), 500);
+        }
+    }
+
+    private function previewHtmlInner(Request $request): Response
+    {
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production';
+
+        if ($env === 'production' && !Auth::check()) {
+            return Response::json(['error' => 'Não autenticado'], 401);
+        }
+
+        $userId = (int) (Auth::id() ?? 0);
+        $file   = (string) ($request->query['file'] ?? '');
+
+        if ($file === '') {
+            return Response::json(['error' => 'file obrigatório'], 422);
+        }
+
+        $path = (new ReportRunner())->resolveFile($userId, $file);
+        if ($path === null || !is_file($path)) {
+            return Response::text('Not found', 404);
+        }
+
+        $html = (string) file_get_contents($path);
+        // Se for imagem/CSS/JS, servir diretamente com MIME correto (sem processar HTML)
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'css', 'js', 'woff', 'woff2', 'ttf', 'eot'], true)) {
+            $mime = match ($ext) {
+                'svg'         => 'image/svg+xml',
+                'png'         => 'image/png',
+                'jpg', 'jpeg' => 'image/jpeg',
+                'gif'         => 'image/gif',
+                'ico'         => 'image/x-icon',
+                'webp'        => 'image/webp',
+                'css'         => 'text/css; charset=utf-8',
+                'js'          => 'application/javascript; charset=utf-8',
+                'woff'        => 'font/woff',
+                'woff2'       => 'font/woff2',
+                'ttf'         => 'font/ttf',
+                'eot'         => 'application/vnd.ms-fontobject',
+                default       => 'application/octet-stream',
+            };
+
+            return (new Response((string) file_get_contents($path)))
+                ->withHeader('Content-Type', $mime)
+                ->withHeader('Cache-Control', 'public, max-age=3600');
+        }
+
+        $html = (string) file_get_contents($path);
+
+        // Encontrar a raiz do coverage
+
+        // Encontrar a raiz do coverage (a pasta que contém _css/)
+        // Necessário porque as classes estão em subpastas (app/Controllers/...)
+        $dir = dirname($path);
+        while ($dir !== '/' && $dir !== '' && !is_dir($dir . '/_css')) {
+            $parent = dirname($dir);
+            if ($parent === $dir) break;
+            $dir = $parent;
+        }
+
+        // Inlinar os CSS conhecidos do PHPUnit coverage
+        $cssFiles = [
+            '_css/bootstrap.min.css',
+            '_css/billboard.min.css',
+            '_css/octicons.css',
+            '_css/style.css',
+            '_css/custom.css',
+        ];
+
+        $cssInline = '';
+        foreach ($cssFiles as $cssRel) {
+            $cssPath = $dir . '/' . $cssRel;
+            $existe = is_file($cssPath) ? 'SIM' : 'NAO';
+            if (is_file($cssPath)) {
+                $cssInline .= "\n/* === {$cssRel} === */\n" . file_get_contents($cssPath) . "\n";
+            }
+        }
+
+        // Remover <link> para CSS local (vão ser inlined)
+        $html = preg_replace(
+            '#<link[^>]*href\s*=\s*["\'][^"\']*_css/[^"\']+["\'][^>]*>#i',
+            '',
+            $html
+        );
+
+        // Injetar CSS antes de </head> (str_replace para evitar backreferences)
+        if ($cssInline !== '') {
+            $html = str_replace(
+                '</head>',
+                '<style>' . $cssInline . '</style></head>',
+                $html
+            );
+        }
+
+        // Encontrar a raiz do coverage (a pasta que contém _css/)
+        $coverageRoot = dirname($path);
+        while ($coverageRoot !== '/' && $coverageRoot !== '' && !is_dir($coverageRoot . '/_css')) {
+            $parent = dirname($coverageRoot);
+            if ($parent === $coverageRoot) break;
+            $coverageRoot = $parent;
+        }
+
+        $currentDir = dirname($path);
+
+        $html = preg_replace_callback(
+            '/(href|src)\s*=\s*(["\'])([^"\']+?)\2/i',
+            function ($m) use ($currentDir, $coverageRoot) {
+                $attr = $m[1] ?? '';
+                $q    = $m[2] ?? '"';
+                $val  = isset($m[3]) ? (string) $m[3] : '';
+
+                if ($val === '') {
+                    return $m[0] ?? '';
+                }
+
+                if (preg_match('/^(https?:|\/\/|\#|data:|mailto:|javascript:|\/api\/)/i', $val)) {
+                    return $m[0];
+                }
+
+                // Separar anchor (#8)
+                $anchor = '';
+                if (($h = strpos($val, '#')) !== false) {
+                    $anchor = substr($val, $h);
+                    $val    = substr($val, 0, $h);
+                }
+
+                // Separar query string
+                $qs = '';
+                if (($p = strpos($val, '?')) !== false) {
+                    $qs  = substr($val, $p);
+                    $val = substr($val, 0, $p);
+                }
+
+                if ($val === '') {
+                    return $m[0];
+                }
+
+                // Resolver o path absoluto real (resolve ".." e ".")
+                $targetAbs = realpath($currentDir . '/' . $val);
+
+                if ($targetAbs === false || !str_starts_with($targetAbs, $coverageRoot)) {
+                    return $m[0];
+                }
+
+                $relToCoverage = ltrim(substr($targetAbs, strlen($coverageRoot)), '/');
+                $target = 'current/coverage/' . $relToCoverage;
+
+                return $attr . '=' . $q
+                    . '/api/frankei/terminal/report/preview?file=' . rawurlencode($target) . $anchor
+                    . $q;
+            },
+            $html
+        ) ?? $html;
+
+        // === Frankei Coverage Redesign: injetar CSS/JS ===
+        $html = \Beaver\Plugins\Frankei\Support\CoverageReportInjector::inject($html);
+
+        return (new Response($html))->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function coverageInline(Request $request): Response
+    {
+        $userId = (int) (Auth::id() ?? 0);
+        $file   = (string) ($request->query['file'] ?? 'current/coverage/dashboard.html');
+
+        $path = (new ReportRunner())->resolveFile($userId, $file);
+        if ($path === null) {
+            return Response::text('Not found', 404);
+        }
+
+        $html = file_get_contents($path);
+        $baseDir = dirname($path);
+
+        // 1. Inline CSS
+        $html = preg_replace_callback(
+            '/<link[^>]+href=["\']([^"\']+\.css)(?:\?[^"\']*)?["\'][^>]*>/i',
+            function ($m) use ($baseDir) {
+                $rel = $m[1];
+                // Remover prefixo se for path já reescrito
+                if (str_starts_with($rel, 'asset?file=')) {
+                    $rel = rawurldecode(substr($rel, 11));
+                }
+                $full = $baseDir . '/' . ltrim($rel, '/');
+                if (is_file($full)) {
+                    return '<style>' . file_get_contents($full) . '</style>';
+                }
+                return $m[0];
+            },
+            $html
+        );
+
+        // 2. Inline JS
+        $html = preg_replace_callback(
+            '/<script[^>]+src=["\']([^"\']+\.js)(?:\?[^"\']*)?["\'][^>]*><\/script>/i',
+            function ($m) use ($baseDir) {
+                $rel = $m[1];
+                if (str_starts_with($rel, 'asset?file=')) {
+                    $rel = rawurldecode(substr($rel, 11));
+                }
+                $full = $baseDir . '/' . ltrim($rel, '/');
+                if (is_file($full)) {
+                    return '<script>' . file_get_contents($full) . '</script>';
+                }
+                return $m[0];
+            },
+            $html
+        );
+
+        // 3. Reescrever links .html internos para a rota preview
+        //    Normaliza paths com ".." via realpath() — evita URLs com /../../
+        $coverageRoot = $baseDir;
+        while ($coverageRoot !== '/' && $coverageRoot !== '' && !is_dir($coverageRoot . '/_css')) {
+            $parent = dirname($coverageRoot);
+            if ($parent === $coverageRoot) break;
+            $coverageRoot = $parent;
+        }
+
+        $html = preg_replace_callback(
+            '/(href|src)=(["\'])(?!https?:|\/\/|data:|#|mailto:|javascript:|\/api\/)([^"\']+)\2/i',
+            function ($m) use ($baseDir, $coverageRoot) {
+                $rel = ltrim($m[3], '/');
+
+                // Separar anchor (#8)
+                $anchor = '';
+                if (($h = strpos($rel, '#')) !== false) {
+                    $anchor = substr($rel, $h);
+                    $rel    = substr($rel, 0, $h);
+                }
+
+                // Separar query string
+                $qs = '';
+                if (($p = strpos($rel, '?')) !== false) {
+                    $qs  = substr($rel, $p);
+                    $rel = substr($rel, 0, $p);
+                }
+
+                if ($rel === '') {
+                    return $m[0];
+                }
+
+                $base = basename($rel);
+
+                // Só reescrever .html/.htm (os CSS/JS já foram inlinados)
+                if (!str_ends_with($base, '.html') && !str_ends_with($base, '.htm')) {
+                    return $m[0];
+                }
+
+                // --- Resolver o path real: elimina "..", "." e normaliza ---
+                $targetAbs = realpath($baseDir . '/' . $rel);
+
+                if ($targetAbs === false || !str_starts_with($targetAbs, $coverageRoot)) {
+                    // path inválido ou fora do coverage — não reescrever
+                    return $m[0];
+                }
+
+                // Extrair relativo ao coverage root
+                $relToCoverage = ltrim(substr($targetAbs, strlen($coverageRoot)), '/');
+                $relPath = 'current/coverage/' . $relToCoverage;
+
+                return $m[1] . '=' . $m[2]
+                    . '/api/frankei/terminal/report/preview?file=' . rawurlencode($relPath) . $anchor
+                    . $m[2];
+            },
+            $html
+        ) ?? $html;
+
+        // === Frankei Coverage Redesign: injetar CSS/JS ===
+        $html = \Beaver\Plugins\Frankei\Support\CoverageReportInjector::inject($html);
+
+        return (new Response($html))
+            ->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    /**
+     * Gera (com cache) um ficheiro PHP self-contained com o dashboard embutido.
+     * Retorna o caminho do ficheiro .php gerado, ou null em caso de erro.
+     *
+     * Uso na view:
+     *   $f = (new TerminalController())->buildInlineDashboard('current/coverage/dashboard.html');
+     *   if ($f && is_file($f)) { include $f; }
+     */
+    public function buildInlineDashboard(string $file = 'current/coverage/dashboard.html'): ?string
+    {
+        $userId = (int) (Auth::id() ?? 0);
+
+        $path = (new ReportRunner())->resolveFile($userId, $file);
+        if ($path === null) {
+            return null;
+        }
+
+        // Pasta de cache
+        $cacheDir = dirname(__DIR__, 4) . '/storage/frankei-inline';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0755, true);
+        }
+
+        // Cache key: path + mtime do HTML
+        $hash    = md5($path . '|' . filemtime($path));
+        $outFile = $cacheDir . '/dashboard-' . $hash . '.php';
+
+        if (is_file($outFile)) {
+            return $outFile;
+        }
+
+        // Ler HTML
+        $html = @file_get_contents($path);
+        if ($html === false) {
+            return null;
+        }
+
+        $absBase = dirname($path);
+
+        // --- Inline CSS ---
+        $html = preg_replace_callback(
+            '/<link[^>]*href=(["\'])([^"\']+\.css)(?:\?[^"\']*)?\1[^>]*>/i',
+            function ($m) use ($absBase) {
+                $rel  = $m[2];
+                $base = basename($rel);
+                $f    = $absBase . '/_css/' . $base;
+                if (is_file($f)) {
+                    return '<style>' . file_get_contents($f) . '</style>';
+                }
+                return $m[0];
+            },
+            $html
+        );
+
+        // --- Inline JS ---
+        $html = preg_replace_callback(
+            '/<script[^>]*src=(["\'])([^"\']+\.js)(?:\?[^"\']*)?\1[^>]*>\s*<\/script>/i',
+            function ($m) use ($absBase) {
+                $rel  = $m[2];
+                $base = basename($rel);
+                $f    = $absBase . '/_js/' . $base;
+                if (is_file($f)) {
+                    return '<script>' . file_get_contents($f) . '</script>';
+                }
+                return $m[0];
+            },
+            $html
+        );
+
+        // --- Reescrever links internos (.html) para a rota preview ---
+        $html = preg_replace_callback(
+            '/(href|src)=(["\'])(?!https?:|\/\/|data:|#|mailto:|javascript:)([^"\']+)\2/i',
+            function ($m) {
+                $rel  = ltrim($m[3], '/');
+                $base = basename($rel);
+                $baseNoAnchor = preg_replace('/#.*$/', '', $base);
+
+                if (str_ends_with($baseNoAnchor, '.html') || str_ends_with($baseNoAnchor, '.htm')) {
+                    $anchor = '';
+                    if (($h = strpos($rel, '#')) !== false) {
+                        $anchor = substr($rel, $h);
+                        $rel    = substr($rel, 0, $h);
+                    }
+                    $relPath = str_starts_with($rel, 'current/coverage/')
+                        ? $rel
+                        : 'current/coverage/' . $rel;
+
+                    return $m[1] . '=' . $m[2]
+                        . '/api/frankei/terminal/report/preview?file=' . rawurlencode($relPath) . $anchor
+                        . $m[2];
+                }
+                return $m[0];
+            },
+            $html
+        );
+
+        // --- Gravar como PHP ---
+        $php = "<?php /* GERADO AUTOMATICAMENTE — NÃO EDITAR */ ?>\n" . $html;
+
+        if (@file_put_contents($outFile, $php) === false) {
+            return null;
+        }
+
+        return $outFile;
+    }
+
+    /**
+     * POST /api/frankei/terminal/report/beaver
+     * Gera o Beaver Test Report (HTML próprio).
+     */
+    public function beaverReport(Request $request): Response
+    {
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production';
+
+        if ($env === 'production' && !Auth::check()) {
+            return Response::json(['error' => 'Não autenticado'], 401);
+        }
+
+        $userId = (int) (Auth::id() ?? 0);
+        $plan   = 'free';
+
+        if ($userId > 0) {
+            $user = Auth::user();
+            $plan = is_object($user) ? ($user->plan ?? 'free') : 'free';
+        }
+
+        try {
+            $gen    = new BeaverReportGenerator();
+            $result = $gen->generate($userId, (string) $plan);
+        } catch (\Throwable $e) {
+            return Response::json(['error' => $e->getMessage()], 500);
+        }
+
+        if (!$result['ok']) {
+            return Response::json($result, 422);
+        }
+
+        return Response::json([
+            'ok'   => true,
+            'path' => $result['path'] ?? null,
+            'url'  => '/api/frankei/terminal/report/beaver/view',
+        ]);
+    }
+
+    /**
+     * GET /api/frankei/terminal/report/beaver/view
+     * Serve o HTML gerado (sem download).
+     */
+    public function beaverReportView(Request $request): Response
+    {
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'production';
+
+        if ($env === 'production' && !Auth::check()) {
+            return Response::json(['error' => 'Não autenticado'], 401);
+        }
+
+        $userId = (int) (Auth::id() ?? 0);
+        $root   = Application::getInstance()->basePath ?? getcwd();
+        $file   = $root . '/storage/frankei-reports/' . $userId . '/current/beaver-test-report.html';
+
+        if (!is_file($file)) {
+            return Response::text('Report não existe. Gera primeiro.', 404);
+        }
+
+        $html = (string) file_get_contents($file);
+        return Response::text($html)->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    /**
+     * GET /api/frankei/terminal/coverage/data
+     *
+     * Lê o clover.xml e devolve JSON estruturado para a vista bonita.
+     */
+    public function coverageData(Request $request): Response
+    {
+        $userId = (int) (Auth::id() ?? 0);
+        $file   = (string) ($request->query['file'] ?? 'current/clover.xml');
+
+        $path = (new ReportRunner())->resolveFile($userId, $file);
+
+        // Se o clover.xml não existe, tentar gerar automaticamente
+        if ($path === null || !is_file($path)) {
+            try {
+                (new ReportRunner())->generate($userId, 'free', ['clover'], 'auto');
+                $path = (new ReportRunner())->resolveFile($userId, $file);
+            } catch (\Throwable $e) {
+                // ignora
+            }
+            if ($path === null || !is_file($path)) {
+                return Response::json(['error' => 'clover.xml não encontrado (tentativa de gerar automaticamente falhou)'], 404);
+            }
+        }
+
+        $xml = @simplexml_load_file($path);
+        if ($xml === false) {
+            return Response::json(['error' => 'XML inválido'], 500);
+        }
+
+        $totals = [
+            'lines'     => ['covered' => 0, 'total' => 0],
+            'functions' => ['covered' => 0, 'total' => 0],
+            'classes'   => ['covered' => 0, 'total' => 0],
+        ];
+
+        $classes = [];
+
+        foreach ($xml->project->package as $package) {
+            $packageName = (string) $package['name'];
+
+            foreach ($package->file as $file) {
+                $fileName  = (string) $file['name'];
+                $shortFile = basename($fileName);
+
+                foreach ($file->class as $class) {
+                    $className = (string) $class['name'];
+                    $namespace = (string) $class['namespace'];
+                    $m = $class->metrics;
+
+                    $stmtTotal  = (int) $m['statements'];
+                    $stmtCov    = (int) $m['coveredstatements'];
+                    $methTotal  = (int) $m['methods'];
+                    $methCov    = (int) $m['coveredmethods'];
+                    $complexity = (int) $m['complexity'];
+
+                    $methods = [];
+                    $maxCrap = 0;
+                    foreach ($file->line as $line) {
+                        if ((string) $line['type'] === 'method') {
+                            $crap = (int) ($line['crap'] ?? 0);
+                            $cnt  = (int) $line['count'];
+                            $methods[] = [
+                                'name'       => (string) $line['name'],
+                                'visibility' => (string) $line['visibility'],
+                                'line'       => (int) $line['num'],
+                                'complexity' => (int) $line['complexity'],
+                                'crap'       => $crap,
+                                'count'      => $cnt,
+                                'covered'    => $cnt > 0,
+                            ];
+                            if ($crap > $maxCrap) $maxCrap = $crap;
+                        }
+                    }
+
+                    $classes[] = [
+                        'name'      => $className,
+                        'shortName' => substr($className, strrpos($className, '\\') + 1),
+                        'namespace' => $namespace,
+                        'package'   => $packageName,
+                        'file'      => $fileName,
+                        'shortFile' => $shortFile,
+                        'lines'     => [
+                            'covered' => $stmtCov,
+                            'total'   => $stmtTotal,
+                            'percent' => $stmtTotal > 0 ? round($stmtCov / $stmtTotal * 100, 2) : 0,
+                        ],
+                        'functions' => [
+                            'covered' => $methCov,
+                            'total'   => $methTotal,
+                            'percent' => $methTotal > 0 ? round($methCov / $methTotal * 100, 2) : 0,
+                        ],
+                        'complexity' => $complexity,
+                        'crap'       => $maxCrap,
+                        'methods'    => $methods,
+                    ];
+
+                    $totals['lines']['covered']     += $stmtCov;
+                    $totals['lines']['total']       += $stmtTotal;
+                    $totals['functions']['covered'] += $methCov;
+                    $totals['functions']['total']   += $methTotal;
+                    $totals['classes']['total']     += 1;
+                    if ($stmtCov > 0) $totals['classes']['covered'] += 1;
+                }
+            }
+        }
+
+        foreach ($totals as $k => &$t) {
+            $t['percent'] = $t['total'] > 0 ? round($t['covered'] / $t['total'] * 100, 2) : 0;
+        }
+        unset($t);
+
+        usort($classes, fn($a, $b) => $a['lines']['percent'] <=> $b['lines']['percent']);
+
+        return Response::json([
+            'ok'        => true,
+            'generated' => (int) $xml['generated'],
+            'totals'    => $totals,
+            'classes'   => $classes,
+        ])->withHeader('Cache-Control', 'no-store');
+    }
+}

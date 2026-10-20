@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial\Http;
+
+use Beaver\Http\Request;
+use Beaver\Http\Response;
+use Beaver\Plugins\FrankeiTrial\Support\TrialLimits;
+
+/**
+ * Testes Unit — versão trial limitada.
+ * Reutiliza o TerminalRunner do plugin Frankei.
+ */
+class TrialTestController
+{
+    public function list(Request $req): Response
+    {
+        if (!$this->autenticado()) {
+            return Response::json(['ok' => false, 'error' => 'Não autenticado'], 401);
+        }
+
+        $root = $this->projectRoot();
+        $dir  = $root . '/tests/Unit';
+
+        $files = is_dir($dir) ? (glob($dir . '/*Test.php') ?: []) : [];
+        sort($files);
+
+        $total = count($files);
+        $limit = TrialLimits::maxTests();
+        $mostrados = ($limit === PHP_INT_MAX) ? $files : array_slice($files, 0, $limit);
+
+        $tests = [];
+        foreach ($mostrados as $f) {
+            $name = basename($f, '.php');
+            $tests[] = [
+                'name'  => $name,
+                'class' => 'Tests\\Unit\\' . $name,
+                'path'  => 'tests/Unit/' . basename($f),
+                'size'  => filesize($f) ?: 0,
+                'mtime' => date('c', filemtime($f) ?: time()),
+            ];
+        }
+
+        return Response::json([
+            'ok'        => true,
+            'plan'      => TrialLimits::plan(),
+            'total'     => $total,
+            'shown'     => count($tests),
+            'limit'     => $limit === PHP_INT_MAX ? null : $limit,
+            'truncated' => $total > $limit,
+            'tests'     => $tests,
+        ]);
+    }
+
+    public function run(Request $req): Response
+    {
+        if (!$this->autenticado()) {
+            return Response::json(['ok' => false, 'error' => 'Não autenticado'], 401);
+        }
+
+        $suite = TrialLimits::allowedSuites()[0] ?? 'Unit';
+        $cmd   = 'beaver test --testsuite=' . $suite;
+
+        $result = $this->executar($cmd);
+        if ($result === null) {
+            return Response::json([
+                'ok'    => false,
+                'error' => 'Terminal indisponível. Verifica se o plugin Frankei está ativo.',
+            ], 503);
+        }
+
+        $output    = (string) ($result['output'] ?? '');
+        $allLines  = explode("\n", $output);
+        $maxLines  = max(200, TrialLimits::maxFindings() * 8);
+        $truncated = count($allLines) > $maxLines;
+        $lines     = $truncated ? array_slice($allLines, 0, $maxLines) : $allLines;
+
+        return Response::json([
+            'ok'          => (bool) ($result['ok'] ?? false),
+            'plan'        => TrialLimits::plan(),
+            'suite'       => $suite,
+            'command'     => $cmd,
+            'elapsed_ms'  => (int) ($result['elapsed_ms'] ?? 0),
+            'exit_code'   => (int) ($result['exit_code'] ?? -1),
+            'lines'       => $lines,
+            'truncated'   => $truncated,
+            'total_lines' => count($allLines),
+            'error'       => $result['error'] ?? null,
+        ]);
+    }
+
+    private function autenticado(): bool
+    {
+        try { return \App\Services\UserService::autenticado(); }
+        catch (\Throwable $e) { return false; }
+    }
+
+    private function projectRoot(): string
+    {
+        try {
+            return \Beaver\Foundation\Application::getInstance()->basePath ?? getcwd();
+        } catch (\Throwable $e) {
+            return getcwd();
+        }
+    }
+
+    private function executar(string $command): ?array
+    {
+        $class = '\\Beaver\\Plugins\\Frankei\\Frankei\\Terminal\\TerminalRunner';
+
+        if (!class_exists($class)) {
+            $file = $this->projectRoot() . '/plugins/frankei/src/Frankei/Terminal/TerminalRunner.php';
+            if (is_file($file)) require_once $file;
+        }
+
+        if (!class_exists($class)) return null;
+
+        try {
+            $runner = new $class($this->projectRoot());
+            return $runner->run($command);
+        } catch (\Throwable $e) {
+            return [
+                'ok'         => false,
+                'output'     => '',
+                'exit_code'  => -1,
+                'elapsed_ms' => 0,
+                'error'      => $e->getMessage(),
+            ];
+        }
+    }
+}

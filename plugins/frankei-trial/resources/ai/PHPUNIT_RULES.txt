@@ -1,0 +1,99 @@
+# Regras PHPUNIT (obrigatorio quando engine=phpunit)
+
+## Anatomia de um ficheiro de teste
+
+    <?php
+    declare(strict_types=1);
+    namespace Tests\Unit;
+
+    use Tests\TestCase;
+    use App\Services\Calc;
+
+    class CalcTest extends TestCase
+    {
+        public function test_soma(): void
+        {
+            $this->assertSame(5, 2 + 3);
+        }
+    }
+
+## PROIBIDO (nada disto num ficheiro PHPUnit do Beaver)
+- `use PHPUnit\Framework\TestCase;` — usar `use Tests\TestCase;`
+- `use Illuminate\...` / `Route::` / `Auth::user()`
+- `use Mockery\...` / `Mockery::mock(...)`
+- `uses(TestCase::class);` (isso e Pest)
+- `it('...', function () { ... });` (isso e Pest)
+
+## Assercoes (usa $this->*, NAO expect())
+`$this->assertSame($esperado, $real)`, `$this->assertEquals`, `$this->assertTrue`,
+`$this->assertFalse`, `$this->assertNull`, `$this->assertNotNull`, `$this->assertEmpty`,
+`$this->assertCount(3, $arr)`, `$this->assertContains('a', $arr)`,
+`$this->assertArrayHasKey('k', $arr)`, `$this->assertInstanceOf(X::class, $obj)`,
+`$this->assertStringContainsString('foo', $str)`, `$this->assertMatchesRegularExpression('/re/', $str)`
+
+Excecao: `$this->expectException(\RuntimeException::class);`
+
+## Stubs / Mocks (PHPUnit nativo)
+
+    $stub = $this->createStub(UserService::class);
+    $stub->method('autenticado')->willReturn(true);
+
+    $mock = $this->createMock(UserService::class);
+    $mock->expects($this->once())
+         ->method('autenticado')
+         ->willReturn(true);
+
+## Exemplo — servico puro (IMITA ESTE FORMATO)
+
+    <?php
+    declare(strict_types=1);
+    namespace Tests\Unit;
+
+    use Tests\TestCase;
+    use App\Services\Calc;
+
+    class CalcTest extends TestCase
+    {
+        public function test_soma_dois_inteiros(): void
+        {
+            $calc = new Calc();
+            $this->assertSame(5, $calc->soma(2, 3));
+        }
+
+        public function test_soma_com_zero(): void
+        {
+            $calc = new Calc();
+            $this->assertSame(0, $calc->soma(0, 0));
+        }
+    }
+
+## Exemplo — controller HTTP (IMITA ESTE FORMATO)
+
+    <?php
+    declare(strict_types=1);
+    namespace Tests\Unit;
+
+    use Tests\TestCase;
+    use App\Controllers\AuthController;
+
+    class AuthControllerTest extends TestCase
+    {
+        public function test_classe_existe(): void
+        {
+            $this->assertTrue(class_exists(AuthController::class));
+        }
+
+        public function test_tem_metodo_login(): void
+        {
+            $this->assertTrue(method_exists(AuthController::class, 'login'));
+        }
+
+        public function test_login_funciona(): void
+        {
+            $this->markTestIncomplete('classe HTTP — requer $_GET/$_POST simulados');
+        }
+    }
+
+## Regra final
+- So UM `<?php`, na primeira linha
+- Cada metodo test_* tem de ter assercoes concretas

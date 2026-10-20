@@ -1,0 +1,275 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial\Http;
+
+use Beaver\Http\Request;
+use Beaver\Http\Response;
+
+/**
+ * TrialAiController
+ * Liga o Frankei Trial a API DeepSeek para gerar testes completos.
+ */
+class TrialAiController
+{
+    public function status(Request $request): Response
+    {
+        $key = $this->envStr('DEEPSEEK_API_KEY');
+
+        return Response::json([
+            'ok'         => true,
+            'configured' => $key !== '',
+            'model'      => $this->envStr('DEEPSEEK_MODEL', 'deepseek-chat'),
+            'endpoint'   => $this->envStr('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/completions'),
+            'message'    => $key === ''
+                ? 'DEEPSEEK_API_KEY nao configurada no .env'
+                : 'Pronto para gerar testes',
+        ]);
+    }
+
+    public function generateTest(Request $request): Response
+    {
+        $body   = $request->body ?? [];
+        $code   = trim((string) ($body['code']   ?? ''));
+        $engine = strtolower((string) ($body['engine'] ?? 'phpunit'));
+        $target = trim((string) ($body['target'] ?? ''));
+        $hints  = trim((string) ($body['hints']  ?? ''));
+
+        if ($code === '') {
+            return Response::json(['ok' => false, 'error' => 'Codigo da classe obrigatorio'], 422);
+        }
+        if (strlen($code) > 30000) {
+            return Response::json(['ok' => false, 'error' => 'Codigo demasiado grande (max 30k)'], 413);
+        }
+        if (!in_array($engine, ['pest', 'phpunit'], true)) {
+            return Response::json(['ok' => false, 'error' => 'engine deve ser pest ou phpunit'], 422);
+        }
+
+        $key = $this->envStr('DEEPSEEK_API_KEY');
+        if ($key === '') {
+            return Response::json([
+                'ok'      => false,
+                'error'   => 'DEEPSEEK_API_KEY nao configurada. Edita o .env',
+                'action'  => 'configure_env',
+                'env_key' => 'DEEPSEEK_API_KEY',
+            ], 412);
+        }
+
+        $model   = $this->envStr('DEEPSEEK_MODEL', 'deepseek-chat');
+        $url     = $this->envStr('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/completions');
+        $timeout = (int) ($this->envStr('DEEPSEEK_TIMEOUT', '60') ?: 60);
+
+        $prompt = $this->buildPrompt($code, $engine, $target, $hints);
+
+        $payload = [
+            'model'       => $model,
+            'messages'    => [
+                ['role' => 'system', 'content' => $this->systemPrompt($engine)],
+                ['role' => 'user',   'content' => $prompt],
+            ],
+            'temperature' => 0.25,
+            'max_tokens'  => 4000,
+            'stream'      => false,
+        ];
+
+        $resp = $this->httpPost($url, $payload, $key, $timeout);
+
+        if (!$resp['ok']) {
+            return Response::json([
+                'ok'    => false,
+                'error' => $resp['error'],
+                'raw'   => $resp['raw'] ?? null,
+            ], 502);
+        }
+
+        $json = $resp['json'] ?? null;
+        if (!is_array($json)) {
+            return Response::json(['ok' => false, 'error' => 'Resposta invalida da API'], 502);
+        }
+
+        $content = (string) ($json['choices'][0]['message']['content'] ?? '');
+        if ($content === '') {
+            return Response::json(['ok' => false, 'error' => 'API nao devolveu conteudo'], 502);
+        }
+
+        [$codeOut, $explanation] = $this->extractCode($content);
+
+        return Response::json([
+            'ok'          => true,
+            'code'        => $codeOut,
+            'raw'         => $content,
+            'explanation' => $explanation,
+            'engine'      => $engine,
+            'target'      => $target,
+            'model'       => $model,
+            'usage'       => $json['usage'] ?? null,
+        ]);
+    }
+
+    private function systemPrompt(string $engine): string
+    {
+        // FK_BEAVER_CONTEXT — injeta o manual do framework
+        $ctx = '';
+        $aiDir = $this->projectRoot() . '/plugins/frankei-trial/resources/ai/';
+        foreach (['BEAVER_FRAMEWORK.txt', 'PHPUNIT_PEST.txt'] as $f) {
+            $file = $aiDir . $f;
+            if (is_file($file)) {
+                $ctx .= "=== " . $f . " ===\n\n"
+                      . file_get_contents($file)
+                      . "\n\n=== FIM " . $f . " ===\n\n";
+            }
+        }
+
+        // FK_BEAVER_CTX_USE — injeta o contexto no inicio do prompt
+        $base = $ctx . "És um engenheiro de software sénior especializado em testes PHP. "
+              . "Devolve SEMPRE apenas um bloco de código ```php ... ``` sem texto antes ou depois. "
+              . "Nunca uses markTestIncomplete, markTestSkipped ou placeholders vazios. "
+              . "Cada teste tem de ter asserções concretas.\n\n";
+
+        if ($engine === 'pest') {
+            return $base
+              . "ESTÁS A GERAR UM FICHEIRO **PEST**. Regras ESTRITAS:\n\n"
+              . "PROIBIDO (não uses estas linhas em Pest):\n"
+              . "  X namespace Tests\\Unit; ou qualquer 'namespace'\n"
+              . "  X class XxxTest extends TestCase\n"
+              . "  X public function test_algo(): void\n"
+              . "  X \$this->assertSame(...) ou \$this->assert*\n"
+              . "  X use PHPUnit\\Framework\\TestCase;\n\n"
+              . "OBRIGATÓRIO (usa exactamente estas estruturas):\n"
+              . "  OK Ficheiro começa por <?php seguido de uses(TestCase::class); (sem namespace)\n"
+              . "  OK Cada teste é it('descrição', function () { ... });\n"
+              . "  OK Asserções usam expect(\$valor)->toBe(...), ->toEqual(...), ->toBeTrue(), etc.\n"
+              . "  OK Imports de classes com use App\\...; (sem namespace)\n\n"
+              . "EXEMPLO DE OUTPUT ESPERADO (imita este estilo):\n"
+              . "<?php\n"
+              . "use Tests\\TestCase;\n"
+              . "use App\\Services\\Calc;\n"
+              . "uses(TestCase::class);\n"
+              . "it('soma dois inteiros', function () {\n"
+              . "    \$calc = new Calc();\n"
+              . "    expect(\$calc->soma(2, 3))->toBe(5);\n"
+              . "});\n";
+        }
+
+        return $base
+          . "ESTÁS A GERAR UM FICHEIRO **PHPUNIT**. Regras ESTRITAS:\n"
+          . "  OK namespace Tests\\Unit;\n"
+          . "  OK use Tests\\TestCase;\n"
+          . "  OK class XxxTest extends TestCase { ... }\n"
+          . "  OK public function test_algo(): void { \$this->assertX(...); }\n"
+          . "PROIBIDO:\n"
+          . "  X it('...', function () { ... });\n"
+          . "  X expect(...)->...\n"
+          . "  X uses(TestCase::class);\n";
+    }
+
+    private function buildPrompt(string $code, string $engine, string $target, string $hints): string
+    {
+        $motor = $engine === 'pest' ? 'Pest' : 'PHPUnit';
+        $p = "Gera um ficheiro de teste completo em {$motor} para a seguinte classe PHP";
+
+        if ($target !== '') $p .= " (FQCN: {$target})";
+        $p .= ":\n\n```php\n{$code}\n```\n";
+
+        $p .= "\nRequisitos:\n";
+        $p .= "- Cobre o comportamento publico da classe.\n";
+        $p .= "- Inclui assercoes concretas (nao assertTrue(true)).\n";
+        $p .= "- Usa exemplos realistas de entrada/saida.\n";
+        $p .= "- Se houver dependencias, cria mocks/stubs apropriados.\n";
+
+        if ($hints !== '') {
+            $p .= "\nInstrucoes adicionais:\n" . $hints . "\n";
+        }
+
+        return $p;
+    }
+
+    private function extractCode(string $raw): array
+    {
+        $explanation = '';
+        $code = $raw;
+
+        if (preg_match('/```(?:php)?\s*\n([\s\S]*?)```/i', $raw, $m)) {
+            $code = trim($m[1]);
+            $explanation = trim(str_replace($m[0], '', $raw));
+        }
+
+        if (stripos(ltrim($code), '<?php') !== 0) {
+            $code = "<?php\n\n" . ltrim($code);
+        }
+
+        return [$code, $explanation];
+    }
+
+    private function envStr(string $key, string $default = ''): string
+    {
+        $v = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+        if ($v !== false && $v !== null && $v !== '') {
+            return (string) $v;
+        }
+
+        $envFile = $this->projectRoot() . '/.env';
+        if (is_file($envFile)) {
+            foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') continue;
+                if (strpos($line, '=') === false) continue;
+                [$k, $val] = explode('=', $line, 2);
+                if (trim($k) === $key) {
+                    return trim($val, " \t\"'");
+                }
+            }
+        }
+        return $default;
+    }
+
+    private function projectRoot(): string
+    {
+        return dirname(__DIR__, 4);
+    }
+
+    private function httpPost(string $url, array $payload, string $bearer, int $timeout): array
+    {
+        if (!function_exists('curl_init')) {
+            return ['ok' => false, 'error' => 'Extensao cURL indisponivel'];
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $bearer,
+                'Accept: application/json',
+            ],
+            CURLOPT_TIMEOUT        => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+
+        $out  = curl_exec($ch);
+        $err  = curl_error($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($out === false) {
+            return ['ok' => false, 'error' => 'Falha cURL: ' . $err];
+        }
+
+        $json = json_decode((string) $out, true);
+
+        if ($code >= 200 && $code < 300 && is_array($json)) {
+            return ['ok' => true, 'json' => $json, 'raw' => (string) $out];
+        }
+
+        $msg = 'HTTP ' . $code;
+        if (is_array($json) && isset($json['error']['message'])) {
+            $msg .= ' - ' . $json['error']['message'];
+        }
+
+        return ['ok' => false, 'error' => $msg, 'raw' => (string) $out];
+    }
+}

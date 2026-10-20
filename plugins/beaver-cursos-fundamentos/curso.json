@@ -1,0 +1,10 @@
+{
+  "slug": "beaver-fundamentos",
+  "titulo": "Beaver Framework — Fundamentos",
+  "descricao": "Curso introdutório ao Beaver Framework. 35 questões, 35 minutos, correção automática.",
+  "imagem": "/plugins/beaver-cursos/ui/img/fundamentos.png",
+  "preco": 49.00,
+  "duracao_min": 35,
+  "licenca_key": null,
+  "ativo": true
+}

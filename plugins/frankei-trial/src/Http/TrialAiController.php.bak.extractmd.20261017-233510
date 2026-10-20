@@ -1,0 +1,585 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial\Http;
+
+use Beaver\Http\Request;
+use Beaver\Http\Response;
+
+/**
+ * TrialAiController
+ * Liga o Frankei Trial a API DeepSeek para gerar testes completos.
+ */
+class TrialAiController
+{
+    public function status(Request $request): Response
+    {
+        $key = $this->envStr('DEEPSEEK_API_KEY');
+
+        return Response::json([
+            'ok'         => true,
+            'configured' => $key !== '',
+            'model'      => $this->envStr('DEEPSEEK_MODEL', 'deepseek-chat'),
+            'endpoint'   => $this->envStr('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/completions'),
+            'message'    => $key === ''
+                ? 'DEEPSEEK_API_KEY nao configurada no .env'
+                : 'Pronto para gerar testes',
+        ]);
+    }
+
+    public function generateTest(Request $request): Response
+    {
+        $body   = $request->body ?? [];
+        $code   = trim((string) ($body['code']   ?? ''));
+        $engine = strtolower((string) ($body['engine'] ?? 'phpunit'));
+        $target = trim((string) ($body['target'] ?? ''));
+        $hints  = trim((string) ($body['hints']  ?? ''));
+
+        if ($code === '') {
+            return Response::json(['ok' => false, 'error' => 'Codigo da classe obrigatorio'], 422);
+        }
+        if (strlen($code) > 30000) {
+            return Response::json(['ok' => false, 'error' => 'Codigo demasiado grande (max 30k)'], 413);
+        }
+        if (!in_array($engine, ['pest', 'phpunit'], true)) {
+            return Response::json(['ok' => false, 'error' => 'engine deve ser pest ou phpunit'], 422);
+        }
+
+        $key = $this->envStr('DEEPSEEK_API_KEY');
+        if ($key === '') {
+            return Response::json([
+                'ok'      => false,
+                'error'   => 'DEEPSEEK_API_KEY nao configurada. Edita o .env',
+                'action'  => 'configure_env',
+                'env_key' => 'DEEPSEEK_API_KEY',
+            ], 412);
+        }
+
+        $model   = $this->envStr('DEEPSEEK_MODEL', 'deepseek-chat');
+        $url     = $this->envStr('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/completions');
+        $timeout = (int) ($this->envStr('DEEPSEEK_TIMEOUT', '60') ?: 60);
+
+        // FK_AI_CACHE — cache sem TTL, so invalidado se o codigo mudar
+        $force       = !empty($body['force']);
+        $cacheDir    = $this->projectRoot() . '/plugins/frankei-trial/storage/ai_cache';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0775, true);
+        }
+        $targetClass = $target !== '' ? $target : $this->guessTargetClass($code);
+        $cacheKey    = preg_replace('/[^A-Za-z0-9_]/', '_', $targetClass !== '' ? $targetClass : 'anom_' . substr(md5($code), 0, 8));
+        $cacheFile   = $cacheDir . '/' . $cacheKey . '.json';
+        // FK_AI_CACHE_ORIG - invalida pela classe original, nao pelo teste
+        // FK_AI_CACHE_ORIG — hash da CLASSE ORIGINAL (source_code), não do teste do user
+        $codeHash = hash('sha256', trim($code));   // fallback
+        try {
+            $svcForHash = new \Beaver\Plugins\FrankeiTrial\Services\ClassIntrospector();
+            $fqcnForHash = $svcForHash->extractTargetFromTest($code);
+            if ($fqcnForHash !== null) {
+                $introForHash = $svcForHash->introspect($fqcnForHash);
+                if ($introForHash !== null && !empty($introForHash['source_code'])) {
+                    $codeHash = hash('sha256', trim($introForHash['source_code']));
+                }
+            }
+        } catch (\Throwable $e) { /* silent */
+        }
+        $now         = time();
+
+        if (!$force && is_file($cacheFile)) {
+            $cached = json_decode((string) @file_get_contents($cacheFile), true);
+            if (
+                is_array($cached)
+                && ($cached['hash'] ?? '') === $codeHash
+                && !empty($cached['code'])
+            ) {
+                return Response::json([
+                    'ok'          => true,
+                    'code'        => $cached['code'],
+                    'raw'         => $cached['raw'] ?? $cached['code'],
+                    'explanation' => $cached['explanation'] ?? '',
+                    'engine'      => $cached['engine'] ?? $engine,
+                    'target'      => $target,
+                    'model'       => $cached['model'] ?? '(cache)',
+                    'usage'       => null,
+                    'from_cache'  => true,
+                    'cached_age'  => $now - (int) ($cached['generated_at'] ?? 0),
+                ]);
+            }
+        }
+
+        // FK_AI_RAG — introspect a classe original via Reflection
+        $introspect = null;
+        try {
+            $svc = new \Beaver\Plugins\FrankeiTrial\Services\ClassIntrospector();
+
+            // FK_AI_USE_TARGET — se o frontend enviou o target, resolver o FQCN diretamente
+            // FK_AI_STRIP_TEST — remover o sufixo "Test" do target
+            $targetParaFqcn = $target;
+            if (substr($targetParaFqcn, -4) === 'Test') {
+                $targetParaFqcn = substr($targetParaFqcn, 0, -4);
+            }
+            $targetFqcn = null;
+            if ($targetParaFqcn !== '') {
+                foreach (
+                    [
+                        'App\\Http\\Controllers\\',
+                        'App\\Controllers\\',
+                        'App\\Models\\',
+                        'App\\',
+                    ] as $prefix
+                ) {
+                    $candidate = $prefix . $targetParaFqcn;
+                    if (class_exists($candidate)) {
+                        $targetFqcn = $candidate;
+                        break;
+                    }
+                }
+            }
+
+            // Fallback: extractTargetFromTest
+            if ($targetFqcn === null) {
+                $targetFqcn = $svc->extractTargetFromTest($code);
+            }
+
+            if ($targetFqcn !== null) {
+                $introspect = $svc->introspect($targetFqcn);
+            }
+        } catch (\Throwable $e) { /* silent */
+        }
+
+        $prompt = $this->buildPrompt($code, $engine, $target, $hints, $introspect);
+
+        $payload = [
+            'model'       => $model,
+            'messages'    => [
+                ['role' => 'system', 'content' => $this->systemPrompt($engine, $introspect)],
+                ['role' => 'user',   'content' => $prompt],
+            ],
+            'temperature' => 0.25,
+            'max_tokens'  => 1200,
+            'stream'      => false,
+            'keep_alive'  => '24h',
+            'num_ctx'     => 8192,
+        ];
+
+        $resp = $this->httpPost($url, $payload, $key, $timeout);
+
+        if (!$resp['ok']) {
+            return Response::json([
+                'ok'    => false,
+                'error' => $resp['error'],
+                'raw'   => $resp['raw'] ?? null,
+            ], 502);
+        }
+
+        $json = $resp['json'] ?? null;
+        if (!is_array($json)) {
+            return Response::json(['ok' => false, 'error' => 'Resposta invalida da API'], 502);
+        }
+
+        $content = (string) ($json['choices'][0]['message']['content'] ?? '');
+        if ($content === '') {
+            return Response::json(['ok' => false, 'error' => 'API nao devolveu conteudo'], 502);
+        }
+
+        [$codeOut, $explanation] = $this->extractCode($content);
+
+        // FK_AI_CACHE — gravar cache (sem TTL)
+        @file_put_contents($cacheFile, json_encode([
+            'hash'         => $codeHash,
+            'generated_at' => $now,
+            'code'         => $codeOut,
+            'raw'          => $content,
+            'explanation'  => $explanation,
+            'engine'       => $engine,
+            'model'        => $model,
+            'target_class' => $targetClass,
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+        return Response::json([
+            'ok'          => true,
+            'code'        => $codeOut,
+            'raw'         => $content,
+            'explanation' => $explanation,
+            'engine'      => $engine,
+            'target'      => $target,
+            'model'       => $model,
+            'usage'       => $json['usage'] ?? null,
+            'from_cache'  => false,
+        ]);
+    }
+
+    /**
+     * POST /api/frankei-trial/ai/suggest-improvements
+     * Analisa a classe e devolve propostas de melhoria (nao testes).
+     * Body: { code }
+     */
+    public function suggestImprovements(Request $req): Response
+    {
+        $body = $req->body ?? [];
+        $code = trim((string) ($body['code'] ?? ''));
+
+        if ($code === '') {
+            return Response::json(['ok' => false, 'error' => 'code vazio'], 422);
+        }
+        if (strlen($code) > 30000) {
+            return Response::json(['ok' => false, 'error' => 'codigo demasiado grande (max 30k)'], 413);
+        }
+
+        $key = $this->envStr('DEEPSEEK_API_KEY');
+        if ($key === '') {
+            return Response::json(['ok' => false, 'error' => 'DEEPSEEK_API_KEY nao configurada'], 412);
+        }
+
+        $model   = $this->envStr('DEEPSEEK_MODEL', 'deepseek-chat');
+        $url     = $this->envStr('DEEPSEEK_API_URL', 'https://api.deepseek.com/v1/chat/completions');
+        $timeout = (int) ($this->envStr('DEEPSEEK_TIMEOUT', '60') ?: 60);
+
+        $prompt = "Analisa esta classe PHP e propoe MELHORIAS (nao testes).\n\n"
+                . "```php\n" . $code . "\n```\n\n"
+                . "Devolve uma lista de melhorias concretas: seguranca, performance, legibilidade, edge cases, validacoes. "
+                . "Cada melhoria numa linha, comeca com '- '.";
+
+        $payload = [
+            'model'       => $model,
+            'messages'    => [
+                ['role' => 'system', 'content' => 'Es um engenheiro senior. Analisas classes PHP e proposes melhorias.'],
+                ['role' => 'user',   'content' => $prompt],
+            ],
+            'temperature' => 0.3,
+            'max_tokens'  => 800,
+            'stream'      => false,
+        ];
+
+        $resp = $this->httpPost($url, $payload, $key, $timeout);
+
+        if (!$resp['ok']) {
+            return Response::json(['ok' => false, 'error' => $resp['error']], 502);
+        }
+
+        $json = $resp['json'] ?? null;
+        if (!is_array($json)) {
+            return Response::json(['ok' => false, 'error' => 'Resposta invalida da API'], 502);
+        }
+
+        $content = (string) ($json['choices'][0]['message']['content'] ?? '');
+        if ($content === '') {
+            return Response::json(['ok' => false, 'error' => 'API nao devolveu conteudo'], 502);
+        }
+
+        return Response::json([
+            'ok'          => true,
+            'suggestions' => $content,
+            'model'       => $model,
+        ]);
+    }
+
+    private function systemPrompt(string $engine, ?array $introspect = null): string
+    {
+        $aiDir = $this->projectRoot() . '/plugins/frankei-trial/resources/ai/';
+
+        // Factos neutros (sempre, MAS nao em modo HTTP-bound para evitar contradicoes)
+        $isHttpBound = $introspect !== null && !empty($introspect['http_bound']);
+        $base = '';
+        if (!$isHttpBound) {
+            $neutral = $aiDir . 'BEAVER_FRAMEWORK.txt';
+            if (is_file($neutral)) {
+                $base .= file_get_contents($neutral) . "\n\n";
+            }
+        }
+
+        // Regras especificas do engine
+        // FK_AI_RAG_HTTPBOUND
+        if ($introspect !== null && !empty($introspect['http_bound'])) {
+            $engineFile = 'INTEGRATION_RULES.txt';
+        } else {
+            $engineFile = $engine === 'pest' ? 'PEST_RULES.txt' : 'PHPUNIT_RULES.txt';
+        }
+        $enginePath = $aiDir . $engineFile;
+        if (is_file($enginePath)) {
+            // FK_AI_TRUNCATE_RULES — limitar as regras a 1500 chars
+            $rules = (string) file_get_contents($enginePath);
+            if (strlen($rules) > 1500) {
+                $rules = substr($rules, 0, 1500) . "\n// ... (regras truncadas)";
+            }
+            $base .= $rules . "\n\n";
+        }
+
+        // Instrucao final (condicional)
+        $base .= "Devolve SEMPRE apenas um bloco de codigo ```php ... ``` sem texto antes ou depois.\n";
+        $base .= "Segue EXATAMENTE o formato dos exemplos acima.\n";
+        if ($isHttpBound) {
+            $base .= "NAO uses markTestIncomplete. Cada teste faz um pedido HTTP real.\n";
+        } else {
+            $base .= "Nunca uses markTestIncomplete, markTestSkipped ou placeholders vazios.\n";
+        }
+
+        // FK_AI_NO_COPY — regra critica contra a copia do teste do user
+        $base .= "\n## REGRA CRITICA (nao ignorar)\n";
+        $base .= "O utilizador JA TEM um teste para esta classe. O teu trabalho NAO e reformata-lo, "
+            . "nem devolve-lo com pequenas alteracoes. O teu trabalho e analisar a CLASSE ORIGINAL "
+            . "(codigo-fonte incluido no prompt do utilizador) e gerar testes INDEPENDENTES que cubram "
+            . "casos que o teste atual NAO cobre: edge cases, caminhos de erro, validacoes, "
+            . "autenticacao, permissoes, dados invalidos, limites. ";
+        $base .= "Se so vires o mesmo teste que ja existe, continua a analisar a classe e adiciona testes novos. ";
+        $base .= "Cada teste deve ser autonomo e verificar COMPORTAMENTO observavel.\n";
+
+
+        // FK_AI_ADD_VALUE — exemplos concretos de testes que adicionam valor
+        $base .= "\n## EXEMPLOS de testes que ADICIONAM valor (o user NAO tem estes)\n";
+        $base .= "- Login com email em branco -> erro de validacao\n";
+        $base .= "- Login com password em branco -> erro de validacao\n";
+        $base .= "- Login com SQL injection no email -> nao autentica\n";
+        $base .= "- Login com next malicioso (//evil.com) -> sanitizado para /\n";
+        $base .= "- Registo com passwords diferentes -> erro\n";
+        $base .= "- Registo com email ja existente (trial usado) -> erro\n";
+        $base .= "- Logout limpa a sessao -> redirect /\n";
+        $base .= "- Acesso a /painel sem sessao -> redirect /auth/login\n";
+        $base .= "Gera testes DIFERENTES destes e dos que o user ja tem.\n";
+
+        return $base;
+    }
+
+    private function buildPrompt(string $code, string $engine, string $target, string $hints, ?array $introspect = null): string
+    {
+        $motor = $engine === 'pest' ? 'Pest' : 'PHPUnit';
+        $p = "Gera um ficheiro de teste completo em {$motor}.
+
+";
+
+        if ($introspect !== null) {
+            $p .= "## Classe a testar (codigo-fonte REAL)\n";
+            $p .= "FQCN: " . $introspect['fqcn'] . "\n";
+            // FK_AI_NO_SOURCE:           $p .= "HTTP-bound: " . ($introspect['http_bound'] ? 'SIM' : 'nao') . "\n";
+            // FK_AI_NO_SOURCE: 
+            // FK_AI_NO_SOURCE:             $srcCode = $introspect['source_code'] ?? '';
+            // FK_AI_NO_SOURCE:             if ($srcCode !== '') {
+            // FK_AI_NO_SOURCE:                 // FK_AI_TRUNCATE — limitar o source_code a 2000 chars (modelo 1.5B nao aguenta 8k)
+            // FK_AI_NO_SOURCE:                 if (strlen($srcCode) > 2000) {
+            // FK_AI_NO_SOURCE:                     $srcCode = substr($srcCode, 0, 2000) . "\n// ... (truncado)\n";
+            // FK_AI_NO_SOURCE:                 }
+            // FK_AI_NO_SOURCE:                 $p .= "\n### Codigo-fonte da classe\n```php\n" . $srcCode . "\n```\n";
+            // FK_AI_NO_SOURCE:             }
+
+            $p .= "\n### Metodos publicos\n";
+            foreach ($introspect['methods'] as $m) {
+                $params = empty($m['params'])
+                    ? ''
+                    : implode(', ', array_map(fn($pr) => ($pr['type'] ?? 'mixed') . ' $' . $pr['name'], $m['params']));
+                $static = !empty($m['static']) ? ' [static]' : '';
+                $p .= "  - " . $m['name'] . "(" . $params . "): " . $m['return'] . $static . "
+";
+            }
+            $p .= "
+";
+            $p .= "REGRA: usa EXATAMENTE estes metodos, com estas assinaturas. NAO inventes nomes nem parametros.
+";
+            if ($introspect['http_bound']) {
+                $p .= "\n## HTTP-bound - gera teste de INTEGRACAO\n";
+                $p .= "A classe e um controller HTTP. Gera um teste que estende Tests\\Integration\\HttpTestCase (NAO Tests\\TestCase).\n";
+                $p .= "Cada teste faz um pedido HTTP real: \$this->get(\$path) ou \$this->post(\$path, \$data).\n";
+                $p .= "Metodos do harness:\n";
+                $p .= "  - makeUser(\$attrs) -> cria user na DB, devolve array com 'id' e 'email'\n";
+                $p .= "  - makeTrialKey(\$codigo, \$email, \$expiraOffset, \$usadoEm)\n";
+                $p .= "  - assertStatus(\$code, \$r)\n";
+                $p .= "  - assertRedirect(\$path, \$r)\n";
+                $p .= "  - assertRedirectContains(\$sub, \$r)\n";
+                $p .= "  - assertBodyContains(\$sub, \$r)\n";
+                $p .= "NUNCA uses markTestIncomplete. NUNCA uses class_exists como teste principal.\n";
+                $p .= "Cada teste tem de verificar COMPORTAMENTO: status code, Location, cookies, ou mensagem de erro.\n";
+                $examplePath = $this->projectRoot() . '/tests/Integration/AuthLoginTest.php';
+                if (is_file($examplePath)) {
+                    $p .= "\n## Exemplo REAL do projecto (imita EXATAMENTE este formato)\n";
+                    $p .= "```php\n" . file_get_contents($examplePath) . "\n```\n";
+                }
+            }
+            // FK_AI_ADD_VALUE — regra absoluta contra copia
+            $p .= "\n## REGRA ABSOLUTA\n";
+            $p .= "NAO copies os testes do user. NAO reformates os testes do user. ";
+            $p .= "Gera testes NOVOS baseados na CLASSE ORIGINAL acima. ";
+            $p .= "Se um teste teu for igual a um teste do user, APAGA-O e substitui por outro caso.\n";
+
+            // FK_AI_NO_COPY - so nomes, nunca o codigo
+            if (empty($introspect['http_bound']) && $code !== '') {
+                if (preg_match_all('/(?:public\s+function|function|it|test)\s*\(?\s*[\x27"]?([A-Za-z_][A-Za-z0-9_]*)/', $code, $mm)) {
+                    $nomes = array_unique(array_filter($mm[1] ?? [], fn($n) => !in_array($n, ['function', 'it', 'test', 'public'], true)));
+                    if ($nomes) {
+                        $p .= "\n## Testes JA existentes (NAO duplicar)\n";
+                        foreach (array_slice($nomes, 0, 30) as $n) $p .= "- " . $n . "\n";
+                    }
+                }
+            }
+        } else {
+            $p .= "Classe a testar:
+```php
+" . $code . "
+```
+";
+        }
+
+        $p .= "
+Requisitos:
+";
+        $p .= "- Cobre o comportamento publico da classe.
+";
+        $p .= "- Inclui assercoes concretas (nao assertTrue(true)).
+";
+        $p .= "- NAO inventes metodos, assinaturas nem imports.
+";
+
+        if ($hints !== '') {
+            $p .= "
+Instrucoes adicionais:
+" . $hints . "
+";
+        }
+
+        return $p;
+    }
+
+    private function extractCode(string $raw): array
+    {
+        $explanation = '';
+        $code = $raw;
+
+        if (preg_match('/```(?:php)?\s*\n([\s\S]*?)```/i', $raw, $m)) {
+            $code = trim($m[1]);
+            $explanation = trim(str_replace($m[0], '', $raw));
+        }
+
+        if (stripos(ltrim($code), '<?php') !== 0) {
+            $code = "<?php\n\n" . ltrim($code);
+        }
+
+        return [$code, $explanation];
+    }
+
+    private function envStr(string $key, string $default = ''): string
+    {
+        $v = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+        if ($v !== false && $v !== null && $v !== '') {
+            return (string) $v;
+        }
+
+        $envFile = $this->projectRoot() . '/.env';
+        if (is_file($envFile)) {
+            foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') continue;
+                if (strpos($line, '=') === false) continue;
+                [$k, $val] = explode('=', $line, 2);
+                if (trim($k) === $key) {
+                    return trim($val, " \t\"'");
+                }
+            }
+        }
+        return $default;
+    }
+
+    private function guessTargetClass(string $code): string
+    {
+        if (preg_match('/^\s*(?:abstract\s+|final\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)/m', $code, $m)) {
+            return $m[1];
+        }
+        if (preg_match('/^\s*namespace\s+([^;]+);/m', $code, $m)) {
+            $parts = explode('\\', trim($m[1]));
+            return (string) end($parts);
+        }
+        return '';
+    }
+
+    private function originalClassHash(string $testCode): ?string
+    {
+        // FK_AI_CACHE_ORIG - extrai FQCN do teste e faz hash do conteudo original
+        if (!preg_match_all('/^use\s+((?:App|Beaver|Tests)\\\\[\w\\\\]+);/m', $testCode, $m)) {
+            return null;
+        }
+
+        $root = $this->projectRoot();
+        $contents = [];
+
+        foreach (array_unique($m[1]) as $fqcn) {
+            if (strpos($fqcn, 'Tests\\') === 0) {
+                continue;
+            }
+
+            $file = null;
+
+            if (strpos($fqcn, 'App\\') === 0) {
+                $rel = 'app/' . str_replace('\\', '/', substr($fqcn, 4)) . '.php';
+                $candidate = $root . '/' . $rel;
+                if (is_file($candidate)) {
+                    $file = $candidate;
+                }
+            } elseif (strpos($fqcn, 'Beaver\\Plugins\\') === 0) {
+                if (preg_match('/^Beaver\\Plugins\\(\w+)\\(.+)$/', $fqcn, $pm)) {
+                    $plugin = strtolower($pm[1]);
+                    $rel = 'plugins/' . $plugin . '/src/' . str_replace('\\', '/', $pm[2]) . '.php';
+                    $candidate = $root . '/' . $rel;
+                    if (is_file($candidate)) {
+                        $file = $candidate;
+                    }
+                }
+            }
+
+            if ($file !== null) {
+                $contents[] = $fqcn . "\n" . file_get_contents($file);
+            }
+        }
+
+        if (empty($contents)) {
+            return null;
+        }
+
+        return hash('sha256', implode("\n\n", $contents));
+    }
+
+    private function projectRoot(): string
+    {
+        return dirname(__DIR__, 4);
+    }
+
+    private function httpPost(string $url, array $payload, string $bearer, int $timeout): array
+    {
+        if (!function_exists('curl_init')) {
+            return ['ok' => false, 'error' => 'Extensao cURL indisponivel'];
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $bearer,
+                'Accept: application/json',
+            ],
+            CURLOPT_TIMEOUT        => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 120,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+
+        $out  = curl_exec($ch);
+        $err  = curl_error($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($out === false) {
+            return ['ok' => false, 'error' => 'Falha cURL: ' . $err];
+        }
+
+        $json = json_decode((string) $out, true);
+
+        if ($code >= 200 && $code < 300 && is_array($json)) {
+            return ['ok' => true, 'json' => $json, 'raw' => (string) $out];
+        }
+
+        $msg = 'HTTP ' . $code;
+        if (is_array($json) && isset($json['error']['message'])) {
+            $msg .= ' - ' . $json['error']['message'];
+        }
+
+        return ['ok' => false, 'error' => $msg, 'raw' => (string) $out];
+    }
+}

@@ -1,0 +1,16 @@
+<?php
+
+return [
+    /*
+    |--------------------------------------------------------------------------
+    | Chave de encriptação
+    |--------------------------------------------------------------------------
+    | Deve ter 32 bytes (raw ou base64). Vem do APP_KEY do .env.
+    |
+    | Gerar nova:
+    |     php -r "echo base64_encode(random_bytes(32));"
+    |
+    | ⚠️ Se mudares, os dados encriptados anteriormente ficam inacessíveis.
+    */
+    'key' => getenv('APP_KEY') ?: '',
+];

@@ -1,0 +1,772 @@
+<?php
+
+/** @var array  $user */
+/** @var string $plan */
+/** @var bool   $isTrial */
+/** @var array  $limits */
+?>
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Frankei Trial</title>
+    <link rel="stylesheet" href="/plugins/frankei/css/dashboard.css?v=<?= time() ?>">
+    <link rel="stylesheet" href="/plugins/frankei-trial/css/trial.css?v=<?= time() ?>">
+    <script src="/plugins/frankei/js/frankei-i18n.js?v=<?= time() ?>" defer></script>
+</head>
+
+<body class="fk-trial-body">
+    <!-- FK_HIDDEN_TABS: containers do frankei (invisíveis, só para evitar erros de JS) -->
+    <nav class="fk-tabs" id="fkTabs" role="tablist" hidden aria-hidden="true"></nav>
+    <nav class="fk-subtabs" id="fkSubtabs" role="tablist" hidden aria-hidden="true" style="display:none"></nav>
+
+
+    <!-- FK_TRIAL_REPORT_HIDDEN: botão invisível para frankei's reportInit ligar -->
+    <button type="button" id="fkTermReportBtn" style="display:none;position:absolute;left:-9999px"></button>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     TOPBAR
+     ═══════════════════════════════════════════════════════════ -->
+    <header class="fk-trial-topbar">
+        <div class="fk-trial-topbar-left">
+            <a href="/frankei-trial" class="fk-trial-brand">
+                <svg class="fk-trial-brand-logo-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="bvgTopbar" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#FFD79A" />
+                            <stop offset="48%" stop-color="#FF9A3C" />
+                            <stop offset="100%" stop-color="#FF6B35" />
+                        </linearGradient>
+                    </defs>
+                    <circle cx="13" cy="17.5" r="7.5" fill="url(#bvgTopbar)" opacity=".72" />
+                    <circle cx="51" cy="17.5" r="7.5" fill="url(#bvgTopbar)" opacity=".72" />
+                    <ellipse cx="32" cy="33" rx="23" ry="21" fill="url(#bvgTopbar)" />
+                    <ellipse cx="32" cy="41" rx="15.5" ry="12" fill="#0A0E14" opacity=".2" />
+                    <ellipse cx="32" cy="34.5" rx="4.6" ry="3.2" fill="#1A1208" />
+                    <circle cx="22.5" cy="26" r="3.4" fill="#1A1208" />
+                    <circle cx="41.5" cy="26" r="3.4" fill="#1A1208" />
+                    <circle cx="23.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                    <circle cx="42.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                    <rect x="27.3" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                    <rect x="32.4" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                </svg>
+                <span><b>Frankei</b> Trial</span>
+            </a>
+            <span class="fk-trial-chip-plan"><?= htmlspecialchars(strtoupper($plan)) ?></span>
+        </div>
+
+        <div class="fk-trial-topbar-right">
+
+            <!-- Idioma -->
+            <span class="fk-lang-chip-wrap" id="fkLangChipWrap">
+                <button type="button" class="fk-lang-chip" id="fkLangChip" title="Idioma / Language" aria-label="Mudar idioma">
+                    <span class="fk-lang-chip-flag" id="fkLangChipFlag">🇵🇹</span>
+                    <span class="fk-lang-chip-code" id="fkLangChipCode">PT</span>
+                    <span class="fk-lang-chip-caret">▾</span>
+                </button>
+                <div class="fk-lang-dropdown" id="fkLangDropdown" hidden>
+                    <button type="button" class="fk-lang-option" data-lang="pt">
+                        <span class="fk-lang-opt-flag">🇵🇹</span>
+                        <span class="fk-lang-opt-name">Português</span>
+                        <span class="fk-lang-opt-check" data-check="pt"></span>
+                    </button>
+                    <button type="button" class="fk-lang-option" data-lang="en">
+                        <span class="fk-lang-opt-flag">🇬🇧</span>
+                        <span class="fk-lang-opt-name">English</span>
+                        <span class="fk-lang-opt-check" data-check="en"></span>
+                    </button>
+                    <button type="button" class="fk-lang-option" data-lang="fr">
+                        <span class="fk-lang-opt-flag">🇫🇷</span>
+                        <span class="fk-lang-opt-name">Français</span>
+                        <span class="fk-lang-opt-check" data-check="fr"></span>
+                    </button>
+                    <button type="button" class="fk-lang-option" data-lang="es">
+                        <span class="fk-lang-opt-flag">🇪🇸</span>
+                        <span class="fk-lang-opt-name">Español</span>
+                        <span class="fk-lang-opt-check" data-check="es"></span>
+                    </button>
+                </div>
+            </span>
+
+            <!-- User -->
+            <span class="fk-user" id="fkUserTrigger" role="button" tabindex="0" aria-expanded="false">
+                <span class="fk-user-icon">👤</span> Olá, <b><?= htmlspecialchars($user['nome'] ?? 'dev') ?></b>
+
+                <div id="fkUserMenu" class="fk-user-menu" hidden>
+                    <div class="fk-user-menu-head">
+                        <span>👤 <?= htmlspecialchars(strtoupper($plan)) ?></span>
+                        <button type="button" class="fk-user-menu-close" id="fkUserMenuClose" aria-label="Fechar">✕</button>
+                    </div>
+                    <div class="fk-user-menu-body">
+                        <div class="fk-user-menu-section-title" data-i18n="Sessão">Sessão</div>
+                        <div class="fk-user-menu-links">
+                            <a href="/frankei/path" class="fk-user-menu-link">
+                                📁 <span data-i18n="Trocar aplicação">Trocar aplicação</span>
+                            </a>
+                            <a href="/frankei/logout" class="fk-user-menu-link danger">
+                                🚪 <span data-i18n="Terminar sessão">Terminar sessão</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </span>
+
+            <!-- Settings -->
+            <button type="button" class="fk-settings-btn" id="fkSettingsBtn" title="Configurações" aria-label="Configurações">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     LAYOUT
+     ═══════════════════════════════════════════════════════════ -->
+    <div class="fk-trial-layout">
+
+        <!-- ─────────── SIDEBAR ─────────── -->
+        <aside class="fk-trial-side">
+
+            <!-- Logo -->
+            <div class="fk-trial-side-card">
+                <div class="fk-trial-side-logo">
+                    <svg class="fk-trial-side-logo-icon-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="bvgSide" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#FFD79A" />
+                                <stop offset="48%" stop-color="#FF9A3C" />
+                                <stop offset="100%" stop-color="#FF6B35" />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="13" cy="17.5" r="7.5" fill="url(#bvgSide)" opacity=".72" />
+                        <circle cx="51" cy="17.5" r="7.5" fill="url(#bvgSide)" opacity=".72" />
+                        <ellipse cx="32" cy="33" rx="23" ry="21" fill="url(#bvgSide)" />
+                        <ellipse cx="32" cy="41" rx="15.5" ry="12" fill="#0A0E14" opacity=".2" />
+                        <ellipse cx="32" cy="34.5" rx="4.6" ry="3.2" fill="#1A1208" />
+                        <circle cx="22.5" cy="26" r="3.4" fill="#1A1208" />
+                        <circle cx="41.5" cy="26" r="3.4" fill="#1A1208" />
+                        <circle cx="23.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                        <circle cx="42.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                        <rect x="27.3" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                        <rect x="32.4" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                    </svg>
+                    <div class="fk-trial-side-logo-name">Frankei</div>
+                    <div class="fk-trial-side-logo-sub">Trial Edition</div>
+                </div>
+            </div>
+
+            <!-- Tipo de testes -->
+            <div class="fk-trial-side-card">
+                <div class="fk-trial-side-label" data-i18n="Tipo de testes permitido">Tipo de testes permitido</div>
+                <div class="fk-trial-side-type">
+                    <span class="fk-trial-side-type-icon">🧪</span>
+                    <span class="fk-trial-side-type-name" data-i18n="Testes Unit">Testes Unit</span>
+                    <span class="fk-trial-side-type-badge">UNIT</span>
+                </div>
+            </div>
+
+            <!-- Bola com contagem -->
+            <div class="fk-trial-side-card">
+                <div class="fk-trial-side-ball-wrap">
+                    <div class="fk-trial-side-ball">
+                        <div class="fk-trial-side-ball-num" id="fkTrialBallNum">—</div>
+                        <div class="fk-trial-side-ball-label" data-i18n="testes">testes</div>
+                    </div>
+                    <div class="fk-trial-side-ball-hint" id="fkTrialBallHint" data-i18n="Testes disponíveis">Testes disponíveis</div>
+                </div>
+            </div>
+            <!-- Lista de testes (na sidebar) -->
+            <div class="fk-trial-side-card fk-trial-side-list-card">
+                <div class="fk-trial-side-label" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <span>📋 <span data-i18n="Testes disponíveis">Testes disponíveis</span></span>
+                    <span class="fk-trial-card-counter" id="fkTrialCardCounter">— / —</span>
+                </div>
+                <div id="fkTrialList" class="fk-trial-side-list">
+                    <div class="fk-trial-empty" style="padding:12px">
+                        <span class="fk-trial-spinner"></span>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- ─────────── MAIN ─────────── -->
+        <main class="fk-trial-main">
+
+            <div class="fk-trial-hero">
+                <h1 data-i18n="Testes Unit">🧪 Testes Unit</h1>
+                <p data-i18n="Corre os testes, vê o resultado. Sem complicações.">Corre os testes, vê o resultado. Sem complicações.</p>
+            </div>
+            <!-- Correr (terminal com header) -->
+            <!-- Barra de suites (compacta) -->
+            <div class="fk-trial-suites-bar" id="fkTrialSuitesBar">
+                <div class="fk-trial-suites-loading">
+                    <span class="fk-trial-spinner"></span> A carregar suites...
+                </div>
+            </div>
+
+            <section class="fk-trial-card fk-trial-term-card">
+                <div class="fk-trial-term-head">
+                    <span class="fk-trial-term-dots">
+                        <span class="fk-trial-term-dot red"></span>
+                        <span class="fk-trial-term-dot yellow"></span>
+                        <span class="fk-trial-term-dot green"></span>
+                    </span>
+                    <span class="fk-trial-term-title">Terminal</span>
+
+                    <select id="fkTrialEngine" title="Motor de testes">
+                        <option value="pest">🐀 Pest</option>
+                        <option value="phpunit">🐘 PHPUnit</option>
+                    </select>
+
+                    <select id="fkTrialSuite" title="Suite de testes">
+                        <option value="all">📂 Todas</option>
+                    </select>
+
+                    <button type="button" class="fk-trial-term-run" id="fkTrialRun">
+                        ▶ RUN
+                    </button>
+
+                    <button type="button" class="fk-trial-term-refresh" id="fkTrialRefresh"
+                        onclick="location.reload()" title="Recarregar">
+                        ↻
+                    </button>
+
+                    <button type="button" class="fk-trial-term-report" id="fkTrialReport" title="Gerar Report">
+                        📊 Report
+                    </button>
+
+                    <span class="fk-trial-term-status" id="fkTrialStatus">
+                        Pronto
+                    </span>
+                </div>
+
+                <pre class="fk-trial-term-output" id="fkTrialTerminal"></pre>
+
+                <!-- Barra de resumo (colada ao fundo do terminal) -->
+                <div class="fk-trial-run-summary" id="fkTrialRunSummary" hidden>
+                    <div class="fk-trial-run-stats" id="fkTrialRunStats"></div>
+                    <button type="button" class="fk-trial-run-analyze" id="fkTrialRunAnalyze">
+                        🔍 <span data-i18n="Analisar em detalhe">Analisar em detalhe</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="fk-trial-card fk-trial-classes-card" id="fkTrialClassesCard" hidden>
+                <h2 style="display:flex;justify-content:space-between;align-items:center">
+                    <span>📋 <span data-i18n="Resultado por classe">Resultado por classe</span></span>
+                    <span class="fk-trial-card-counter" id="fkTrialClassesCounter">— / —</span>
+                </h2>
+                <div id="fkTrialClassesList">
+                    <div class="fk-trial-empty">
+                        <span class="fk-trial-spinner"></span>
+                    </div>
+                </div>
+                <div class="fk-trial-pagination" id="fkTrialPagination" hidden>
+                    <button type="button" class="fk-trial-page-btn" data-page-action="first" title="Primeira">⏮</button>
+                    <button type="button" class="fk-trial-page-btn" data-page-action="prev" title="Anterior">◀</button>
+                    <span class="fk-trial-page-info" id="fkTrialPageInfo">1 / 1</span>
+                    <button type="button" class="fk-trial-page-btn" data-page-action="next" title="Seguinte">▶</button>
+                    <button type="button" class="fk-trial-page-btn" data-page-action="last" title="Última">⏭</button>
+                </div>
+            </section>
+    </div>
+
+    <footer class="fk-trial-footer">
+        <!-- ══════════════════════════════════════════════════════════════
+                     FK_LOGO_MARQUEE_V1 — logos a correr
+                     Bloco auto-contido. Para remover, procura por FK_LOGO_MARQUEE_V1.
+                     ══════════════════════════════════════════════════════════════ -->
+        <style>
+            .fk-marquee {
+                --fk-marquee-bg: var(--fk-bg, #0f0f12);
+                padding: 28px 0 20px;
+                border-top: 1px solid rgba(255, 255, 255, 0.06);
+                overflow: hidden;
+                position: relative;
+                color: currentColor;
+            }
+
+            .fk-marquee-title {
+                text-align: center;
+                font-size: 12px;
+                font-weight: 600;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                opacity: 0.45;
+                margin: 0 0 18px;
+            }
+
+            .fk-marquee-track {
+                display: flex;
+                gap: 56px;
+                width: max-content;
+                animation: fk-marquee-scroll 40s linear infinite;
+                will-change: transform;
+            }
+
+            .fk-marquee-track:hover {
+                animation-play-state: paused;
+            }
+
+            .fk-marquee-group {
+                display: flex;
+                gap: 56px;
+                flex-shrink: 0;
+            }
+
+            .fk-marquee-item {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                height: 36px;
+                flex-shrink: 0;
+                color: currentColor;
+                opacity: 0.55;
+                filter: grayscale(1);
+                transition: opacity .25s, filter .25s, transform .25s;
+                text-decoration: none;
+            }
+
+            .fk-marquee-item:hover {
+                opacity: 1;
+                filter: grayscale(0);
+                transform: translateY(-2px);
+            }
+
+            .fk-marquee-item svg,
+            .fk-marquee-item img {
+                height: 100%;
+                width: auto;
+                display: block;
+            }
+
+            .fk-marquee::before,
+            .fk-marquee::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                width: 120px;
+                pointer-events: none;
+                z-index: 2;
+            }
+
+            .fk-marquee::before {
+                left: 0;
+                background: linear-gradient(90deg, var(--fk-marquee-bg), transparent);
+            }
+
+            .fk-marquee::after {
+                right: 0;
+                background: linear-gradient(270deg, var(--fk-marquee-bg), transparent);
+            }
+
+            @keyframes fk-marquee-scroll {
+                from {
+                    transform: translateX(0);
+                }
+
+                to {
+                    transform: translateX(-50%);
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .fk-marquee-track {
+                    animation: none;
+                    overflow-x: auto;
+                }
+            }
+
+            @media (max-width: 640px) {
+                .fk-marquee-track {
+                    animation-duration: 60s;
+                }
+
+                .fk-marquee-item {
+                    height: 26px;
+                }
+
+                .fk-marquee-group {
+                    gap: 36px;
+                }
+            }
+        </style>
+
+        <section class="fk-marquee" aria-label="Usado por equipas de">
+            <p class="fk-marquee-title">Trusted by teams who ship with confidence</p>
+            <div class="fk-marquee-track" id="fkMarqueeTrack">
+                <div class="fk-marquee-group">
+                    <a href="https://empresa-a.com" target="_blank" rel="noopener" class="fk-marquee-item" title="Empresa A">
+                        <svg viewBox="0 0 120 40" aria-hidden="true"><text x="0" y="26" font-size="20" font-weight="700" fill="currentColor">EMPRESA A</text></svg>
+                    </a>
+                    <a href="https://empresa-b.com" target="_blank" rel="noopener" class="fk-marquee-item" title="Empresa B">
+                        <svg viewBox="0 0 120 40" aria-hidden="true"><text x="0" y="26" font-size="20" font-weight="700" fill="currentColor">EMPRESA B</text></svg>
+                    </a>
+                    <a href="https://empresa-c.com" target="_blank" rel="noopener" class="fk-marquee-item" title="Empresa C">
+                        <svg viewBox="0 0 120 40" aria-hidden="true"><text x="0" y="26" font-size="20" font-weight="700" fill="currentColor">EMPRESA C</text></svg>
+                    </a>
+                    <a href="https://empresa-d.com" target="_blank" rel="noopener" class="fk-marquee-item" title="Empresa D">
+                        <svg viewBox="0 0 120 40" aria-hidden="true"><text x="0" y="26" font-size="20" font-weight="700" fill="currentColor">EMPRESA D</text></svg>
+                    </a>
+                    <a href="https://empresa-e.com" target="_blank" rel="noopener" class="fk-marquee-item" title="Empresa E">
+                        <svg viewBox="0 0 120 40" aria-hidden="true"><text x="0" y="26" font-size="20" font-weight="700" fill="currentColor">EMPRESA E</text></svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <script>
+            (function() {
+                'use strict';
+
+                function setupMarquee() {
+                    var track = document.getElementById('fkMarqueeTrack');
+                    if (!track) return;
+                    var grupos = track.querySelectorAll('.fk-marquee-group');
+                    if (grupos.length >= 2) return;
+                    var g1 = grupos[0];
+                    if (!g1) return;
+                    var g2 = g1.cloneNode(true);
+                    g2.setAttribute('aria-hidden', 'true');
+                    var links = g2.querySelectorAll('a');
+                    for (var i = 0; i < links.length; i++) links[i].setAttribute('tabindex', '-1');
+                    track.appendChild(g2);
+                    var n = g1.querySelectorAll('.fk-marquee-item').length || 5;
+                    var dur = Math.max(20, n * 4);
+                    track.style.animationDuration = dur + 's';
+                    console.log('[fk-marquee] ativo · ' + n + ' logos · ' + dur + 's');
+                }
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', setupMarquee);
+                } else {
+                    setupMarquee();
+                }
+            })();
+        </script>
+        <!-- ═══ /FK_LOGO_MARQUEE_V1 ═══ -->
+
+        <b>Frankei Trial</b> · <span data-i18n="Versão limitada">Versão limitada</span> ·
+        <a href="/frankei/precos" data-i18n="Fazer upgrade para Pro">Fazer upgrade para Pro →</a>
+
+    </footer>
+
+    </main>
+    </div>
+
+    <script>
+        /* Ligação dos controlos da topbar (lang, user, settings) */
+        (function() {
+            'use strict';
+
+            // ─── Lang chip ───
+            function setChipLabel(lang) {
+                var flags = {
+                    pt: '\uD83C\uDDF5\uD83C\uDDF9',
+                    en: '\uD83C\uDDEC\uD83C\uDDE7',
+                    fr: '\uD83C\uDDEB\uD83C\uDDF7',
+                    es: '\uD83C\uDDEA\uD83C\uDDF8'
+                };
+                var codes = {
+                    pt: 'PT',
+                    en: 'EN',
+                    fr: 'FR',
+                    es: 'ES'
+                };
+                var f = document.getElementById('fkLangChipFlag');
+                var c = document.getElementById('fkLangChipCode');
+                if (f) f.textContent = flags[lang] || flags.pt;
+                if (c) c.textContent = codes[lang] || 'PT';
+                document.querySelectorAll('.fk-lang-option').forEach(function(o) {
+                    var check = o.querySelector('.fk-lang-opt-check');
+                    if (check) check.textContent = (o.dataset.lang === lang) ? '\u2713' : '';
+                    o.classList.toggle('active', o.dataset.lang === lang);
+                });
+            }
+
+            var btn = document.getElementById('fkLangChip');
+            var dd = document.getElementById('fkLangDropdown');
+            if (btn && dd) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dd.hidden = !dd.hidden;
+                });
+                dd.querySelectorAll('.fk-lang-option').forEach(function(opt) {
+                    opt.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var lang = opt.dataset.lang;
+                        if (window.FrankeiI18n && window.FrankeiI18n.setLang) {
+                            window.FrankeiI18n.setLang(lang);
+                        }
+                        setChipLabel(lang);
+                        dd.hidden = true;
+                    });
+                });
+                document.addEventListener('click', function(e) {
+                    if (!dd.hidden && !e.target.closest('#fkLangChipWrap')) dd.hidden = true;
+                });
+            }
+
+            // ─── User chip ───
+            var userTrigger = document.getElementById('fkUserTrigger');
+            var userMenu = document.getElementById('fkUserMenu');
+            var userClose = document.getElementById('fkUserMenuClose');
+            if (userTrigger && userMenu) {
+                userTrigger.addEventListener('click', function(e) {
+                    if (e.target.closest('#fkUserMenu')) return;
+                    e.stopPropagation();
+                    userMenu.hidden = !userMenu.hidden;
+                });
+                if (userClose) userClose.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    userMenu.hidden = true;
+                });
+                document.addEventListener('click', function(e) {
+                    if (!userMenu.hidden && !userTrigger.contains(e.target)) userMenu.hidden = true;
+                });
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') userMenu.hidden = true;
+                });
+            }
+
+            // ─── Settings btn ─── (placeholder — mostra alert)
+            var setBtn = document.getElementById('fkSettingsBtn');
+            if (setBtn) {
+                setBtn.addEventListener('click', function() {
+                    alert('Configurações do Frankei Trial:\n\n• Plano: TRIAL\n• Testes: Unit apenas\n• Limite: 25 testes\n\nPara configurações completas, faz upgrade para Pro.');
+                });
+            }
+
+            // ─── Inicializar chip ───
+            var curLang = 'pt';
+            if (window.FrankeiI18n && window.FrankeiI18n.getLang) {
+                curLang = window.FrankeiI18n.getLang();
+            } else {
+                try {
+                    curLang = localStorage.getItem('frankei:lang') || 'pt';
+                } catch (_) {}
+            }
+            setChipLabel(curLang);
+            window.addEventListener('frankei:lang', function(ev) {
+                if (ev.detail && ev.detail.lang) setChipLabel(ev.detail.lang);
+            });
+        })();
+    </script>
+
+    <script src="/plugins/frankei/js/junit-view.js?v=<?= time() ?>" defer></script>
+    <script src="/plugins/frankei/js/dashboard.js?v=<?= time() ?>" defer></script>
+    <script src="/plugins/frankei-trial/js/trial.js?v=<?= time() ?>" defer></script>
+
+    <!-- FK_MODAL_B: modal de edição (usada pelo editor de testes) -->
+    <div class="fk-modal" id="fkModal">
+        <div class="fk-modal-content">
+            <button class="fk-modal-close" id="fkModalClose">✕</button>
+            <div class="fk-modal-body" id="fkModalBody"></div>
+        </div>
+    </div>
+
+    <div class="fk-modal fk-report-modal" id="fkReportModal">
+        <div class="fk-modal-content fk-report-modal-content">
+            <button class="fk-modal-close" id="fkReportClose">✕</button>
+
+            <div class="fk-report-head">
+                <h2 class="fk-report-title">📊 Report — Testes</h2>
+                <div class="fk-report-summary" id="fkReportSummary"></div>
+            </div>
+
+            <div class="fk-report-body">
+                <aside class="fk-report-side">
+                    <div class="fk-report-section">
+                        <div class="fk-report-label">Incluir no report</div>
+
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="junit" checked>
+                            <span>JUnit XML</span>
+                            <small>CI / GitHub Actions</small>
+                        </label>
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="coverage" checked>
+                            <span>Coverage HTML</span>
+                            <small>relatório visual</small>
+                        </label>
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="clover">
+                            <span>Clover XML</span>
+                            <small>integrações</small>
+                        </label>
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="cobertura">
+                            <span>Cobertura XML</span>
+                            <small>integrações</small>
+                        </label>
+                        <label class="fk-report-opt">
+                            <input type="checkbox" data-type="text">
+                            <span>Coverage Text</span>
+                            <small>resumo rápido</small>
+                        </label>
+                    </div>
+
+                    <div class="fk-report-section">
+                        <div class="fk-report-label">Motor</div>
+                        <div class="fk-report-engine" id="fkReportEngine">🐀 Pest</div>
+                    </div>
+
+                    <div class="fk-report-section">
+                        <button type="button" class="fk-btn fk-btn-primary fk-btn-block" id="fkReportGenerate">
+                            ⚙️ Gerar report
+                        </button>
+                    </div>
+                </aside>
+
+                <main class="fk-report-main">
+                    <div class="fk-report-tabs" id="fkReportTabs">
+                        <button type="button" class="fk-report-tab active" data-view="summary">Resumo</button>
+                        <button type="button" class="fk-report-tab" data-view="html">HTML</button>
+                        <button type="button" class="fk-report-tab" data-view="xml">XML</button>
+                        <button type="button" class="fk-report-tab" data-view="files">Ficheiros</button>
+                        <button type="button" class="fk-report-tab" data-view="beaver">🦫 Beaver Test Report</button>
+                        <button type="button" class="fk-report-tab-settings" id="fkBeaverConfigBtn" title="Configurações do Beaver Report" aria-label="Configurações">
+                            ⚙️
+                        </button>
+                    </div>
+
+                    <div class="fk-report-view" id="fkReportView">
+                        <div class="fk-report-empty">
+                            <div style="font-size:32px;opacity:0.4">📊</div>
+                            <p>Clica em <b>Gerar report</b> para produzir.</p>
+                        </div>
+                    </div>
+                </main>
+            </div>
+
+            <div class="fk-report-foot">
+                <span class="fk-report-foot-info" id="fkReportFootInfo"></span>
+                <div class="fk-report-foot-actions">
+                    <button type="button" class="fk-btn fk-btn-beaver" id="fkReportViewBeaver" title="Gerar e abrir o Beaver Test Report">
+                        <span class="fk-btn-beaver-icon">
+                            <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true">
+                                <defs>
+                                    <linearGradient id="bvgBtn" x1="0" y1="0" x2="1" y2="1">
+                                        <stop offset="0%" stop-color="#FFD79A" />
+                                        <stop offset="48%" stop-color="#FF9A3C" />
+                                        <stop offset="100%" stop-color="#FF6B35" />
+                                    </linearGradient>
+                                </defs>
+                                <circle cx="13" cy="17.5" r="7.5" fill="url(#bvgBtn)" opacity=".72" />
+                                <circle cx="51" cy="17.5" r="7.5" fill="url(#bvgBtn)" opacity=".72" />
+                                <ellipse cx="32" cy="33" rx="23" ry="21" fill="url(#bvgBtn)" />
+                                <ellipse cx="32" cy="41" rx="15.5" ry="12" fill="#0A0E14" opacity=".2" />
+                                <ellipse cx="32" cy="34.5" rx="4.6" ry="3.2" fill="#1A1208" />
+                                <circle cx="22.5" cy="26" r="3.4" fill="#1A1208" />
+                                <circle cx="41.5" cy="26" r="3.4" fill="#1A1208" />
+                                <circle cx="23.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                                <circle cx="42.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                                <rect x="27.3" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                                <rect x="32.4" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                            </svg>
+                        </span>
+                        Ver Report Beaver
+                    </button>
+                    <button type="button" class="fk-btn fk-btn-ghost" id="fkReportDownloadCurrent">📥 Download atual</button>
+                    <button type="button" class="fk-btn fk-btn-primary" id="fkReportDownloadZip">📦 Download tudo (.zip)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.FK_PATH = <?= json_encode($path ?? '') ?>;
+    </script>
+    <script src="/plugins/frankei/js/frankei-test-creator.js?v=<?= time() ?>"></script>
+
+
+    <script>
+        /* Contador de trial */
+        (function() {
+            var chip = document.getElementById('fkTrialChip');
+            var timeEl = document.getElementById('fkTrialTime');
+            if (!chip || !timeEl) return;
+
+            var expires = parseInt(chip.dataset.expires, 10) * 1000;
+
+            function pad(n) {
+                return n < 10 ? '0' + n : '' + n;
+            }
+
+            function tick() {
+                var diff = Math.max(0, expires - Date.now());
+
+                if (diff <= 0) {
+                    timeEl.textContent = 'expirado';
+                    chip.classList.add('is-urgent');
+                    setTimeout(function() {
+                        window.location.href = '/auth/login?erro=' + encodeURIComponent('Trial expirado.');
+                    }, 5000);
+                    return;
+                }
+
+                var sec = Math.floor(diff / 1000);
+                var days = Math.floor(sec / 86400);
+                var hours = Math.floor((sec % 86400) / 3600);
+                var mins = Math.floor((sec % 3600) / 60);
+                var secs = sec % 60;
+
+                if (days >= 1) {
+                    timeEl.textContent = days + 'd ' + pad(hours) + 'h ' + pad(mins) + 'm';
+                } else if (hours >= 1) {
+                    timeEl.textContent = pad(hours) + 'h ' + pad(mins) + 'm ' + pad(secs) + 's';
+                } else {
+                    timeEl.textContent = pad(mins) + 'm ' + pad(secs) + 's';
+                }
+
+                chip.classList.remove('is-soon', 'is-urgent');
+                if (sec < 3600) chip.classList.add('is-urgent');
+                else if (sec < 86400) chip.classList.add('is-soon');
+            }
+
+            tick();
+            setInterval(tick, 1000);
+        })();
+    </script>
+
+
+    <script>
+        /* Capturar erros JS para debug */
+        window.addEventListener('error', function(e) {
+            fetch('/api/frankei/log-js-error', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    msg: e.message,
+                    file: e.filename,
+                    line: e.lineno,
+                    col: e.colno,
+                    stack: e.error ? e.error.stack : ''
+                })
+            });
+        });
+    </script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+
+</html>

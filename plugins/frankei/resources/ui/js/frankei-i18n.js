@@ -1,0 +1,151 @@
+(function (window, document) {
+  'use strict';
+
+  // FK_I18N_EMBEDDED: dicionario carregado directamente (sem fetch)
+  var DICT_EMBEDDED = {"_meta":{"source":"pt","version":1,"languages":{"pt":{"name":"Português","flag":"🇵🇹"},"en":{"name":"English","flag":"🇬🇧"},"fr":{"name":"Français","flag":"🇫🇷"},"es":{"name":"Español","flag":"🇪🇸"}}},"strings":{"Frankei":{"pt":"Frankei","en":"Frankei","fr":"Frankei","es":"Frankei"},"A consola de testes do Beaver Framework":{"pt":"A consola de testes do Beaver Framework","en":"The Beaver Framework testing console","fr":"La console de tests de Beaver Framework","es":"La consola de tests del Beaver Framework"},"Análise":{"pt":"Análise","en":"Analysis","fr":"Analyse","es":"Análisis"},"Testes":{"pt":"Testes","en":"Tests","fr":"Tests","es":"Tests"},"Cobertura":{"pt":"Cobertura","en":"Coverage","fr":"Couverture","es":"Cobertura"},"Segurança":{"pt":"Segurança","en":"Security","fr":"Sécurité","es":"Seguridad"},"Desempenho":{"pt":"Desempenho","en":"Performance","fr":"Performance","es":"Rendimiento"},"Código":{"pt":"Código","en":"Code","fr":"Code","es":"Código"},"Avançado":{"pt":"Avançado","en":"Advanced","fr":"Avancé","es":"Avanzado"},"Correr análise":{"pt":"Correr análise","en":"Run analysis","fr":"Lancer l'analyse","es":"Ejecutar análisis"},"Correr tudo":{"pt":"Correr tudo","en":"Run all","fr":"Tout exécuter","es":"Ejecutar todo"},"Exportar JSON":{"pt":"Exportar JSON","en":"Export JSON","fr":"Exporter JSON","es":"Exportar JSON"},"Report":{"pt":"Report","en":"Report","fr":"Rapport","es":"Informe"},"Criar teste":{"pt":"Criar teste","en":"Create test","fr":"Créer un test","es":"Crear test"},"Gerar report":{"pt":"Gerar report","en":"Generate report","fr":"Générer le rapport","es":"Generar informe"},"Download atual":{"pt":"Download atual","en":"Current download","fr":"Télécharger actuel","es":"Descarga actual"},"Download tudo (.zip)":{"pt":"Download tudo (.zip)","en":"Download all (.zip)","fr":"Télécharger tout (.zip)","es":"Descargar todo (.zip)"},"Ver Report Beaver":{"pt":"Ver Report Beaver","en":"View Beaver Report","fr":"Voir le rapport Beaver","es":"Ver informe Beaver"},"Estado":{"pt":"Estado","en":"Status","fr":"État","es":"Estado"},"Alvos":{"pt":"Alvos","en":"Targets","fr":"Cibles","es":"Objetivos"},"Findings":{"pt":"Findings","en":"Findings","fr":"Constats","es":"Hallazgos"},"Duração":{"pt":"Duração","en":"Duration","fr":"Durée","es":"Duración"},"Controlo":{"pt":"Controlo","en":"Control","fr":"Contrôle","es":"Control"},"⚙️ Configurações":{"pt":"⚙️ Configurações","en":"⚙️ Settings","fr":"⚙️ Paramètres","es":"⚙️ Ajustes"},"Configurações":{"pt":"Configurações","en":"Settings","fr":"Paramètres","es":"Ajustes"},"Idioma":{"pt":"Idioma","en":"Language","fr":"Langue","es":"Idioma"},"🌐 Idioma":{"pt":"🌐 Idioma","en":"🌐 Language","fr":"🌐 Langue","es":"🌐 Idioma"},"Conta":{"pt":"Conta","en":"Account","fr":"Compte","es":"Cuenta"},"Fechar":{"pt":"Fechar","en":"Close","fr":"Fermer","es":"Cerrar"},"Todos":{"pt":"Todos","en":"All","fr":"Tous","es":"Todos"},"Total Testes":{"pt":"Total Testes","en":"Total tests","fr":"Tests totaux","es":"Tests totales"},"Passaram":{"pt":"Passaram","en":"Passed","fr":"Réussis","es":"Aprobados"},"Falhas":{"pt":"Falhas","en":"Failures","fr":"Échecs","es":"Fallos"},"Todos ":{"pt":"Todos","en":"All","fr":"Tous","es":"Todos"},"Pass":{"pt":"Pass","en":"Pass","fr":"Réussi","es":"Aprobado"},"Fail":{"pt":"Fail","en":"Fail","fr":"Échec","es":"Fallo"},"Skip":{"pt":"Skip","en":"Skip","fr":"Ignoré","es":"Omitido"},"📊 Report — Testes":{"pt":"📊 Report — Testes","en":"📊 Report — Tests","fr":"📊 Rapport — Tests","es":"📊 Informe — Tests"},"Incluir no report":{"pt":"Incluir no report","en":"Include in report","fr":"Inclure dans le rapport","es":"Incluir en el informe"},"Motor":{"pt":"Motor","en":"Engine","fr":"Moteur","es":"Motor"},"Clica em Gerar report para produzir.":{"pt":"Clica em Gerar report para produzir.","en":"Click Generate report to produce.","fr":"Cliquez sur Générer le rapport pour produire.","es":"Haz clic en Generar informe para producir."},"Resumo":{"pt":"Resumo","en":"Summary","fr":"Résumé","es":"Resumen"},"Ficheiros":{"pt":"Ficheiros","en":"Files","fr":"Fichiers","es":"Ficheros"},"Métodos":{"pt":"Métodos","en":"Methods","fr":"Méthodes","es":"Métodos"},"Nao cob":{"pt":"Nao cob","en":"Uncovered","fr":"Non couv.","es":"No cubr."},"Cob":{"pt":"Cob","en":"Cov.","fr":"Couv.","es":"Cubr."},"Criar um novo teste":{"pt":"Criar um novo teste","en":"Create a new test","fr":"Créer un nouveau test","es":"Crear un nuevo test"},"Classe":{"pt":"Classe","en":"Class","fr":"Classe","es":"Clase"},"Método":{"pt":"Método","en":"Method","fr":"Méthode","es":"Método"},"Ficheiro":{"pt":"Ficheiro","en":"File","fr":"Fichier","es":"Fichero"},"Cancelar":{"pt":"Cancelar","en":"Cancel","fr":"Annuler","es":"Cancelar"},"Guardar":{"pt":"Guardar","en":"Save","fr":"Enregistrer","es":"Guardar"},"Fechar ✕":{"pt":"Fechar ✕","en":"Close ✕","fr":"Fermer ✕","es":"Cerrar ✕"},"A carregar...":{"pt":"A carregar...","en":"Loading...","fr":"Chargement...","es":"Cargando..."},"A gerar...":{"pt":"A gerar...","en":"Generating...","fr":"Génération...","es":"Generando..."},"Pronto":{"pt":"Pronto","en":"Ready","fr":"Prêt","es":"Listo"},"Concluído":{"pt":"Concluído","en":"Done","fr":"Terminé","es":"Completado"},"Escolhe o idioma da consola":{"pt":"Escolhe o idioma da consola","en":"Choose the console language","fr":"Choisissez la langue de la console","es":"Elige el idioma de la consola"},"Aplicado a todo o Frankei":{"pt":"Aplicado a todo o Frankei (não inclui o conteúdo em análise)","en":"Applied to all of Frankei (excludes analyzed content)","fr":"Appliqué à tout Frankei (exclut le contenu analysé)","es":"Aplicado a todo Frankei (excluye el contenido analizado)"},"$ Aguarda análise. Clica \"Correr análise\" para começar.":{"pt":"$ Aguarda análise. Clica \"Correr análise\" para começar.","en":"$ Waiting for analysis. Click \"Run analysis\" to start.","fr":"$ En attente d'analyse. Cliquez sur \"Lancer l'analyse\" pour commencer.","es":"$ Esperando análisis. Haz clic en \"Ejecutar análisis\" para empezar."},"A iniciar…":{"pt":"A iniciar…","en":"Starting…","fr":"Démarrage…","es":"Iniciando…"},"Alvo":{"pt":"Alvo","en":"Target","fr":"Cible","es":"Objetivo"},"Aninhamento profundo a partir de":{"pt":"Aninhamento profundo a partir de","en":"Deep nesting starting at","fr":"Imbrication profonde à partir de","es":"Anidamiento profundo desde"},"Análise a correr":{"pt":"Análise a correr","en":"Analysis running","fr":"Analyse en cours","es":"Análisis en curso"},"Bases de dados":{"pt":"Bases de dados","en":"Databases","fr":"Bases de données","es":"Bases de datos"},"Categoria":{"pt":"Categoria","en":"Category","fr":"Catégorie","es":"Categoría"},"Clover XML":{"pt":"Clover XML","en":"Clover XML","fr":"Clover XML","es":"Clover XML"},"Cobertura XML":{"pt":"Cobertura XML","en":"Cobertura XML","fr":"Cobertura XML","es":"Cobertura XML"},"Comportamento":{"pt":"Comportamento","en":"Behavior","fr":"Comportement","es":"Comportamiento"},"Configuração":{"pt":"Configuração","en":"Configuration","fr":"Configuration","es":"Configuración"},"Contexto de análise":{"pt":"Contexto de análise","en":"Analysis context","fr":"Contexte d'analyse","es":"Contexto de análisis"},"Control":{"pt":"Controlo","en":"Control","fr":"Contrôle","es":"Control"},"Correções automáticas":{"pt":"Correções automáticas","en":"Automatic fixes","fr":"Corrections automatiques","es":"Correcciones automáticas"},"Coverage HTML":{"pt":"Coverage HTML","en":"Coverage HTML","fr":"Coverage HTML","es":"Coverage HTML"},"Coverage Text":{"pt":"Coverage Text","en":"Coverage Text","fr":"Coverage Text","es":"Coverage Text"},"Código & Qualidade":{"pt":"Código & Qualidade","en":"Code & Quality","fr":"Code & Qualité","es":"Código y Calidad"},"Duración":{"pt":"Duração","en":"Duration","fr":"Durée","es":"Duración"},"English":{"pt":"English","en":"English","fr":"English","es":"English"},"Español":{"pt":"Español","en":"Español","fr":"Español","es":"Español"},"Ficheros":{"pt":"Ficheiros","en":"Files","fr":"Fichiers","es":"Ficheros"},"Filtros":{"pt":"Filtros","en":"Filters","fr":"Filtres","es":"Filtros"},"Français":{"pt":"Français","en":"Français","fr":"Français","es":"Français"},"Função longa a partir de":{"pt":"Função longa a partir de","en":"Long function starting at","fr":"Fonction longue à partir de","es":"Función larga desde"},"HTML":{"pt":"HTML","en":"HTML","fr":"HTML","es":"HTML"},"Hallazgos":{"pt":"Findings","en":"Findings","fr":"Constats","es":"Hallazgos"},"Incluir en el informe":{"pt":"Incluir no report","en":"Include in report","fr":"Inclure dans le rapport","es":"Incluir en el informe"},"JUnit XML":{"pt":"JUnit XML","en":"JUnit XML","fr":"JUnit XML","es":"JUnit XML"},"Limite de findings":{"pt":"Limite de findings","en":"Findings limit","fr":"Limite de constats","es":"Límite de hallazgos"},"Limites":{"pt":"Limites","en":"Limits","fr":"Limites","es":"Límites"},"Linhas de contexto":{"pt":"Linhas de contexto","en":"Context lines","fr":"Lignes de contexte","es":"Líneas de contexto"},"Microserviços":{"pt":"Microserviços","en":"Microservices","fr":"Microservices","es":"Microservicios"},"Número mágico a partir de":{"pt":"Número mágico a partir de","en":"Magic number starting at","fr":"Nombre magique à partir de","es":"Número mágico desde"},"Objetivos":{"pt":"Alvos","en":"Targets","fr":"Cibles","es":"Objetivos"},"PHPUnit":{"pt":"PHPUnit","en":"PHPUnit","fr":"PHPUnit","es":"PHPUnit"},"PRO":{"pt":"PRO","en":"PRO","fr":"PRO","es":"PRO"},"Palavras-passe":{"pt":"Palavras-passe","en":"Passwords","fr":"Mots de passe","es":"Contraseñas"},"Passwords":{"pt":"Palavras-passe","en":"Passwords","fr":"Mots de passe","es":"Contraseñas"},"Pastas ignoradas":{"pt":"Pastas ignoradas","en":"Ignored folders","fr":"Dossiers ignorés","es":"Carpetas ignoradas"},"Performance":{"pt":"Desempenho","en":"Performance","fr":"Performance","es":"Rendimiento"},"Pest":{"pt":"Pest","en":"Pest","fr":"Pest","es":"Pest"},"Português":{"pt":"Português","en":"Português","fr":"Português","es":"Português"},"Relatório":{"pt":"Report","en":"Report","fr":"Rapport","es":"Informe"},"Rendimiento":{"pt":"Desempenho","en":"Performance","fr":"Performance","es":"Rendimiento"},"Resumen":{"pt":"Resumo","en":"Summary","fr":"Résumé","es":"Resumen"},"SELECT *":{"pt":"SELECT *","en":"SELECT *","fr":"SELECT *","es":"SELECT *"},"Scanners ativos":{"pt":"Scanners ativos","en":"Active scanners","fr":"Scanners actifs","es":"Escáneres activos"},"Seguridad":{"pt":"Segurança","en":"Security","fr":"Sécurité","es":"Seguridad"},"Sem resultados ainda":{"pt":"Sem resultados ainda","en":"No results yet","fr":"Pas encore de résultats","es":"Aún sin resultados"},"Sensíveis":{"pt":"Sensíveis","en":"Sensitive","fr":"Sensibles","es":"Sensibles"},"Sessão":{"pt":"Sessão","en":"Session","fr":"Session","es":"Sesión"},"Severidade":{"pt":"Severidade","en":"Severity","fr":"Sévérité","es":"Severidad"},"Tabelas personalizadas":{"pt":"Tabelas personalizadas","en":"Custom tables","fr":"Tables personnalisées","es":"Tablas personalizadas"},"Tabelas que requerem atenção":{"pt":"Tabelas que requerem atenção","en":"Tables requiring attention","fr":"Tables nécessitant attention","es":"Tablas que requieren atención"},"Tests":{"pt":"Testes","en":"Tests","fr":"Tests","es":"Tests"},"Trial":{"pt":"Trial","en":"Trial","fr":"Essai","es":"Prueba"},"Tudo":{"pt":"Tudo","en":"All","fr":"Tout","es":"Todo"},"Verificações":{"pt":"Verificações","en":"Checks","fr":"Vérifications","es":"Verificaciones"},"XML":{"pt":"XML","en":"XML","fr":"XML","es":"XML"},"frankei — tudo":{"pt":"frankei — tudo","en":"frankei — all","fr":"frankei — tout","es":"frankei — todo"},"pronto":{"pt":"pronto","en":"ready","fr":"prêt","es":"listo"},"soon":{"pt":"em breve","en":"soon","fr":"bientôt","es":"pronto"},"tudo":{"pt":"tudo","en":"all","fr":"tout","es":"todo"},"⚙️ Ajustes":{"pt":"⚙️ Ajustes","en":"⚙️ Settings","fr":"⚙️ Paramètres","es":"⚙️ Ajustes"},"⚙️ Gerar report":{"pt":"⚙️ Gerar report","en":"⚙️ Generate report","fr":"⚙️ Générer le rapport","es":"⚙️ Generar informe"},"⚡ Desempenho":{"pt":"⚡ Desempenho","en":"⚡ Performance","fr":"⚡ Performance","es":"⚡ Rendimiento"},"✓ Concluído":{"pt":"✓ Concluído","en":"✓ Done","fr":"✓ Terminé","es":"✓ Completado"},"➕ Criar teste":{"pt":"➕ Criar teste","en":"➕ Create test","fr":"➕ Créer un test","es":"➕ Crear test"},"🇪🇸":{"pt":"🇪🇸","en":"🇪🇸","fr":"🇪🇸","es":"🇪🇸"},"🇫🇷":{"pt":"🇫🇷","en":"🇫🇷","fr":"🇫🇷","es":"🇫🇷"},"🇬🇧":{"pt":"🇬🇧","en":"🇬🇧","fr":"🇬🇧","es":"🇬🇧"},"🇵🇹":{"pt":"🇵🇹","en":"🇵🇹","fr":"🇵🇹","es":"🇵🇹"},"🎯 Avançado":{"pt":"🎯 Avançado","en":"🎯 Advanced","fr":"🎯 Avancé","es":"🎯 Avanzado"},"🐀 Pest":{"pt":"🐀 Pest","en":"🐀 Pest","fr":"🐀 Pest","es":"🐀 Pest"},"👤 Conta":{"pt":"👤 Conta","en":"👤 Account","fr":"👤 Compte","es":"👤 Cuenta"},"📁 Trocar aplicação":{"pt":"📁 Trocar aplicação","en":"📁 Switch application","fr":"📁 Changer d'application","es":"📁 Cambiar aplicación"},"📊 Análise":{"pt":"📊 Análise","en":"📊 Analysis","fr":"📊 Analyse","es":"📊 Análisis"},"📊 Bases de dados":{"pt":"📊 Bases de dados","en":"📊 Databases","fr":"📊 Bases de données","es":"📊 Bases de datos"},"📊 Informe — Tests":{"pt":"📊 Report — Testes","en":"📊 Report — Tests","fr":"📊 Rapport — Tests","es":"📊 Informe — Tests"},"📥 Download atual":{"pt":"📥 Download atual","en":"📥 Current download","fr":"📥 Télécharger actuel","es":"📥 Descarga actual"},"📥 Report":{"pt":"📥 Report","en":"📥 Report","fr":"📥 Rapport","es":"📥 Informe"},"🔑 Palavras-passe":{"pt":"🔑 Palavras-passe","en":"🔑 Passwords","fr":"🔑 Mots de passe","es":"🔑 Contraseñas"},"🔒 Segurança":{"pt":"🔒 Segurança","en":"🔒 Security","fr":"🔒 Sécurité","es":"🔒 Seguridad"},"🔧 Auto-fix":{"pt":"🔧 Auto-fix","en":"🔧 Auto-fix","fr":"🔧 Auto-correction","es":"🔧 Auto-fix"},"🔴 Alto":{"pt":"🔴 Alto","en":"🔴 High","fr":"🔴 Élevé","es":"🔴 Alto"},"🔴 Crítico":{"pt":"🔴 Crítico","en":"🔴 Critical","fr":"🔴 Critique","es":"🔴 Crítico"},"🚪 Terminar sessão":{"pt":"🚪 Terminar sessão","en":"🚪 Log out","fr":"🚪 Se déconnecter","es":"🚪 Cerrar sesión"},"🟡 Médio":{"pt":"🟡 Médio","en":"🟡 Medium","fr":"🟡 Moyen","es":"🟡 Medio"},"🟢 Baixo":{"pt":"🟢 Baixo","en":"🟢 Low","fr":"🟢 Faible","es":"🟢 Bajo"},"🟢 Info":{"pt":"🟢 Info","en":"🟢 Info","fr":"🟢 Info","es":"🟢 Info"},"🦫 Beaver Test Report":{"pt":"🦫 Beaver Test Report","en":"🦫 Beaver Test Report","fr":"🦫 Beaver Test Report","es":"🦫 Beaver Test Report"},"🧪 Unit Tests":{"pt":"🧪 Testes Unitários","en":"🧪 Unit Tests","fr":"🧪 Tests Unitaires","es":"🧪 Tests Unitarios"},"🧹 Código":{"pt":"🧹 Código","en":"🧹 Code","fr":"🧹 Code","es":"🧹 Código"},"🧹 Limpar testes":{"pt":"🧹 Limpar testes","en":"🧹 Clean tests","fr":"🧹 Nettoyer les tests","es":"🧹 Limpiar tests"},"▶ Correr":{"pt":"▶ Correr","en":"▶ Run","fr":"▶ Lancer","es":"▶ Ejecutar"},"▶ Correr ":{"pt":"▶ Correr ","en":"▶ Run ","fr":"▶ Lancer ","es":"▶ Ejecutar "},"all":{"pt":"todos","en":"all","fr":"tous","es":"todos"},"unit":{"pt":"unit","en":"unit","fr":"unit","es":"unit"},"feature":{"pt":"feature","en":"feature","fr":"feature","es":"feature"},"coverage":{"pt":"cobertura","en":"coverage","fr":"couverture","es":"cobertura"},"unit tests":{"pt":"testes unit","en":"unit tests","fr":"tests unit","es":"tests unit"},"feature tests":{"pt":"testes feature","en":"feature tests","fr":"tests feature","es":"tests feature"},"A correr…":{"pt":"A correr…","en":"Running…","fr":"En cours…","es":"Ejecutando…"},"⏳ A correr…":{"pt":"⏳ A correr…","en":"⏳ Running…","fr":"⏳ En cours…","es":"⏳ Ejecutando…"},"Unit":{"pt":"Unit","en":"Unit","fr":"Unit","es":"Unit"},"Feature":{"pt":"Feature","en":"Feature","fr":"Feature","es":"Feature"},"com cobertura":{"pt":"com cobertura","en":"with coverage","fr":"avec couverture","es":"con cobertura"},"Idioma / Language":{"pt":"Idioma","en":"Language","fr":"Langue","es":"Idioma"},"👤 Account":{"pt":"👤 Conta","en":"👤 Account","fr":"👤 Compte","es":"👤 Cuenta"},"Session":{"pt":"Sessão","en":"Session","fr":"Session","es":"Sesión"},"📁 Switch application":{"pt":"📁 Trocar aplicação","en":"📁 Switch application","fr":"📁 Changer d'application","es":"📁 Cambiar aplicación"},"🚪 Log out":{"pt":"🚪 Terminar sessão","en":"🚪 Log out","fr":"🚪 Se déconnecter","es":"🚪 Cerrar sesión"},"Close":{"pt":"Fechar","en":"Close","fr":"Fermer","es":"Cerrar"},"Frankei Trial":{"pt":"Frankei Trial","en":"Frankei Trial","fr":"Frankei Trial","es":"Frankei Trial"},"Testes Unit":{"pt":"Testes Unit","en":"Unit Tests","fr":"Tests Unitaires","es":"Tests Unitarios"},"Tipo de testes permitido":{"pt":"Tipo de testes permitido","en":"Allowed test type","fr":"Type de test autorisé","es":"Tipo de test permitido"},"Testes disponíveis":{"pt":"Testes disponíveis","en":"Available tests","fr":"Tests disponibles","es":"Tests disponibles"},"Correr testes":{"pt":"Correr testes","en":"Run tests","fr":"Lancer les tests","es":"Ejecutar tests"},"Correr testes Unit":{"pt":"Correr testes Unit","en":"Run Unit tests","fr":"Lancer les tests Unit","es":"Ejecutar tests Unit"},"A correr...":{"pt":"A correr...","en":"Running...","fr":"En cours...","es":"Ejecutando..."},"Recarregar":{"pt":"Recarregar","en":"Reload","fr":"Recharger","es":"Recargar"},"Ainda sem output.":{"pt":"Ainda sem output.","en":"No output yet.","fr":"Pas encore de sortie.","es":"Aún sin salida."},"Clica em":{"pt":"Clica em","en":"Click","fr":"Cliquez sur","es":"Haz clic en"},"para correr":{"pt":"para correr.","en":"to run.","fr":"pour lancer.","es":"para ejecutar."},"Fazer upgrade":{"pt":"Fazer upgrade","en":"Upgrade","fr":"Passer au supérieur","es":"Mejorar plan"},"Fazer upgrade para Pro":{"pt":"Fazer upgrade para Pro","en":"Upgrade to Pro","fr":"Passer à Pro","es":"Mejorar a Pro"},"Limites do plano":{"pt":"Limites do plano","en":"Plan limits","fr":"Limites du forfait","es":"Límites del plan"},"Máx.":{"pt":"Máx.","en":"Max.","fr":"Max.","es":"Máx."},"ficheiros":{"pt":"ficheiros","en":"files","fr":"fichiers","es":"ficheros"},"testes":{"pt":"testes","en":"tests","fr":"tests","es":"tests"},"Trocar aplicação":{"pt":"Trocar aplicação","en":"Switch application","fr":"Changer d'application","es":"Cambiar aplicación"},"Terminar sessão":{"pt":"Terminar sessão","en":"Log out","fr":"Se déconnecter","es":"Cerrar sesión"},"A carregar testes...":{"pt":"A carregar testes...","en":"Loading tests...","fr":"Chargement des tests...","es":"Cargando tests..."},"Sem testes Unit.":{"pt":"Sem testes Unit.","en":"No Unit tests.","fr":"Aucun test Unit.","es":"Sin tests Unit."},"Cria um novo para começar.":{"pt":"Cria um novo para começar.","en":"Create a new one to start.","fr":"Créez-en un pour commencer.","es":"Crea uno nuevo para empezar."},"Versão limitada":{"pt":"Versão limitada","en":"Limited version","fr":"Version limitée","es":"Versión limitada"},"Saúde do sistema":{"pt":"Saúde do sistema","en":"System health","fr":"Santé du système","es":"Salud del sistema"}}};
+
+  var STORAGE_KEY = 'frankei:lang';
+  var DICT        = DICT_EMBEDDED.strings || {};
+  var META        = DICT_EMBEDDED._meta || { languages: { pt: { name: 'Português', flag: '🇵🇹' } } };
+  var LANG        = 'pt';
+
+  // Elementos que NUNCA devem ser traduzidos
+  var SKIP_SELECTORS = [
+    'script', 'style', 'code', 'pre', 'textarea',
+    '[data-i18n-skip]',
+    '.fk-terminal', '.fk-term-line', '.fk-term-output',
+    '.jv-table', '.cv-table', '.cv-code', '.fk-code-wrap',
+    '.fk-report-preview-text', '.junit-view',
+    'iframe', 'svg'
+  ].join(',');
+
+  function t(key) {
+    if (!DICT || !DICT[key]) return key;
+    return DICT[key][LANG] || DICT[key].pt || key;
+  }
+  window.t = t;
+
+  function pareceDinamico(txt) {
+    if (/\d/.test(txt)) return true;
+    if (/[{}();=<>]/.test(txt)) return true;
+    if (txt.indexOf('·') !== -1) return true;
+    if (txt.indexOf('/') !== -1 && txt.length > 3) return true;
+    if (txt.length > 80) return true;
+    return false;
+  }
+
+  function traduzirNo(node) {
+    if (node.nodeType === 3) {
+      var pai = node.parentNode;
+      if (!pai || (pai.closest && pai.closest(SKIP_SELECTORS))) return;
+
+      if (node.__fkJ18nOrig === undefined) {
+        node.__fkJ18nOrig = node.nodeValue;
+      }
+      var original = node.__fkJ18nOrig;
+      var txt = (original || '').trim();
+      if (!txt || pareceDinamico(txt) || !DICT[txt]) return;
+
+      var novo = DICT[txt][LANG] || DICT[txt].pt || txt;
+      var pre = (original.match(/^\s*/) || [''])[0];
+      var pos = (original.match(/\s*$/) || [''])[0];
+      node.nodeValue = pre + novo + pos;
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    if (node.matches && node.matches(SKIP_SELECTORS)) return;
+
+    ['title', 'placeholder', 'aria-label'].forEach(function (attr) {
+      if (!node.hasAttribute || !node.hasAttribute(attr)) return;
+      var k = '__fkJ18nOrig_' + attr;
+      if (!node[k]) node[k] = node.getAttribute(attr);
+      var orig = node[k];
+      if (!DICT[orig]) return;
+      node.setAttribute(attr, DICT[orig][LANG] || DICT[orig].pt || orig);
+    });
+
+    for (var i = 0; i < node.childNodes.length; i++) {
+      traduzirNo(node.childNodes[i]);
+    }
+  }
+
+  function aplicar() {
+    if (!DICT) return;
+    traduzirNo(document.body);
+    document.documentElement.lang = LANG;
+  }
+
+  function setLang(lang) {
+    if (!META.languages[lang]) lang = 'pt';
+    LANG = lang;
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch (_) {}
+    aplicar();
+
+    // Actualizar chip no topbar
+    var flags = { pt: '🇵🇹', en: '🇬🇧', fr: '🇫🇷', es: '🇪🇸' };
+    var codes = { pt: 'PT', en: 'EN', fr: 'FR', es: 'ES' };
+    var flagEl = document.getElementById('fkLangChipFlag');
+    var codeEl = document.getElementById('fkLangChipCode');
+    if (flagEl) flagEl.textContent = flags[lang] || flags.pt;
+    if (codeEl) codeEl.textContent = codes[lang] || 'PT';
+
+    // Marcar opção activa no dropdown
+    document.querySelectorAll('.fk-lang-option').forEach(function (o) {
+      var check = o.querySelector('.fk-lang-opt-check');
+      if (check) check.textContent = (o.dataset.lang === lang) ? '✓' : '';
+      o.classList.toggle('active', o.dataset.lang === lang);
+    });
+
+    // Notificar
+    try {
+      window.dispatchEvent(new CustomEvent('frankei:lang', { detail: { lang: lang } }));
+    } catch (_) {}
+  }
+  window.frankeiSetLang = setLang;
+
+  function ligarObservador() {
+    if (!window.MutationObserver) return;
+    var pendente = false;
+    var obs = new MutationObserver(function () {
+      if (pendente) return;
+      pendente = true;
+      setTimeout(function () { pendente = false; aplicar(); }, 200);
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Expor API
+  window.FrankeiI18n = {
+    setLang: setLang,
+    getLang: function () { return LANG; },
+    t: t,
+    reload: aplicar,
+    toggle: function () {}
+  };
+
+  function init() {
+    var saved = null;
+    try { saved = localStorage.getItem(STORAGE_KEY); } catch (_) {}
+    var navLang = 'pt';
+    try {
+      var nav = (navigator.language || 'pt').slice(0, 2).toLowerCase();
+      if (META.languages[nav]) navLang = nav;
+    } catch (_) {}
+    LANG = saved || navLang || 'pt';
+    if (!META.languages[LANG]) LANG = 'pt';
+
+    console.log('[frankei-i18n] OK. Idioma:', LANG, '| Chaves:', Object.keys(DICT).length);
+
+    aplicar();
+    ligarObservador();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Reaplicar quando o DOM estiver todo pronto (garante que apanha conteudo tardio)
+  window.addEventListener('load', function () { setTimeout(init, 100); });
+})(window, document);

@@ -1,0 +1,73 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial\Http;
+
+use Beaver\Http\Request;
+use Beaver\Http\Response;
+use Beaver\Plugins\FrankeiTrial\Support\TrialLimits;
+
+class TrialController
+{
+    public function index(Request $request): Response
+    {
+        $plan    = TrialLimits::plan();
+        $isTrial = TrialLimits::isTrial();
+
+        $user = $this->utilizadorAtual();
+
+        $limits = [
+            'maxFiles'              => TrialLimits::maxFiles() === PHP_INT_MAX ? 0 : TrialLimits::maxFiles(),
+            'maxTests'              => TrialLimits::maxTests() === PHP_INT_MAX ? 0 : TrialLimits::maxTests(),
+            'maxFindings'           => TrialLimits::maxFindings() === PHP_INT_MAX ? 0 : TrialLimits::maxFindings(),
+            'allowedSuites'         => TrialLimits::allowedSuites(),
+            'allowSecurityScanners' => TrialLimits::allowSecurityScanners(),
+        ];
+
+        $view = dirname(__DIR__, 2) . '/resources/views/trial.php';
+
+        if (!is_file($view)) {
+            return Response::html('<pre>View trial.php nao encontrada em: ' . htmlspecialchars($view) . '</pre>', 500);
+        }
+
+        ob_start();
+        extract([
+            'user'    => $user,
+            'plan'    => $plan,
+            'isTrial' => $isTrial,
+            'limits'  => $limits,
+        ]);
+        require $view;
+        $html = ob_get_clean();
+
+        return Response::html($html ?: '');
+    }
+
+    public function health(Request $request): Response
+    {
+        return Response::json([
+            'ok'     => true,
+            'plugin' => 'frankei-trial',
+            'plan'   => TrialLimits::plan(),
+            'limits' => [
+                'maxFiles'              => TrialLimits::maxFiles() === PHP_INT_MAX ? null : TrialLimits::maxFiles(),
+                'maxTests'              => TrialLimits::maxTests() === PHP_INT_MAX ? null : TrialLimits::maxTests(),
+                'maxFindings'           => TrialLimits::maxFindings() === PHP_INT_MAX ? null : TrialLimits::maxFindings(),
+                'allowedSuites'         => TrialLimits::allowedSuites(),
+                'allowSecurityScanners' => TrialLimits::allowSecurityScanners(),
+            ],
+            'timestamp' => date('c'),
+        ]);
+    }
+
+    private function utilizadorAtual(): array
+    {
+        try {
+            $u = \App\Services\UserService::atual();
+            return is_array($u) ? $u : ['nome' => 'dev'];
+        } catch (\Throwable $e) {
+            return ['nome' => 'dev'];
+        }
+    }
+}

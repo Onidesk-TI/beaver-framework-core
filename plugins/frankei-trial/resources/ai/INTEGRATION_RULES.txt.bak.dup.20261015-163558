@@ -1,0 +1,7 @@
+cd /var/www/beaver/ftp/beaver-framework && \
+cp plugins/frankei-trial/resources/ai/INTEGRATION_RULES.txt \
+   plugins/frankei-trial/resources/ai/INTEGRATION_RULES.txt.bak.dup.$(date +%Y%m%d-%H%M%S) && \
+nano plugins/frankei-trial/resources/ai/INTEGRATION_RULES.txt
+
+
+

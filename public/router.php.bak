@@ -1,0 +1,16 @@
+<?php
+
+// Buffer de output — permite header() mesmo que plugins imprimam debug
+ob_start();
+
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$file = __DIR__ . $path;
+
+if ($path !== '/' && is_file($file)) {
+    ob_end_flush();
+    return false;
+}
+
+require __DIR__ . '/index.php';
+
+ob_end_flush();

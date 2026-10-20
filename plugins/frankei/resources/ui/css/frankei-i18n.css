@@ -1,0 +1,140 @@
+
+/* Frankei i18n — toggles de idioma no painel de settings */
+.fk-lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #e8dcc8;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2E1A10;
+  transition: .15s;
+  margin-bottom: 8px;
+  text-align: left;
+}
+.fk-lang-toggle:hover {
+  background: #faf6ee;
+  border-color: #d4b896;
+  transform: translateX(2px);
+}
+.fk-lang-toggle.active {
+  background: linear-gradient(135deg, #FFD79A 0%, #FF9A3C 48%, #FF6B35 100%);
+  border-color: #e08540;
+  color: #1A1208;
+  font-weight: 700;
+}
+.fk-lang-toggle-flag {
+  font-size: 22px;
+  line-height: 1;
+}
+.fk-lang-toggle-name {
+  flex: 1;
+}
+.fk-lang-toggle-code {
+  font-family: ui-monospace, monospace;
+  font-size: 10.5px;
+  opacity: .55;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.fk-lang-toggle-check {
+  font-weight: 900;
+  color: #047857;
+  font-size: 14px;
+}
+.fk-lang-help {
+  padding: 10px 12px;
+  background: #faf6ee;
+  border-left: 3px solid #e8a44f;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: #6b5544;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+
+/* FK_LANG_CHIP_CSS — chip de idioma no topbar */
+.fk-lang-chip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.fk-lang-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #faf6ee;
+  border: 1px solid #e8dcc8;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b5544;
+  transition: .15s;
+  line-height: 1;
+}
+.fk-lang-chip:hover {
+  background: #f5ebd8;
+  border-color: #d4b896;
+  color: #c25a1f;
+}
+.fk-lang-chip-flag { font-size: 15px; }
+.fk-lang-chip-code { font-family: ui-monospace, monospace; font-size: 10.5px; letter-spacing: .06em; }
+.fk-lang-chip-caret { font-size: 9px; opacity: .6; }
+
+.fk-lang-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #e8dcc8;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  padding: 6px;
+  z-index: 9999;
+}
+.fk-lang-dropdown[hidden] { display: none !important; }
+
+.fk-lang-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2E1A10;
+  text-align: left;
+  transition: .12s;
+}
+.fk-lang-option:hover { background: #faf6ee; }
+.fk-lang-option.active {
+  background: linear-gradient(135deg, #FFD79A 0%, #FF9A3C 48%, #FF6B35 100%);
+  color: #1A1208;
+  font-weight: 700;
+}
+.fk-lang-opt-flag { font-size: 18px; }
+.fk-lang-opt-name { flex: 1; }
+.fk-lang-opt-check {
+  font-weight: 900;
+  color: #047857;
+  font-size: 13px;
+}
+.fk-lang-option.active .fk-lang-opt-check { color: #1A1208; }

@@ -1,0 +1,101 @@
+/* ═══════════════════════════════════════════════════════
+   BEAVER — FOOTER PARTILHADO
+   ═══════════════════════════════════════════════════════ */
+
+.beaver-footer {
+    margin-top: 80px;
+    padding: 40px 24px 20px;
+    background: linear-gradient(180deg, transparent, #F4F5F7);
+    border-top: 1px solid #E4E6EA;
+    color: #5F656D;
+    font-size: 0.88rem;
+    font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.beaver-footer-inner {
+    max-width: 1100px;
+    margin: 0 auto 32px;
+    display: grid;
+    grid-template-columns: 1.4fr 2fr;
+    gap: 60px;
+}
+@media (max-width: 900px) {
+    .beaver-footer-inner { grid-template-columns: 1fr; gap: 32px; }
+}
+
+.beaver-footer-logo {
+    display: inline-block;
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: #2B2F36;
+    text-decoration: none;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+}
+.beaver-footer-logo .accent { color: #E07800; }
+.beaver-footer-tagline {
+    color: #5F656D;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 0;
+    max-width: 300px;
+}
+
+.beaver-footer-links {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
+@media (max-width: 700px) {
+    .beaver-footer-links { grid-template-columns: repeat(2, 1fr); }
+}
+.beaver-footer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.beaver-footer-col strong {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #7A3F00;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+}
+.beaver-footer-col a {
+    color: #5F656D;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: color 0.15s;
+}
+.beaver-footer-col a:hover { color: #E07800; }
+
+.beaver-footer-bottom {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding-top: 20px;
+    border-top: 1px solid #E4E6EA;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #8A9099;
+    letter-spacing: 0.02em;
+}
+.beaver-footer-bottom .accent { color: #E07800; }
+
+/* Dark mode */
+[data-theme="dark"] .beaver-footer {
+    background: linear-gradient(180deg, transparent, #0F1419);
+    border-top-color: #2B2F36;
+    color: #B8BDC4;
+}
+[data-theme="dark"] .beaver-footer-logo { color: #E8EEF6; }
+[data-theme="dark"] .beaver-footer-tagline { color: #8A9099; }
+[data-theme="dark"] .beaver-footer-col strong { color: #FFD79A; }
+[data-theme="dark"] .beaver-footer-col a { color: #B8BDC4; }
+[data-theme="dark"] .beaver-footer-col a:hover { color: #FF9A3C; }
+[data-theme="dark"] .beaver-footer-bottom {
+    border-top-color: #2B2F36;
+    color: #8A9099;
+}

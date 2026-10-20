@@ -1,0 +1,24 @@
+# Beaver Framework — factos do projeto
+
+Beaver NAO e Laravel nem Symfony. NUNCA uses:
+- `use Illuminate\...` / `use Symfony\...`
+- `Route::`, `Request::fake()`, `Auth::user()`
+- `shouldReceive(...)`, `$this->mock(...)` (Mockery/Laravel)
+
+## Controllers (`App\Controllers\*`)
+- Devolvem **void**, usam `$_GET`/`$_POST`/`$_SERVER` diretamente
+- Sao HTTP-bound — NAO testaveis em teste unitario sem simular superglobais
+- Metodos tipicos: `showLogin()`, `login()`, `showRegistar()`, `registar()`, `logout()`
+
+## Response (`Beaver\Http\Response`)
+- Propriedades publicas: `$response->content`, `$response->status`, `$response->headers`
+- Estaticos: `Response::json($data)`, `Response::html()`, `Response::redirect($url)`
+- NAO existem metodos `getStatusCode()`, `getContent()`, `getHeaders()`
+
+## Servicos comuns do projeto
+- `App\Services\UserService::autenticado(): bool`
+- `App\Services\SiteDB::select($sql, $params): array`
+- `App\Services\SiteDB::exec($sql, $params): int`
+
+## Classe base dos testes
+`use Tests\TestCase;` — que estende `PHPUnit\Framework\TestCase`.

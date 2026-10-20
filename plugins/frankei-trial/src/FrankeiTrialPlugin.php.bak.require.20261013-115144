@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial;
+
+use Beaver\Plugin\PluginBase;
+
+/**
+ * Frankei Trial — versão limitada do Frankei.
+ *
+ * Regras (configuráveis em config/plan.php):
+ *   - Só corre testes Unit
+ *   - Máximo 25 ficheiros por análise
+ *   - Máximo 25 testes por execução
+ *   - Sem scanners de segurança (só estrutura de testes)
+ *
+ * Não importa nem altera nada do plugin `frankei` original.
+ */
+class FrankeiTrialPlugin extends PluginBase
+{
+    public function boot(): void
+    {
+        $routesFile = $this->path . '/routes/web.php';
+        if (is_file($routesFile)) {
+            $this->loadRoutes();
+        }
+        $this->loadViews();
+    }
+}

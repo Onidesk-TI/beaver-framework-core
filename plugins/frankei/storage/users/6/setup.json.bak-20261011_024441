@@ -1,0 +1,23 @@
+{
+    "user_id": 6,
+    "path": "/mnt/c/wamp64/www/remote",
+    "framework": "php",
+    "validated_at": "2026-10-11T02:32:28+01:00",
+    "stats": {
+        "php_files": 1,
+        "controllers": 0,
+        "models": 0,
+        "views": 0,
+        "writable": true
+    },
+    "files": [
+        "index.php",
+        "src/App.php",
+        "src/Router.php",
+        "src/Database.php",
+        "src/Config.php"
+    ],
+    "files_count": 5,
+    "plan": "free",
+    "plan_limit": 5
+}

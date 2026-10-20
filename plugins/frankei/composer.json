@@ -1,0 +1,25 @@
+{
+    "name": "onidesk/beaver-frankei",
+    "description": "Beaver Frankei — security analyzer plugin",
+    "type": "beaver-plugin",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "ext-pdo": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Beaver\\Plugins\\Frankei\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "authors": [
+        {
+            "name": "Franco",
+            "email": "onidesk@outlook.com"
+        }
+    ]
+}

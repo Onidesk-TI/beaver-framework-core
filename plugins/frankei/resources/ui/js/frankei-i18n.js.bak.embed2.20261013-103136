@@ -1,0 +1,169 @@
+(function (window, document) {
+  'use strict';
+
+  var STORAGE_KEY = 'frankei:lang';
+  var DICT        = null;
+  var META        = null;
+  var LANG        = 'pt';
+
+  // Textos que NUNCA devem ser traduzidos (selectors)
+  var SKIP_SELECTORS = [
+    'script', 'style', 'code', 'pre', 'textarea',
+    '[data-i18n-skip]',
+    '.fk-terminal', '.fk-term-line', '.fk-term-output',
+    '.jv-table', '.cv-table', '.cv-code', '.fk-code-wrap',
+    '.fk-report-preview-text', '.junit-view',
+    'iframe'
+  ].join(',');
+
+  function t(key) {
+    if (!DICT || !DICT[key]) return key;
+    return DICT[key][LANG] || DICT[key].pt || key;
+  }
+  window.t = t;
+
+  // Heurística: se tem números, %, ·, ou parece código/path, não traduzir
+  function pareceDinamico(txt) {
+    if (/\d/.test(txt)) return true;
+    if (/[{}();=<>]/.test(txt)) return true;
+    if (txt.indexOf('·') !== -1) return true;
+    if (txt.indexOf('/') !== -1 && txt.length > 3) return true;
+    if (txt.length > 80) return true;
+    return false;
+  }
+
+  function traduzirNo(node) {
+    if (node.nodeType === 3) {
+      // Text node
+      var pai = node.parentNode;
+      if (!pai) return;
+      if (pai.closest && pai.closest(SKIP_SELECTORS)) return;
+
+      var original = node.__fkJ18nOrig;
+      if (original === undefined) {
+        original = node.nodeValue;
+        node.__fkJ18nOrig = original;
+      }
+
+      var txt = (original || '').trim();
+      if (!txt) return;
+      if (pareceDinamico(txt)) return;
+      if (!DICT[txt]) return;
+
+      var novo = DICT[txt][LANG] || DICT[txt].pt || txt;
+      // Preservar espaços em branco à volta
+      var pre  = original.match(/^\s*/)[0];
+      var pos  = original.match(/\s*$/)[0];
+      node.nodeValue = pre + novo + pos;
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    if (node.matches && node.matches(SKIP_SELECTORS)) return;
+
+    // Atributos traduzíveis
+    ['title', 'placeholder', 'aria-label'].forEach(function (attr) {
+      if (!node.hasAttribute || !node.hasAttribute(attr)) return;
+      var v = node.getAttribute(attr);
+      var k = '__fkJ18nOrig_' + attr;
+      if (!node[k]) node[k] = v;
+      var orig = node[k];
+      if (!DICT[orig]) return;
+      node.setAttribute(attr, DICT[orig][LANG] || DICT[orig].pt || orig);
+    });
+
+    // Percorrer filhos
+    for (var i = 0; i < node.childNodes.length; i++) {
+      traduzirNo(node.childNodes[i]);
+    }
+  }
+
+  function aplicar() {
+    if (!DICT) return;
+    traduzirNo(document.body);
+    document.documentElement.lang = LANG;
+  }
+
+  function setLang(lang) {
+    if (!META || !META.languages[lang]) lang = 'pt';
+    LANG = lang;
+    try { localStorage.setItem(STORAGE_KEY, lang); } catch (_) {}
+    aplicar();
+    // Notificar sistema
+    try {
+      window.dispatchEvent(new CustomEvent('frankei:lang', { detail: { lang: lang } }));
+    } catch (_) {}
+    // Atualizar toggles se existirem
+    document.querySelectorAll('.fk-lang-toggle').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.lang === lang);
+      var icon = b.querySelector('.fk-lang-toggle-check');
+      if (icon) icon.textContent = (b.dataset.lang === lang) ? '✓' : '';
+    });
+  }
+  window.frankeiSetLang = setLang;
+  window.frankeiGetLang = function () { return LANG; };
+
+  // Carregar dicionário
+  function carregar() {
+    var url = '/plugins/frankei/js/i18n/frankei.json?t=' + (window.__fkBoot || Date.now());
+    fetch(url, { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        META = data._meta || { languages: { pt: { name: 'Português', flag: '🇵🇹' } } };
+        DICT = data.strings || {};
+        var saved = null;
+        try { saved = localStorage.getItem(STORAGE_KEY); } catch (_) {}
+        var initial = saved || 'pt';
+        if (!META.languages[initial]) initial = 'pt';
+        LANG = initial;
+        aplicar();
+        ligarObservador();
+        ligarToggles();
+      })
+      .catch(function (e) {
+        console.warn('[frankei-i18n] falha ao carregar dicionario:', e.message);
+      });
+  }
+
+  // MutationObserver: re-traduzir quando aparece conteúdo novo
+  function ligarObservador() {
+    if (!window.MutationObserver) return;
+    var pendente = false;
+    var obs = new MutationObserver(function () {
+      if (pendente) return;
+      pendente = true;
+      setTimeout(function () {
+        pendente = false;
+        aplicar();
+      }, 200);
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Ligar toggles do painel de settings
+  function ligarToggles() {
+    document.querySelectorAll('.fk-lang-toggle').forEach(function (b) {
+      if (b.dataset.fkLangBound === '1') return;
+      b.dataset.fkLangBound = '1';
+      b.addEventListener('click', function () {
+        setLang(b.dataset.lang);
+      });
+    });
+    setLang(LANG);
+  }
+
+  // Expor API pública
+  window.FrankeiI18n = {
+    setLang:  setLang,
+    getLang:  function () { return LANG; },
+    t:        t,
+    reload:   aplicar,
+    toggle:   function () { ligarToggles(); aplicar(); }
+  };
+
+  // Boot
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', carregar);
+  } else {
+    carregar();
+  }
+})(window, document);

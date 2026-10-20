@@ -1,0 +1,675 @@
+/* Frankei Trial — UI logic */
+(function () {
+  'use strict';
+
+  var state = {
+    plan: 'trial',
+    total: 0,
+    shown: 0,
+    limit: null,
+    tests: [],
+    suites: [],
+    porSuite: {},
+    engine: 'pest',
+    suite: 'all',
+    running: false,
+    classesPage: 1,
+    classesPerPage: 5,
+    classesTotal: 0,
+    classesPages: 0,
+  };
+
+  var $list      = document.getElementById('fkTrialList');
+  var $btnRun    = document.getElementById('fkTrialRun');
+  var $terminal  = document.getElementById('fkTrialTerminal');
+  var $counter   = document.getElementById('fkTrialCounter');
+  var $ballNum   = document.getElementById('fkTrialBallNum');
+  var $ballHint  = document.getElementById('fkTrialBallHint');
+  var $cardCounter = document.getElementById('fkTrialCardCounter');
+  var $engineSel = document.getElementById('fkTrialEngine');
+  var $suiteSel  = document.getElementById('fkTrialSuite');
+  var $status    = document.getElementById('fkTrialStatus');
+  var $btnReport = document.getElementById('fkTrialReport');
+  var $suitesBar = document.getElementById('fkTrialSuitesBar');
+  var $runSummary = document.getElementById('fkTrialRunSummary');
+  var $runStats   = document.getElementById('fkTrialRunStats');
+  var $btnAnalyze = document.getElementById('fkTrialRunAnalyze');
+  var $classesCard    = document.getElementById('fkTrialClassesCard');
+  var $classesList    = document.getElementById('fkTrialClassesList');
+  var $classesCounter = document.getElementById('fkTrialClassesCounter');
+  var $pagination     = document.getElementById('fkTrialPagination');
+  var $pageInfo       = document.getElementById('fkTrialPageInfo');
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function t(key) {
+    return (window.FrankeiI18n && window.FrankeiI18n.t) ? window.FrankeiI18n.t(key) : key;
+  }
+
+  function setStatus(msg, cls) {
+    if (!$status) return;
+    $status.textContent = msg || '';
+    $status.className = 'fk-trial-term-status' + (cls ? ' ' + cls : '');
+  }
+
+  function setRunning(on) {
+    state.running = on;
+    if (!$btnRun) return;
+    $btnRun.disabled = on;
+    if (on) {
+      $btnRun.dataset.orig = $btnRun.innerHTML;
+      $btnRun.innerHTML = '<span class="fk-trial-spinner"></span> RUN';
+      setStatus(t('A correr...'), 'run');
+    } else if ($btnRun.dataset.orig) {
+      $btnRun.innerHTML = $btnRun.dataset.orig;
+    }
+  }
+
+
+  var SUITE_ICONS = {
+    'Unit':     '🧪',
+    'Feature':  '🎯',
+    'Coverage': '📊',
+    'all':      '📦'
+  };
+
+  function renderSuitesBar() {
+    if (!$suitesBar) return;
+    var suites = state.suites || [];
+    var counts = state.porSuite || {};
+
+    if (!suites.length) {
+      $suitesBar.innerHTML = '<span class="fk-trial-suites-loading">Sem suites disponíveis</span>';
+      return;
+    }
+
+    // "Todas" + cada suite
+    var items = [];
+    items.push({
+      id: 'all',
+      name: t('Todas') || 'Todas',
+      count: state.total
+    });
+    suites.forEach(function (s) {
+      items.push({
+        id: s,
+        name: s,
+        count: counts[s] || 0
+      });
+    });
+
+    $suitesBar.innerHTML = items.map(function (it) {
+      var icon = SUITE_ICONS[it.id] || '📂';
+      var isActive = (state.suite === it.id);
+      var isLocked = false; // Fase 4B: aplicar aqui a constante de bloqueio
+      var proBadge = '';    // Fase 4B: '<span class="fk-trial-suite-chip-pro">PRO</span>'
+      var disabled = (it.count === 0) ? 'disabled' : '';
+      var lockedClass = isLocked ? ' is-locked' : '';
+
+      return '<span class="fk-trial-suite-chip' +
+        (isActive ? ' is-active' : '') + lockedClass + '" data-suite="' + esc(it.id) + '">' +
+        '<span class="fk-trial-suite-chip-icon">' + icon + '</span>' +
+        '<span class="fk-trial-suite-chip-name">' + esc(it.name) + '</span>' +
+        '<span class="fk-trial-suite-chip-count">' + it.count + '</span>' +
+        proBadge +
+        '<button type="button" class="fk-trial-suite-chip-run" ' + disabled +
+          ' data-run-suite="' + esc(it.id) + '" title="Correr esta suite">▶</button>' +
+      '</span>';
+    }).join('');
+  }
+
+  // Handler de cliques na barra
+  if ($suitesBar) {
+    $suitesBar.addEventListener('click', function (e) {
+      var runBtn = e.target.closest('.fk-trial-suite-chip-run');
+      if (runBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        var suiteId = runBtn.dataset.runSuite;
+        var chip = runBtn.closest('.fk-trial-suite-chip');
+        if (chip && chip.classList.contains('is-locked')) {
+          setStatus('🔒 Suite bloqueada no plano ' + state.plan, 'warn');
+          return;
+        }
+        // Correr a suite
+        state.suite = suiteId;
+        // Sincronizar com o select (se existir)
+        if ($suiteSel) $suiteSel.value = suiteId;
+        runTests();
+        return;
+      }
+
+      var chip = e.target.closest('.fk-trial-suite-chip');
+      if (chip) {
+        var suiteId = chip.dataset.suite;
+        if (chip.classList.contains('is-locked')) return;
+        state.suite = suiteId;
+        if ($suiteSel) $suiteSel.value = suiteId;
+        renderSuitesBar(); // actualizar visual do "active"
+      }
+    });
+  }
+
+
+  /* ── Parser do output Pest/PHPUnit ── */
+  function parseTestOutput(lines) {
+    var stats = {
+      tests: 0, passed: 0, failed: 0, skipped: 0,
+      assertions: 0, time: '—', ok: false
+    };
+
+    var texto = (lines || []).join('\n');
+
+    // Pest/PHPUnit: "Tests:    14 passed (34 assertions)"
+    var m1 = texto.match(/Tests:\s+(\d+)\s+passed/i);
+    if (m1) { stats.passed = parseInt(m1[1], 10) || 0; }
+    var m1b = texto.match(/(\d+)\s+failed/i);
+    if (m1b) { stats.failed = parseInt(m1b[1], 10) || 0; }
+    var m1c = texto.match(/(\d+)\s+skipped/i);
+    if (m1c) { stats.skipped = parseInt(m1c[1], 10) || 0; }
+    var m1d = texto.match(/([\d.,]+)\s+assertions/i);
+    if (m1d) { stats.assertions = parseInt(m1d[1].replace(/[.,]/g, ''), 10) || 0; }
+    var m1e = texto.match(/Duration:\s+([\d.,]+\s*\w+)/i);
+    if (m1e) { stats.time = m1e[1]; }
+
+    // Formato "OK (14 tests, 41 assertions)" do PHPUnit
+    var m2 = texto.match(/OK \((\d+) tests?,\s*(\d+)\s+assertions?\)/i);
+    if (m2) {
+      stats.passed = parseInt(m2[1], 10) || 0;
+      stats.assertions = parseInt(m2[2], 10) || 0;
+    }
+
+    // Formato Pest PT: "Passaram  14"
+    var m3 = texto.match(/Pass(aram)?\s*[:·]?\s*(\d+)/i);
+    if (m3) stats.passed = parseInt(m3[2], 10) || stats.passed;
+
+    stats.tests = stats.passed + stats.failed + stats.skipped;
+    stats.ok = (stats.failed === 0 && stats.tests > 0);
+
+    return stats;
+  }
+
+  /* ── Render do resumo ── */
+  function renderRunSummary(data) {
+    if (!$runSummary || !$runStats) return;
+
+    var stats = parseTestOutput(data.lines || []);
+
+    // Se não conseguiu parsear nada, usar dados do backend
+    if (stats.tests === 0 && data.total_lines) {
+      stats.time = (data.elapsed_ms || 0) + 'ms';
+    }
+
+    $runSummary.hidden = false;
+
+    var html = '';
+    html += '<span class="fk-trial-stat ' + (stats.ok ? 'ok' : (stats.failed > 0 ? 'err' : 'muted')) + '">' +
+              '<span class="fk-trial-stat-icon">' + (stats.ok ? '✅' : '❌') + '</span>' +
+              '<span class="fk-trial-stat-value">' + stats.tests + ' ' + esc(t('testes')) + '</span>' +
+            '</span>';
+
+    if (stats.passed > 0) {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat ok">' +
+                '<span class="fk-trial-stat-icon">✅</span>' +
+                '<span class="fk-trial-stat-value">' + stats.passed + '</span>' +
+              '</span>';
+    }
+    if (stats.failed > 0) {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat err">' +
+                '<span class="fk-trial-stat-icon">❌</span>' +
+                '<span class="fk-trial-stat-value">' + stats.failed + '</span>' +
+              '</span>';
+    }
+    if (stats.skipped > 0) {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat warn">' +
+                '<span class="fk-trial-stat-icon">⏭️</span>' +
+                '<span class="fk-trial-stat-value">' + stats.skipped + '</span>' +
+              '</span>';
+    }
+    if (stats.assertions > 0) {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat info">' +
+                '<span class="fk-trial-stat-icon">📊</span>' +
+                '<span class="fk-trial-stat-value">' + stats.assertions + '</span>' +
+              '</span>';
+    }
+    if (stats.time !== '—') {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat muted">' +
+                '<span class="fk-trial-stat-icon">⏱️</span>' +
+                '<span class="fk-trial-stat-value">' + esc(stats.time) + '</span>' +
+              '</span>';
+    }
+
+    $runStats.innerHTML = html;
+
+    // Ativar botão Analisar
+    if ($btnAnalyze) $btnAnalyze.disabled = false;
+  }
+
+
+  /* ═══════════════════════════════════════════════════════
+     CLASSES — tabela + paginação
+     ═══════════════════════════════════════════════════════ */
+
+  function renderClasses(data) {
+    if (!$classesList) return;
+
+    state.classesTotal = data.total;
+    state.classesPages = data.pages;
+    state.classesPage  = data.page;
+
+    if (data.total === 0) {
+      $classesList.innerHTML = '<div class="fk-trial-empty">' +
+        '<div class="fk-trial-empty-icon">📋</div>' +
+        '<p>' + esc(data.message || t('Sem resultados ainda')) + '</p>' +
+      '</div>';
+      if ($pagination) $pagination.hidden = true;
+      if ($classesCounter) $classesCounter.textContent = '0 / 0';
+      return;
+    }
+
+    if ($classesCounter) {
+      var start = (data.page - 1) * data.perPage + 1;
+      var end   = Math.min(data.page * data.perPage, data.total);
+      $classesCounter.textContent = start + '–' + end + ' / ' + data.total;
+    }
+
+    var rows = data.classes.map(function (c) {
+      var cls = 'is-' + (c.status || 'pass');
+      var statusBadge = {
+        passed:  '<span class="fk-trial-cls-badge ok">✅ ' + c.tests + '</span>',
+        failed:  '<span class="fk-trial-cls-badge err">❌ ' + (c.failures + c.errors) + ' / ' + c.tests + '</span>',
+        partial: '<span class="fk-trial-cls-badge warn">⚠️ ' + c.tests + '</span>',
+        skipped: '<span class="fk-trial-cls-badge none">⏭️ ' + c.tests + '</span>',
+      }[c.status] || '<span class="fk-trial-cls-badge none">—</span>';
+
+      var ns = c.classname.lastIndexOf('\\');
+      var namespacePart = ns >= 0 ? c.classname.substring(0, ns + 1) : '';
+      var shortPart     = c.classname.substring(ns + 1);
+
+      return '<tr class="' + cls + '" data-classname="' + esc(c.classname) + '">' +
+        '<td style="padding:12px 14px">' +
+          '<span class="fk-trial-cls-namespace">' + esc(namespacePart) + '</span>' +
+          '<span class="fk-trial-cls-name">' + esc(shortPart) + '</span>' +
+        '</td>' +
+        '<td><span class="fk-trial-cls-suite">' + esc(c.suite || 'Unit') + '</span></td>' +
+        '<td class="center" style="padding:12px 14px;text-align:center">' + statusBadge + '</td>' +
+        '<td class="num" style="padding:12px 14px;text-align:right">' + c.tests + '</td>' +
+        '<td class="num" style="padding:12px 14px;text-align:right">' + c.assertions + '</td>' +
+        '<td class="num" style="padding:12px 14px;text-align:right">' + (c.time < 0.01 ? '<0.01s' : c.time.toFixed(3) + 's') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    $classesList.innerHTML =
+      '<table class="fk-trial-classes-table" style="width:100%;border-collapse:separate;border-spacing:0">' +
+        '<thead><tr>' +
+          '<th style="padding:12px 14px;text-align:left">' + esc(t('Classe')) + '</th>' +
+          '<th style="padding:12px 14px;text-align:left">' + esc(t('Suite')) + '</th>' +
+          '<th class="center" style="padding:12px 14px;text-align:center">' + esc(t('Estado')) + '</th>' +
+          '<th class="num" style="padding:12px 14px;text-align:right">' + esc(t('Testes')) + '</th>' +
+          '<th class="num" style="padding:12px 14px;text-align:right">' + esc(t('Assertions')) + '</th>' +
+          '<th class="num" style="padding:12px 14px;text-align:right">' + esc(t('Tempo')) + '</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>';
+
+    // Paginação
+    if ($pagination && data.pages > 1) {
+      $pagination.hidden = false;
+      if ($pageInfo) $pageInfo.textContent = data.page + ' / ' + data.pages;
+      $pagination.querySelectorAll('[data-page-action]').forEach(function (b) {
+        var a = b.dataset.pageAction;
+        b.disabled =
+          (a === 'first' || a === 'prev') ? (data.page <= 1) :
+          (a === 'next'  || a === 'last') ? (data.page >= data.pages) : false;
+      });
+    } else if ($pagination) {
+      $pagination.hidden = true;
+    }
+  }
+
+  function loadClasses(page) {
+    if (!$classesList || !$classesCard) return;
+    state.classesPage = page || 1;
+
+    $classesCard.hidden = false;
+    $classesList.innerHTML = '<div class="fk-trial-empty">' +
+      '<span class="fk-trial-spinner"></span> ' + esc(t('A carregar...')) +
+    '</div>';
+
+    var url = '/api/frankei-trial/tests/classes?page=' + state.classesPage +
+              '&perPage=' + state.classesPerPage;
+
+    fetch(url, { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          $classesList.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+            esc(d.error || 'Erro') + '</div>';
+          return;
+        }
+        renderClasses(d);
+      })
+      .catch(function (e) {
+        $classesList.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+          esc(e.message) + '</div>';
+      });
+  }
+
+  /* Paginação — botões */
+  if ($pagination) {
+    $pagination.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-page-action]');
+      if (!b || b.disabled) return;
+      var a = b.dataset.pageAction;
+      var p = state.classesPage;
+      if (a === 'first') p = 1;
+      if (a === 'prev')  p = Math.max(1, p - 1);
+      if (a === 'next')  p = Math.min(state.classesPages, p + 1);
+      if (a === 'last')  p = state.classesPages;
+      loadClasses(p);
+    });
+  }
+
+  /* Clique numa linha → abre Modal B */
+  if ($classesList) {
+    $classesList.addEventListener('click', function (e) {
+      var tr = e.target.closest('tr[data-classname]');
+      if (!tr) return;
+      var classname = tr.dataset.classname;
+      abrirEditorTeste(classname);
+    });
+  }
+
+  function abrirEditorTeste(classname) {
+    var modal = document.getElementById('fkModal');
+    if (!modal) {
+      setStatus('✗ Modal B não disponível', 'err');
+      return;
+    }
+    var body = modal.querySelector('.fk-modal-body') || document.getElementById('fkModalBody');
+    if (!body) {
+      setStatus('✗ .fk-modal-body não encontrado', 'err');
+      return;
+    }
+
+    // Buscar detalhes da classe
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:#8a7a68">' +
+      '<span class="fk-trial-spinner"></span> A carregar...</div>';
+    modal.classList.add('open');
+
+    fetch('/api/frankei-trial/tests/classes?perPage=1000', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.error || 'Erro');
+        var cls = (d.classes || []).filter(function (c) { return c.classname === classname; })[0];
+        if (!cls) throw new Error('Classe não encontrada');
+
+        var rows = (cls.testcases || []).map(function (tc) {
+          var icon = { pass: '✅', fail: '❌', error: '⚠️', skip: '⏭️' }[tc.status] || '·';
+          var color = { pass: '#10b981', fail: '#ef4444', error: '#f59e0b', skip: '#94a3b8' }[tc.status] || '#8a7a68';
+          return '<tr>' +
+            '<td style="padding:6px 10px;border-bottom:1px solid #f0e8d8">' +
+              '<span style="color:' + color + ';font-weight:700">' + icon + '</span> ' +
+              esc(tc.name) +
+            '</td>' +
+            '<td style="padding:6px 10px;border-bottom:1px solid #f0e8d8;text-align:right;font-family:monospace;color:#8a7a68">' +
+              (tc.time < 0.01 ? '<0.01s' : tc.time.toFixed(3) + 's') +
+            '</td>' +
+            '<td style="padding:6px 10px;border-bottom:1px solid #f0e8d8;text-align:right;font-family:monospace;color:#8a7a68">' +
+              tc.assertions + ' assert.' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+
+        body.innerHTML =
+          '<div style="padding:20px">' +
+            '<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:start;gap:20px;flex-wrap:wrap">' +
+              '<div>' +
+                '<h2 style="margin:0 0 4px;font-size:18px;letter-spacing:-.02em">' + esc(cls.shortname || cls.classname) + '</h2>' +
+                '<div style="font-size:11px;color:#8a7a68;font-family:monospace">' + esc(cls.classname) + '</div>' +
+              '</div>' +
+              '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                '<span class="fk-trial-cls-suite">' + esc(cls.suite || 'Unit') + '</span>' +
+                '<span class="fk-trial-cls-badge ' +
+                  (cls.status === 'passed' ? 'ok' : (cls.status === 'failed' ? 'err' : 'warn')) + '">' +
+                  '✅ ' + cls.tests + ' · ⏱ ' + cls.time.toFixed(3) + 's' +
+                '</span>' +
+              '</div>' +
+            '</div>' +
+            '<table style="width:100%;border-collapse:collapse;font-size:12px;background:#faf6ee;border-radius:10px;overflow:hidden">' +
+              '<thead><tr style="background:#f0e8d8">' +
+                '<th style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a7a68">' + esc(t('Teste')) + '</th>' +
+                '<th style="text-align:right;padding:8px 10px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a7a68">' + esc(t('Tempo')) + '</th>' +
+                '<th style="text-align:right;padding:8px 10px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8a7a68">' + esc(t('Assertions')) + '</th>' +
+              '</tr></thead>' +
+              '<tbody>' + rows + '</tbody>' +
+            '</table>' +
+          '</div>';
+
+        // Fechar
+        var closeBtn = modal.querySelector('#fkModalClose') || document.getElementById('fkModalClose');
+        if (closeBtn && !closeBtn.dataset.fkBound) {
+          closeBtn.dataset.fkBound = '1';
+          closeBtn.addEventListener('click', function () {
+            modal.classList.remove('open');
+          });
+        }
+        modal.addEventListener('click', function (e) {
+          if (e.target === modal) modal.classList.remove('open');
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && modal.classList.contains('open')) modal.classList.remove('open');
+        });
+      })
+      .catch(function (e) {
+        body.innerHTML = '<div style="padding:40px;text-align:center;color:#b91c1c">' +
+          'Erro: ' + esc(e.message) + '</div>';
+      });
+  }
+
+  function renderList(data) {
+    state.plan     = data.plan;
+    state.total    = data.total;
+    state.shown    = data.shown;
+    state.limit    = data.limit;
+    state.tests    = data.tests || [];
+    state.suites   = data.suites || ['Unit'];
+    state.porSuite = data.por_suite || {};
+
+    // Popular suite selector
+    if ($suiteSel && $suiteSel.options.length <= 1) {
+      $suiteSel.innerHTML = '<option value="all">' + esc(t('Todas')) + '</option>';
+      state.suites.forEach(function (s) {
+        var opt = document.createElement('option');
+        opt.value = s;
+        var count = state.porSuite[s] || 0;
+        opt.textContent = s + ' (' + count + ')';
+        $suiteSel.appendChild(opt);
+      });
+    }
+
+    // Ball
+    if ($ballNum)  $ballNum.textContent = state.total;
+    if ($ballHint) {
+      $ballHint.textContent = state.limit === null
+        ? t('Testes disponíveis')
+        : t('Testes disponíveis') + ' / máx ' + state.limit;
+    }
+
+    if ($counter) {
+      $counter.textContent = state.limit === null
+        ? state.total + ' ' + t('testes')
+        : state.total + ' ' + t('testes') + ' · máx ' + state.limit;
+    }
+
+    if ($cardCounter) {
+      $cardCounter.textContent = state.shown + ' / ' + state.total;
+    }
+
+    renderSuitesBar();
+
+    if (!$list) return;
+
+    if (state.tests.length === 0) {
+      $list.innerHTML = '<div class="fk-trial-empty">' +
+        '<div class="fk-trial-empty-icon">🧪</div>' +
+        '<p>' + esc(t('Sem testes Unit.')) + '</p>' +
+      '</div>';
+      return;
+    }
+
+    $list.innerHTML = '<div class="fk-trial-test-list">' +
+      state.tests.map(function (t) {
+        var kb = Math.round((t.size || 0) / 1024 * 10) / 10;
+        var suiteTag = '<span style="font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;margin-right:6px">' +
+          esc(t.suite || 'Unit') + '</span>';
+        return '<div class="fk-trial-test">' +
+          '<div>' +
+            '<div class="fk-trial-test-name">' + suiteTag + esc(t.name) + '</div>' +
+            '<div class="fk-trial-test-meta">' + kb + ' KB</div>' +
+          '</div>' +
+          '<div class="fk-trial-test-check">✓</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  function loadList() {
+    if (!$list) return;
+    setStatus(t('A carregar testes...'), '');
+    $list.innerHTML = '<div class="fk-trial-empty">' +
+      '<span class="fk-trial-spinner"></span> ' + esc(t('A carregar testes...')) +
+    '</div>';
+
+    fetch('/api/frankei-trial/tests/list', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          $list.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+            esc(d.error || 'Erro') + '</div>';
+          return;
+        }
+        renderList(d);
+        setStatus('✓ ' + d.total + ' ' + t('testes') + ' prontos', 'ok');
+      })
+      .catch(function (e) {
+        $list.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+          'Erro: ' + esc(e.message) + '</div>';
+        setStatus('✗ Erro', 'err');
+      });
+  }
+
+  function runTests() {
+    if (state.running) return;
+    setRunning(true);
+
+    state.engine = $engineSel ? $engineSel.value : 'pest';
+    state.suite  = $suiteSel  ? $suiteSel.value  : 'all';
+
+    if ($terminal) {
+      $terminal.textContent = '→ beaver test --engine=' + state.engine +
+        (state.suite !== 'all' ? ' --testsuite=' + state.suite : '') + '\n\n';
+    }
+
+    fetch('/api/frankei-trial/tests/run', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suite: state.suite, engine: state.engine })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        // Atualizar status no header
+        setStatus(
+          (d.ok ? '✓ Sucesso' : '✗ Falha') + ' · ' + d.elapsed_ms + 'ms',
+          d.ok ? 'ok' : 'err'
+        );
+
+        if (!$terminal) return;
+        var head = '═══ ' + (d.ok ? '✓ Sucesso' : '✗ Falha') + ' ═══\n' +
+                   'Suite:  ' + (d.suite || 'all') + '  |  Engine: ' + (d.engine || '?') + '\n' +
+                   'Tempo:  ' + d.elapsed_ms + 'ms  |  Exit: ' + d.exit_code + '\n' +
+                   (d.truncated ? 'Output truncado\n' : '') +
+                   '─────────────────────────────\n\n';
+        $terminal.textContent = head + (d.lines || []).join('\n');
+        renderRunSummary(d);
+        loadClasses(1);
+      })
+      .catch(function (e) {
+        setStatus('✗ Erro', 'err');
+        if ($terminal) $terminal.textContent = '✗ Erro: ' + (e.message || e) + '\n';
+      })
+      .finally(function () { setRunning(false); });
+  }
+
+
+
+
+
+  function abrirReportModal() {
+    // O modal é gerido pelo frankei (dashboard.js → reportInit())
+    // Basta chamar o botão oculto que ele escuta
+    var hidden = document.getElementById('fkTermReportBtn');
+    if (!hidden) {
+      setStatus('✗ Modal indisponível', 'err');
+      return;
+    }
+    hidden.click();
+    setStatus('📊 Report aberto', '');
+  }
+
+  if ($btnReport) $btnReport.addEventListener('click', abrirReportModal);
+
+  /* FK_ANALYZE_HANDLER — botão "🔍 Analisar em detalhe" abre o Modal A */
+  if ($btnAnalyze) {
+    $btnAnalyze.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // O dashboard.js do frankei ligou um handler em #fkTermReportBtn (invisível)
+      // Clicar nele dispara o reportInit() que abre o #fkReportModal
+      var hidden = document.getElementById('fkTermReportBtn');
+      if (!hidden) {
+        setStatus('✗ Modal indisponível', 'err');
+        return;
+      }
+
+      hidden.click();
+
+      // Pequeno delay para o modal abrir, depois ir para tab "Resumo"
+      setTimeout(function () {
+        var tabResumo = document.querySelector('#fkReportTabs [data-view="summary"]');
+        if (tabResumo) tabResumo.click();
+      }, 150);
+    });
+  }
+
+  if ($btnRun) $btnRun.addEventListener('click', runTests);
+
+  // Re-render ao mudar idioma
+  window.addEventListener('frankei:lang', function () {
+    renderList({
+      plan: state.plan, total: state.total, shown: state.shown,
+      limit: state.limit, tests: state.tests, suites: state.suites,
+      por_suite: state.porSuite,
+    });
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { loadList(); loadClasses(1); });
+  } else {
+    loadList();
+    loadClasses(1);
+  }
+})();

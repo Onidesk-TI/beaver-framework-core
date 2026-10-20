@@ -1,0 +1,12 @@
+{
+    "name": "Curso — Beaver Fundamentos",
+    "slug": "curso-beaver-fundamentos",
+    "version": "0.1.0",
+    "author": "Onidesk",
+    "description": "Curso introdutório ao Beaver Framework.",
+    "namespace": "Beaver\\Plugins\\CursoBeaverFundamentos",
+    "main": "src/CursoPlugin.php",
+    "beaver_version": ">=0.1.0",
+    "requires": { "php": ">=8.1" },
+    "enabled": true
+}

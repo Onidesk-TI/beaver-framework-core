@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial;
+
+use Beaver\Plugin\PluginBase;
+
+require_once __DIR__ . '/Support/TrialLimits.php';
+require_once __DIR__ . '/Http/TrialController.php';
+require_once __DIR__ . '/Http/TrialTestController.php';
+
+class FrankeiTrialPlugin extends PluginBase
+{
+    public function boot(): void
+    {
+        class_exists('Beaver\\Plugins\\FrankeiTrial\\Http\\TrialController');
+        class_exists('Beaver\\Plugins\\FrankeiTrial\\Http\\TrialTestController');
+        class_exists('Beaver\\Plugins\\FrankeiTrial\\Support\\TrialLimits');
+
+        $runnerFile = dirname($this->path) . '/frankei/src/Frankei/Terminal/TerminalRunner.php';
+        if (is_file($runnerFile)) require_once $runnerFile;
+
+        $routesFile = $this->path . '/routes/web.php';
+        if (is_file($routesFile)) $this->loadRoutes();
+        $this->loadViews();
+    }
+}

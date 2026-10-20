@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt" data-theme="amber">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Frankei — Configurar aplicação</title>
+    <link rel="stylesheet" href="/plugins/frankei/css/setup.css?v=<?= time() ?>">
+</head>
+
+<body>
+
+    <div class="fk-setup-wrap">
+
+        <header class="fk-setup-top">
+            <a href="/" class="fk-setup-brand">
+                <span class="fk-setup-logo">
+                    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="bvgBrand" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#FFD79A" />
+                                <stop offset="48%" stop-color="#FF9A3C" />
+                                <stop offset="100%" stop-color="#FF6B35" />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="13" cy="17.5" r="7.5" fill="url(#bvgBrand)" opacity=".72" />
+                        <circle cx="51" cy="17.5" r="7.5" fill="url(#bvgBrand)" opacity=".72" />
+                        <ellipse cx="32" cy="33" rx="23" ry="21" fill="url(#bvgBrand)" />
+                        <ellipse cx="32" cy="41" rx="15.5" ry="12" fill="#0A0E14" opacity=".2" />
+                        <ellipse cx="32" cy="34.5" rx="4.6" ry="3.2" fill="#1A1208" />
+                        <circle cx="22.5" cy="26" r="3.4" fill="#1A1208" />
+                        <circle cx="41.5" cy="26" r="3.4" fill="#1A1208" />
+                        <circle cx="23.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                        <circle cx="42.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                        <rect x="27.3" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                        <rect x="32.4" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                    </svg>
+                </span>
+                <span><b>Beaver</b> · Frankei</span>
+            </a>
+            <div class="fk-setup-user">
+                <?php if (!empty($user['nome'])): ?>
+                    <span>Olá, <b><?= htmlspecialchars($user['nome']) ?></b></span>
+                <?php endif; ?>
+                <a href="/frankei/logout" class="fk-link-logout">Sair</a>
+            </div>
+        </header>
+
+        <main class="fk-setup-main">
+
+            <div class="fk-steps">
+                <span class="fk-step fk-step-done">1 · Conta</span>
+                <span class="fk-step-line"></span>
+                <span class="fk-step fk-step-active">2 · Aplicação</span>
+                <span class="fk-step-line"></span>
+                <span class="fk-step">3 · Análise</span>
+            </div>
+
+            <div class="fk-hero-img">
+                <img src="/plugins/frankei/img/frankei_splash.png" alt="Frankei — análise de segurança" loading="eager">
+            </div>
+
+            <div class="fk-seal">
+                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="bvgSeal" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#FFD79A" />
+                            <stop offset="48%" stop-color="#FF9A3C" />
+                            <stop offset="100%" stop-color="#FF6B35" />
+                        </linearGradient>
+                    </defs>
+                    <circle cx="13" cy="17.5" r="7.5" fill="url(#bvgSeal)" opacity=".72" />
+                    <circle cx="51" cy="17.5" r="7.5" fill="url(#bvgSeal)" opacity=".72" />
+                    <ellipse cx="32" cy="33" rx="23" ry="21" fill="url(#bvgSeal)" />
+                    <ellipse cx="32" cy="41" rx="15.5" ry="12" fill="#0A0E14" opacity=".2" />
+                    <ellipse cx="32" cy="34.5" rx="4.6" ry="3.2" fill="#1A1208" />
+                    <circle cx="22.5" cy="26" r="3.4" fill="#1A1208" />
+                    <circle cx="41.5" cy="26" r="3.4" fill="#1A1208" />
+                    <circle cx="23.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                    <circle cx="42.6" cy="25" r="1.1" fill="#FFF6E8" opacity=".85" />
+                    <rect x="27.3" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                    <rect x="32.4" y="44.5" width="4.3" height="10.5" rx="1.7" fill="#FFF6E8" />
+                </svg>
+            </div>
+
+            <h1 class="fk-setup-title">Onde está o teu projeto?</h1>
+            <p class="fk-setup-sub">
+                Indica o caminho absoluto da aplicação PHP que queres analisar.
+                O Frankei vai ler os ficheiros localmente.
+            </p>
+
+            <?php if (!empty($errors)): ?>
+                <div class="fk-alert fk-alert-error"><?= htmlspecialchars($errors) ?></div>
+            <?php endif; ?>
+
+            <form method="POST" action="/frankei/path" class="fk-form" id="fkFormPath">
+
+                <label class="fk-label" for="fkPath">Caminho da aplicação</label>
+
+                <div class="fk-input-group">
+                    <span class="fk-input-icon">📁</span>
+                    <input
+                        type="text"
+                        id="fkPath"
+                        name="path"
+                        class="fk-input"
+                        placeholder="/var/www/beaver-project"
+                        value="<?= htmlspecialchars($old ?? '') ?>"
+                        autocomplete="off"
+                        spellcheck="false"
+                        autofocus>
+                    <span class="fk-input-status" id="fkStatus"></span>
+                </div>
+
+                <div class="fk-tech-section">
+                    <label class="fk-label">Tecnologia principal</label>
+                    <div class="fk-radio-row" id="fkTechPrincipal">
+                        <label class="fk-radio"><input type="radio" name="tech_main" value="php" checked><span>PHP</span></label>
+                        <label class="fk-radio"><input type="radio" name="tech_main" value="js"><span>JavaScript</span></label>
+                        <label class="fk-radio"><input type="radio" name="tech_main" value="python"><span>Python</span></label>
+                        <label class="fk-radio"><input type="radio" name="tech_main" value="other"><span>Outro</span></label>
+                    </div>
+                </div>
+
+                <div class="fk-tech-section">
+                    <label class="fk-label">Outras tecnologias usadas</label>
+                    <div class="fk-checkbox-grid" id="fkTechOutras">
+                        <label class="fk-checkbox"><input type="checkbox" name="tech[]" value="css"><span>CSS</span></label>
+                        <label class="fk-checkbox"><input type="checkbox" name="tech[]" value="html"><span>HTML</span></label>
+                        <label class="fk-checkbox"><input type="checkbox" name="tech[]" value="sql"><span>SQL</span></label>
+                        <label class="fk-checkbox"><input type="checkbox" name="tech[]" value="ts"><span>TypeScript</span></label>
+                        <label class="fk-checkbox"><input type="checkbox" name="tech[]" value="vue"><span>Vue</span></label>
+                        <label class="fk-checkbox"><input type="checkbox" name="tech[]" value="react"><span>React</span></label>
+                        <label class="fk-checkbox"><input type="checkbox" name="tech[]" value="node"><span>Node.js</span></label>
+                        <label class="fk-checkbox"><input type="checkbox" name="tech[]" value="bash"><span>Bash</span></label>
+                    </div>
+                </div>
+
+                <div class="fk-checks" id="fkChecks" aria-live="polite">
+                    <!-- preenchido pelo JS -->
+                </div>
+
+                <div class="fk-privacy">
+                    <span class="fk-privacy-ico">🔒</span>
+                    <div>
+                        <b>A tua privacidade</b>
+                        <p>
+                            O Frankei analisa o teu código <b>localmente</b>.
+                            Não copiamos, não enviamos e não armazenamos o teu código-fonte.
+                            Guardamos apenas:
+                        </p>
+                        <ul>
+                            <li>O caminho da aplicação</li>
+                            <li>A estrutura de pastas (nomes e contagem)</li>
+                            <li>Os problemas encontrados (findings agregados)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="fk-free-note">
+                    <span>⚡</span>
+                    <span><b>Plano Free:</b> 1 análise apenas. Não poderás trocar de aplicação depois.</span>
+                </div>
+
+                <div class="fk-actions">
+                    <a href="/frankei" class="fk-btn fk-btn-ghost">Cancelar</a>
+                    <button type="submit" class="fk-btn fk-btn-primary" id="fkSubmitBtn" disabled>
+                        Iniciar análise
+                        <span class="fk-btn-arrow">→</span>
+                    </button>
+                </div>
+
+            </form>
+
+        </main>
+
+        <footer class="fk-setup-foot">
+            <span>Frankei · Beaver Framework</span>
+            <span>·</span>
+            <span>Segurança local</span>
+        </footer>
+
+    </div>
+
+    <script>
+        window.FK_USER_ID = <?= (int)($user['id'] ?? 0) ?>;
+    </script>
+    <script src="/plugins/frankei/js/setup.js?v=<?= time() ?>"></script>
+</body>
+
+</html>

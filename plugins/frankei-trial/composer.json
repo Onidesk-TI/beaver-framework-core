@@ -1,0 +1,10 @@
+{
+    "name": "beaver/frankei-trial",
+    "description": "Frankei Trial — versão limitada",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Beaver\\Plugins\\FrankeiTrial\\": "src/"
+        }
+    }
+}

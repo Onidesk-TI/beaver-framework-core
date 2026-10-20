@@ -1,0 +1,20 @@
+<?php
+
+/**
+ * Rotas do plugin Frankei Trial.
+ *
+ * @var \Beaver\Http\Router                            $router
+ * @var \Beaver\Plugins\FrankeiTrial\FrankeiTrialPlugin $plugin
+ */
+
+use Beaver\Plugins\FrankeiTrial\Http\TrialController;
+
+// Página principal
+$router->get('/frankei-trial', function ($req) {
+    return (new TrialController())->index($req);
+});
+
+// Health
+$router->get('/api/frankei-trial/health', function ($req) {
+    return (new TrialController())->health($req);
+});

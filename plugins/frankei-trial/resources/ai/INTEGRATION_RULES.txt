@@ -1,0 +1,45 @@
+# Regras para testes de INTEGRACAO (HTTP-bound)
+
+Quando a classe a testar e HTTP-bound (controller), a geracao e OBRIGATORIAMENTE:
+
+- Ficheiro em tests/Integration/
+- namespace Tests\Integration;
+- class NomeTest extends HttpTestCase  (NAO extends TestCase)
+- use Tests\Integration\HttpTestCase;
+- Metodos publicos com atributo #[Test] (NAO uses it() nem function())
+
+NAO uses Pest (nada de `uses()`, `it()`, `expect()`).
+NAO uses namespace Tests\Unit.
+NAO uses Illuminate\... nem Mockery.
+NAO uses markTestIncomplete.
+
+Estrutura obrigatoria:
+
+    <?php
+    declare(strict_types=1);
+
+    namespace Tests\Integration;
+
+    use PHPUnit\Framework\Attributes\Test;
+
+    final class AuthControllerTest extends HttpTestCase
+    {
+        #[Test]
+        public function get_login_mostra_formulario(): void
+        {
+            $r = $this->get('/auth/login');
+            $this->assertStatus(200, $r);
+        }
+    }
+
+Metodos do harness HttpTestCase disponiveis:
+- $this->get($path)          -> faz GET, devolve ['http_code', 'body', 'location', ...]
+- $this->post($path, $data)  -> faz POST
+- $this->makeUser($attrs)    -> insere user, devolve ['id' => ..., 'email' => ...]
+- $this->makeTrialKey(...)   -> insere trial_key
+- $this->assertStatus($n, $r)
+- $this->assertRedirect($path, $r)
+- $this->assertRedirectContains($sub, $r)
+- $this->assertBodyContains($sub, $r)
+
+Cada teste tem de verificar COMPORTAMENTO: status HTTP, Location, cookies, ou mensagem no body.

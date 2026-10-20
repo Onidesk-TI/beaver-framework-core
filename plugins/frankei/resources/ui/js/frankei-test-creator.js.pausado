@@ -1,0 +1,760 @@
+/* ============================================================
+ * Frankei — Test Creator
+ *
+ * Modal para gerar esqueleto de teste a partir de uma classe
+ * do coverage e (opcionalmente) correr logo o teste.
+ *
+ * Uso:
+ *   window.FrankeiTestCreator.open({ class: 'App\\Foo', file: '/path/Foo.php' })
+ *
+ * @package Beaver\Plugins\Frankei
+ * ============================================================ */
+(function () {
+    'use strict';
+
+    var MODAL_ID  = 'fkTestCreatorModal';
+    var STYLE_ID  = 'fkTestCreatorStyle';
+
+    function getEngine() {
+        try {
+            var e = localStorage.getItem('frankei:testEngine');
+            if (e === 'pest' || e === 'phpunit') return e;
+        } catch (_) {}
+        return 'pest';
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function injectStyle() {
+        if (document.getElementById(STYLE_ID)) return;
+        var st = document.createElement('style');
+        st.id = STYLE_ID;
+        st.textContent = `
+            #${MODAL_ID} {
+                position: fixed; inset: 0; z-index: 999999;
+                background: rgba(20,30,50,.7);
+                backdrop-filter: blur(4px);
+                display: none; align-items: center; justify-content: center;
+                padding: 24px;
+                isolation: isolate;
+            }
+            #${MODAL_ID}.open { display: flex; }
+            #${MODAL_ID} .fk-tc-content {
+                background: #fff; border-radius: 14px;
+                max-width: 900px; width: 100%; max-height: 92vh;
+                overflow: hidden; position: relative;
+                display: flex; flex-direction: column;
+                box-shadow: 0 24px 60px -12px rgba(0,0,0,.4);
+            }
+            #${MODAL_ID} .fk-tc-head {
+                display: flex; align-items: center; gap: 12px;
+                padding: 16px 20px; border-bottom: 1px solid #e5e7eb;
+                background: #fafafa;
+            }
+            #${MODAL_ID} .fk-tc-title {
+                font-weight: 700; font-size: 16px; color: #111827;
+                flex: 1; min-width: 0;
+            }
+            #${MODAL_ID} .fk-tc-title small {
+                display: block; font-weight: 400; color: #6b7280;
+                font-size: 12px; font-family: ui-monospace, monospace;
+                margin-top: 2px; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            #${MODAL_ID} .fk-tc-close {
+                width: 32px; height: 32px; border: 0; background: transparent;
+                border-radius: 8px; cursor: pointer; font-size: 16px;
+                color: #6b7280;
+            }
+            #${MODAL_ID} .fk-tc-close:hover { background: #f3f4f6; color: #111827; }
+
+            #${MODAL_ID} .fk-tc-bar {
+                display: flex; align-items: center; gap: 12px;
+                padding: 12px 20px; border-bottom: 1px solid #e5e7eb;
+                background: #fff;
+            }
+            #${MODAL_ID} .fk-tc-bar label {
+                font-size: 12px; color: #6b7280; font-weight: 600;
+                text-transform: uppercase; letter-spacing: .03em;
+            }
+            #${MODAL_ID} .fk-tc-bar select {
+                padding: 6px 10px; border-radius: 8px;
+                border: 1px solid #d1d5db; background: #fff; color: #111827;
+                font-size: 13px; cursor: pointer;
+            }
+            #${MODAL_ID} .fk-tc-class-input {
+                flex: 0 1 320px;
+                min-width: 200px; max-width: 380px;
+                padding: 6px 10px;
+                border: 1px solid #d1d5db; border-radius: 8px;
+                background: #fff; color: #111827;
+                font-family: ui-monospace, Menlo, Consolas, monospace;
+                font-size: 13px; height: 30px; box-sizing: border-box;
+            }
+            #${MODAL_ID} .fk-tc-class-input:focus {
+                outline: 2px solid #c7d2fe; border-color: #a5b4fc;
+            }
+            #${MODAL_ID} .fk-tc-class-status {
+                font-size: 15px; width: 18px; text-align: center; flex-shrink: 0;
+            }
+            #${MODAL_ID} .fk-tc-class-status.ok  { color: #16a34a; }
+            #${MODAL_ID} .fk-tc-class-status.err { color: #dc2626; }
+            #${MODAL_ID} .fk-tc-class-wrap {
+                position: relative; flex: 0 1 320px;
+                min-width: 200px; max-width: 380px;
+            }
+            #${MODAL_ID} .fk-tc-class-wrap .fk-tc-class-input {
+                width: 100%; flex: none;
+            }
+            #${MODAL_ID} .fk-tc-class-dropdown {
+                position: absolute; top: calc(100% + 2px); left: 0; right: 0;
+                max-height: 300px; overflow-y: auto;
+                background: #fff; border: 1px solid #d1d5db; border-radius: 8px;
+                box-shadow: 0 12px 30px rgba(0,0,0,.15);
+                z-index: 999999; display: none;
+            }
+            #${MODAL_ID} .fk-tc-class-dropdown.open { display: block; }
+            #${MODAL_ID} .fk-tc-dd-item {
+                padding: 8px 14px; cursor: pointer; border-bottom: 1px solid #f3f4f6;
+            }
+            #${MODAL_ID} .fk-tc-dd-item:last-child { border-bottom: none; }
+            #${MODAL_ID} .fk-tc-dd-item:hover,
+            #${MODAL_ID} .fk-tc-dd-item.active { background: #f0fdf4; }
+            #${MODAL_ID} .fk-tc-dd-class {
+                display: block; font-family: ui-monospace, Menlo, monospace;
+                font-size: 12.5px; color: #111827; font-weight: 600;
+            }
+            #${MODAL_ID} .fk-tc-dd-file {
+                display: block; font-size: 11px; color: #6b7280; margin-top: 2px;
+            }
+            #${MODAL_ID} .fk-tc-dd-empty {
+                padding: 12px 14px; color: #6b7280; font-size: 12px; font-style: italic;
+            }
+            #${MODAL_ID} .fk-tc-bar .fk-tc-info {
+                margin-left: auto; font-size: 12px; color: #6b7280;
+            }
+
+            #${MODAL_ID} .fk-tc-body {
+                flex: 1 1 auto; min-height: 0;
+                display: flex; flex-direction: column;
+                padding: 12px 20px;
+            }
+            #${MODAL_ID} textarea.fk-tc-editor {
+                flex: 1 1 auto; min-height: 340px;
+                width: 100%; resize: none;
+                font-family: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+                font-size: 13px; line-height: 1.6;
+                padding: 14px; border-radius: 10px;
+                border: 1px solid #d1d5db; background: #fafafa; color: #111827;
+                box-sizing: border-box;
+            }
+            #${MODAL_ID} textarea.fk-tc-editor:focus {
+                outline: 2px solid #c7d2fe; border-color: #a5b4fc;
+                background: #fff;
+            }
+
+            #${MODAL_ID} .fk-tc-foot {
+                display: flex; gap: 10px; align-items: center;
+                padding: 14px 20px; border-top: 1px solid #e5e7eb;
+                background: #fafafa;
+            }
+            #${MODAL_ID} .fk-tc-head .fk-tc-status {
+                margin-left: auto;
+                font-size: 12.5px; color: #6b7280;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                max-width: 55%;
+            }
+            #${MODAL_ID} .fk-tc-head .fk-tc-status.ok  { color: #047857; }
+            #${MODAL_ID} .fk-tc-head .fk-tc-status.err { color: #b91c1c; }
+            #${MODAL_ID} .fk-tc-btn {
+                padding: 8px 16px; border-radius: 9px; border: 1px solid #d1d5db;
+                background: #fff; color: #374151; font-weight: 600; font-size: 13px;
+                cursor: pointer;
+            }
+            #${MODAL_ID} .fk-tc-btn:hover { background: #f3f4f6; }
+            #${MODAL_ID} .fk-tc-btn-primary {
+                background: var(--blue, #2b5cb8); color: #fff; border-color: var(--blue, #2b5cb8);
+            }
+            #${MODAL_ID} .fk-tc-btn-primary:hover { background: var(--blue-600, #24509e); }
+            #${MODAL_ID} .fk-tc-btn[disabled] { opacity: .55; cursor: not-allowed; }
+        `;
+        document.head.appendChild(st);
+    }
+
+    function ensureModal() {
+        var m = document.getElementById(MODAL_ID);
+        if (m) return m;
+
+        injectStyle();
+
+        m = document.createElement('div');
+        m.id = MODAL_ID;
+        m.className = 'fk-tc-modal';
+        m.innerHTML = `
+            <div class="fk-tc-content">
+                <div class="fk-tc-head">
+                    <div class="fk-tc-title">
+                        <span id="fkTcTitle">Criar teste</span>
+                        <small id="fkTcPath">—</small>
+                    </div>
+                    <span class="fk-tc-status" id="fkTcStatus"></span>
+                    <button type="button" class="fk-tc-close" id="fkTcClose" aria-label="Fechar">✕</button>
+                </div>
+
+                               <div class="fk-tc-bar">
+                    <label title="Classe a testar (origem). O ficheiro de teste é gerado automaticamente. Ex: App\\Controllers\\ForumController">Classe <span style="opacity:.4;font-weight:400;text-transform:none;letter-spacing:0">(origem)</span></label>
+                    <div class="fk-tc-class-wrap">
+                        <input type="text" id="fkTcClassInput" class="fk-tc-class-input"
+                               autocomplete="off" spellcheck="false"
+                               placeholder="App\\Controllers\\ForumController">
+                        <div class="fk-tc-class-dropdown" id="fkTcClassDropdown"></div>
+                    </div>
+                    <span class="fk-tc-class-status" id="fkTcClassStatus"></span>
+
+                    <label>Suite</label>
+                    <select id="fkTcTarget">
+                        <option value="Unit">Unit</option>
+                        <option value="Feature">Feature</option>
+                    </select>
+
+                    <label>Motor</label>
+                    <select id="fkTcEngine">
+                        <option value="pest">🐀 Pest</option>
+                        <option value="phpunit">🐘 PHPUnit</option>
+                    </select>
+
+                    <span class="fk-tc-info" id="fkTcInfo">—</span>
+                </div>
+
+                <div class="fk-tc-body">
+                    <textarea id="fkTcEditor" class="fk-tc-editor" spellcheck="false"></textarea>
+                </div>
+
+                <div class="fk-tc-foot">
+                    <button type="button" class="fk-tc-btn" id="fkTcCancel">Cancelar</button>
+                    <button type="button" class="fk-tc-btn" id="fkTcSave">💾 Gravar</button>
+                    <button type="button" class="fk-tc-btn fk-tc-btn-primary" id="fkTcSaveRun">▶ Gravar e correr</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
+
+        m.addEventListener('click', function (e) {
+            if (e.target === m) close();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && m.classList.contains('open')) close();
+        });
+
+        return m;
+    }
+
+    var current = { cls: '', file: '', testClass: '', filterName: '' };
+
+    function setStatus(txt, kind) {
+        var s = document.getElementById('fkTcStatus');
+        if (!s) return;
+        s.textContent = txt || '';
+        s.className = 'fk-tc-status' + (kind ? ' ' + kind : '');
+    }
+
+    function close() {
+        var m = document.getElementById(MODAL_ID);
+        if (m) m.classList.remove('open');
+    }
+
+    function _regenSkeleton() {
+        if (!current.cls || current.cls.indexOf('\\') === -1) return;
+
+        var editor = document.getElementById('fkTcEditor');
+        if (!editor) return;
+
+        if (editor.value.trim() !== '') {
+            if (!confirm('Substituir o código atual pelo novo esqueleto?')) return;
+        }
+
+        current.testClass = '';
+        preview();
+    }
+
+    function preview() {
+        // Sem classe escolhida: limpar estado
+        if (!current.cls || current.cls.indexOf('\\') === -1) {
+            var infoEl0 = document.getElementById('fkTcInfo');
+            if (infoEl0) infoEl0.textContent = '—';
+            return;
+        }
+
+        var target = document.getElementById('fkTcTarget').value;
+        var engine = document.getElementById('fkTcEngine').value;
+        var editor = document.getElementById('fkTcEditor');
+        var infoEl = document.getElementById('fkTcInfo');
+        var saveBtn = document.getElementById('fkTcSave');
+        var saveRunBtn = document.getElementById('fkTcSaveRun');
+
+        if (infoEl) { infoEl.textContent = 'A carregar…'; infoEl.style.color = '#6b7280'; }
+        setStatus('A carregar pré-visualização…');
+        if (editor) editor.disabled = true;
+
+        fetch('/api/frankei/tests/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                class:  current.cls,
+                file:   current.file,
+                target: target,
+                engine: engine
+            })
+        })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+            if (editor) editor.disabled = false;
+
+            if (!res.ok || !res.data.ok) {
+                setStatus('Erro: ' + (res.data.error || 'desconhecido'), 'err');
+                if (infoEl) infoEl.textContent = '—';
+                return;
+            }
+
+            current.testClass  = res.data.testClass;
+            current.filterName = res.data.filterName;
+
+            var pathEl = document.getElementById('fkTcPath');
+            if (pathEl) pathEl.textContent = res.data.path;
+
+            if (res.data.exists) {
+                // ─── JÁ EXISTE: carregar conteúdo do ficheiro ───
+                if (infoEl) {
+                    infoEl.innerHTML = '⚠️ <b>Já existe</b> · a carregar…';
+                    infoEl.style.color = '#d97706';
+                }
+
+                var _testClassName = res.data.testClass || (current.cls.split('\\').pop() + 'Test');
+                fetch('/api/frankei/test-file?class=' + encodeURIComponent(_testClassName),
+                      { credentials: 'include' })
+                  .then(function (r) { return r.json(); })
+                  .then(function (d) {
+                      if (editor) {
+                          editor.value = d.ok ? d.content : (res.data.code || '');
+                      }
+                      if (infoEl) {
+                          if (d.ok) {
+                              infoEl.innerHTML = '⚠️ <b>Já existe</b> — carregado para edição (' +
+                                                 (d.size || 0) + ' bytes)';
+                              infoEl.style.color = '#d97706';
+                          } else {
+                              infoEl.innerHTML = '⚠️ <b>Já existe</b> — erro ao carregar (' + (d.error || '?') + ')';
+                              infoEl.style.color = '#dc2626';
+                          }
+                      }
+                      setStatus('Carregado. Edita e clica em Substituir.', 'warn');
+                  })
+                  .catch(function () {
+                      if (editor) editor.value = res.data.code || '';
+                      if (infoEl) infoEl.innerHTML = '⚠️ <b>Já existe</b> — erro de rede';
+                  });
+
+                if (saveBtn)    saveBtn.innerHTML    = '💾 Substituir';
+                if (saveRunBtn) saveRunBtn.innerHTML = '▶ Substituir e correr';
+
+            } else {
+                // ─── NOVO: skeleton ───
+                if (editor) editor.value = res.data.code || '';
+
+                if (infoEl) {
+                    infoEl.innerHTML = '✓ Novo ficheiro · ' + (res.data.methodCount || 0) + ' métodos';
+                    infoEl.style.color = '#16a34a';
+                }
+                setStatus('Pronto. Edita se quiseres e clica em Gravar.', 'ok');
+
+                if (saveBtn)    saveBtn.innerHTML    = '💾 Gravar';
+                if (saveRunBtn) saveRunBtn.innerHTML = '▶ Gravar e correr';
+            }
+        })
+        .catch(function (e) {
+            if (editor) editor.disabled = false;
+            setStatus('Erro de rede: ' + e.message, 'err');
+        });
+    }
+
+    function save(run) {
+        var target = document.getElementById('fkTcTarget').value;
+        var engine = document.getElementById('fkTcEngine').value;
+        var code   = document.getElementById('fkTcEditor').value;
+
+        // Ler classe diretamente do input (fonte de verdade)
+        var inp = document.getElementById('fkTcClassInput');
+        if (inp) {
+            var clsNow = inp.value.trim();
+            if (clsNow) {
+                current.cls = clsNow;
+                if (!current.file && _classIndex && _classIndex[clsNow]) {
+                    current.file = _classIndex[clsNow];
+                }
+            }
+        }
+
+        if (!current.cls) {
+            setStatus('Escolhe uma classe primeiro.', 'err');
+            return;
+        }
+
+        if (!code.trim()) {
+            setStatus('Nada para gravar.', 'err');
+            return;
+        }
+
+        function doSave(overwrite) {
+            // 1) Ler classe do input (fonte de verdade) — à prova de race conditions
+            var _inp = document.getElementById('fkTcClassInput');
+            var _clsFinal = (_inp && _inp.value.trim()) || current.cls || '';
+
+            // 2) Se temos classe mas não temos file, tentar derivar do índice
+            var _fileFinal = current.file || '';
+            if (!_fileFinal && _classIndex && _classIndex[_clsFinal]) {
+                _fileFinal = _classIndex[_clsFinal];
+            }
+
+            // 3) Se mesmo assim nada, bloquear com mensagem clara
+            if (!_clsFinal) {
+                setStatus('Escolhe uma classe no campo em cima primeiro.', 'err');
+                return;
+            }
+
+            setStatus(run ? 'A gravar e a correr…' : 'A gravar…');
+
+            fetch('/api/frankei/tests/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    class:  _clsFinal,
+                    file:   _fileFinal,
+                    target: target,
+                    engine: engine,
+                    code:   code,
+                    overwrite: overwrite
+                })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+            .then(function (res) {
+                if (res.status === 409) {
+                    if (!confirm('O ficheiro ' + (res.data.path || '') + ' já existe. Substituir?')) {
+                        setStatus('Cancelado.', 'err');
+                        return;
+                    }
+                    doSave(true);
+                    return;
+                }
+                if (res.status !== 200 || !res.data.ok) {
+                    setStatus('Erro: ' + (res.data.error || ('HTTP ' + res.status)), 'err');
+                    return;
+                }
+
+                setStatus('✔ Gravado: ' + res.data.path, 'ok');
+
+                if (run) {
+                    if (typeof window.execTermCommand === 'function') {
+                        var cmd = 'beaver test --filter=' + res.data.filterName
+                                + ' --coverage';
+                        if (engine === 'pest' || engine === 'phpunit') {
+                            cmd += ' --engine=' + engine;
+                        }
+
+                        // Guardar o filtro para refresh automático do coverage
+                        try {
+                            localStorage.setItem('frankei:lastTestFilter', res.data.filterName);
+                            localStorage.setItem('frankei:lastTestAt', String(Date.now()));
+                        } catch (_) {}
+
+                        setTimeout(function () {
+                            close();
+
+                            // Depois de correr, tentar atualizar os números do coverage
+                            if (typeof window.CoverageView === 'object'
+                                && typeof window.CoverageView.reload === 'function') {
+                                // dá tempo ao pest de terminar antes de pedir novo clover.xml
+                                setTimeout(function () {
+                                    try { window.CoverageView.reload(); } catch (_) {}
+                                }, 8000);
+                            }
+
+                            window.execTermCommand(cmd);
+                        }, 400);
+                    } else {
+                        setStatus('Gravado, mas terminal indisponível.', 'err');
+                    }
+                }
+            })
+            .catch(function (e) {
+                setStatus('Erro de rede: ' + e.message, 'err');
+            });
+        }
+
+        doSave(false);
+    }
+
+    function open(opts) {
+        opts = opts || {};
+
+        var m = ensureModal();
+
+        // Reforço: garantir que o modal está mesmo no topo do body
+        // (foge a stacking contexts como #fkModal com backdrop-filter)
+        if (m.parentNode !== document.body) {
+            document.body.appendChild(m);
+        }
+        m.style.zIndex = '999999';
+
+        current.cls  = opts.class || '';
+        current.file = opts.file  || '';
+
+               // Ligar o autocomplete ANTES de mexer no valor
+        if (typeof _bindClassInput === 'function') _bindClassInput();
+
+        var _clsInput0 = document.getElementById('fkTcClassInput');
+        if (_clsInput0) _clsInput0.value = current.cls || '';
+        _updateClassStatus();
+
+        if (!current.cls) {
+            setTimeout(function(){
+                var i = document.getElementById('fkTcClassInput');
+                if (i) i.focus();
+            }, 50);
+        }
+
+        // valores iniciais
+        document.getElementById('fkTcEngine').value = getEngine();
+        document.getElementById('fkTcTarget').value = 'Unit';
+        document.getElementById('fkTcEditor').value = '';
+        document.getElementById('fkTcTitle').textContent =
+            '➕ Criar teste para ' + (current.cls.split('\\').pop() || current.cls);
+        setStatus('');
+
+        // binds (uma vez)
+        if (!m.dataset.fkTcBound) {
+            m.dataset.fkTcBound = '1';
+
+            document.getElementById('fkTcClose').addEventListener('click', close);
+            document.getElementById('fkTcCancel').addEventListener('click', close);
+            document.getElementById('fkTcTarget').addEventListener('change', _regenSkeleton);
+            document.getElementById('fkTcEngine').addEventListener('change', _regenSkeleton);
+            document.getElementById('fkTcSave').addEventListener('click', function () { save(false); });
+            document.getElementById('fkTcSaveRun').addEventListener('click', function () { save(true); });
+        }
+
+        m.classList.add('open');
+        preview();
+    }
+
+       // ─── Autocomplete de classes ───
+    var _classTimer = null;
+    var _classIndex = {};
+
+    function _fetchClasses(q, cb) {
+        fetch('/api/frankei/classes?q=' + encodeURIComponent(q) + '&limit=80',
+              { credentials: 'include' })
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+              var list = (d && d.classes) || [];
+              list.forEach(function(item){ _classIndex[item.class] = item.file; });
+              cb(list);
+          })
+          .catch(function(){ cb([]); });
+    }
+
+    function _setSaveEnabled(enabled) {
+        var save    = document.getElementById('fkTcSave');
+        var saveRun = document.getElementById('fkTcSaveRun');
+        if (save) {
+            save.disabled = !enabled;
+            save.style.opacity = enabled ? '' : '0.5';
+            save.style.cursor  = enabled ? '' : 'not-allowed';
+        }
+        if (saveRun) {
+            saveRun.disabled = !enabled;
+            saveRun.style.opacity = enabled ? '' : '0.5';
+            saveRun.style.cursor  = enabled ? '' : 'not-allowed';
+        }
+    }
+
+    function _updateClassStatus() {
+        var input = document.getElementById('fkTcClassInput');
+        var st    = document.getElementById('fkTcClassStatus');
+        var path  = document.getElementById('fkTcPath');
+        var title = document.getElementById('fkTcTitle');
+        if (!input || !st) return;
+
+        var v = input.value.trim();
+
+        if (!v) {
+            st.textContent = '';
+            st.className   = 'fk-tc-class-status';
+            current.cls = '';
+            current.file = '';
+            current.testClass = '';
+            if (path) path.textContent = '—';
+            if (title) title.textContent = '➕ Criar teste';
+            _setSaveEnabled(false);
+            var _st0 = document.getElementById('fkTcStatus');
+            if (_st0) { _st0.textContent = ''; _st0.className = 'fk-tc-status'; }
+            var _info0 = document.getElementById('fkTcInfo');
+            if (_info0) _info0.textContent = '—';
+            return;
+        }
+
+        var fileFound = _classIndex && _classIndex[v];
+
+        if (fileFound) {
+            st.textContent = '✅';
+            st.className   = 'fk-tc-class-status ok';
+            current.cls  = v;
+            current.file = fileFound;
+            _setSaveEnabled(true);
+            if (path) path.textContent = fileFound;
+
+            // Gerar/carregar sempre que muda de classe
+            var _changed = current._lastPreviewedCls !== v;
+            current._lastPreviewedCls = v;
+            if (_changed && typeof preview === 'function') {
+                current.testClass = '';   // força regen
+                try { preview(); } catch (e) {}
+            }
+            if (title) {
+                var short = v.split('\\').pop();
+                title.textContent = '➕ Criar teste para ' + short;
+            }
+        } else {
+            st.textContent = '❌';
+            st.className   = 'fk-tc-class-status err';
+            current.cls = v;
+            current.file = '';
+            current.testClass = '';
+            _setSaveEnabled(false);
+            if (path) path.textContent = '—';
+            var _st = document.getElementById('fkTcStatus');
+            if (_st) { _st.textContent = ''; _st.className = 'fk-tc-status'; }
+            if (title) {
+                var short2 = v.split('\\').pop();
+                title.textContent = '➕ Criar teste para ' + short2;
+            }
+        }
+    }
+
+    function _bindClassInput() {
+        var input = document.getElementById('fkTcClassInput');
+        var dd    = document.getElementById('fkTcClassDropdown');
+        if (!input || input.dataset.fkTcBound) return;
+        input.dataset.fkTcBound = '1';
+
+        var activeIdx = -1;
+        var currentItems = [];
+
+        function hideDd() {
+            if (dd) dd.classList.remove('open');
+            activeIdx = -1;
+        }
+
+        function selectItem(item) {
+            input.value = item.class;
+            current.cls = item.class;
+            current.file = item.file;
+            _classIndex[item.class] = item.file;
+            _updateClassStatus();
+            hideDd();
+        }
+
+        function renderList(items) {
+            currentItems = items;
+            if (!dd) return;
+            if (!items.length) {
+                dd.innerHTML = '<div class="fk-tc-dd-empty">Sem resultados</div>';
+                dd.classList.add('open');
+                return;
+            }
+            dd.innerHTML = items.map(function (it, i) {
+                return '<div class="fk-tc-dd-item" data-idx="' + i + '">' +
+                       '<span class="fk-tc-dd-class">' + it.class + '</span>' +
+                       '<span class="fk-tc-dd-file">'  + it.file  + '</span>' +
+                       '</div>';
+            }).join('');
+            dd.classList.add('open');
+            activeIdx = -1;
+            dd.querySelectorAll('.fk-tc-dd-item').forEach(function (el) {
+                el.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    selectItem(items[+el.dataset.idx]);
+                });
+            });
+        }
+
+        function highlight() {
+            if (!dd) return;
+            var els = dd.querySelectorAll('.fk-tc-dd-item');
+            els.forEach(function (el, i) {
+                el.classList.toggle('active', i === activeIdx);
+            });
+            if (activeIdx >= 0 && els[activeIdx]) {
+                els[activeIdx].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        // pré-carrega todas as classes (para o _classIndex)
+        _fetchClasses('', function (items) { /* só para index */ });
+
+        input.addEventListener('input', function () {
+            var q = input.value.trim();
+            clearTimeout(_classTimer);
+            _classTimer = setTimeout(function () {
+                _fetchClasses(q, function (items) {
+                    renderList(items);
+                    _updateClassStatus();
+                });
+            }, 120);
+            _updateClassStatus();
+        });
+
+        input.addEventListener('focus', function () {
+            _fetchClasses(input.value.trim(), function (items) {
+                if (items.length) renderList(items);
+            });
+        });
+
+        input.addEventListener('blur', function () {
+            setTimeout(hideDd, 180);
+            _updateClassStatus();
+        });
+
+        input.addEventListener('keydown', function (e) {
+            if (!dd) return;
+            var els = dd.querySelectorAll('.fk-tc-dd-item');
+            var open = dd.classList.contains('open');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!open) {
+                    _fetchClasses(input.value.trim(), renderList);
+                    return;
+                }
+                activeIdx = Math.min(activeIdx + 1, els.length - 1);
+                highlight();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIdx = Math.max(activeIdx - 1, 0);
+                highlight();
+            } else if (e.key === 'Enter' && activeIdx >= 0 && currentItems[activeIdx]) {
+                e.preventDefault();
+                selectItem(currentItems[activeIdx]);
+            } else if (e.key === 'Escape') {
+                hideDd();
+            }
+        });
+    }
+
+    window.FrankeiTestCreator = { open: open, close: close, _bindClassInput: _bindClassInput };
+})();

@@ -1,0 +1,79 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial\Http;
+
+use Beaver\Http\Request;
+use Beaver\Http\Response;
+use Beaver\Plugins\FrankeiTrial\Support\TrialLimits;
+
+class TrialController
+{
+    public function index(Request $request): Response
+    {
+        $plan    = TrialLimits::plan();
+        $isTrial = TrialLimits::isTrial();
+
+        $badge = $isTrial
+            ? '<span style="background:#f59e0b;color:#1f2937;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:800">TRIAL</span>'
+            : '<span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:800">' . strtoupper($plan) . '</span>';
+
+        $limits = $isTrial
+            ? '<li>Máx. ficheiros: <b>' . TrialLimits::maxFiles() . '</b></li>'
+            . '<li>Máx. testes: <b>' . TrialLimits::maxTests() . '</b></li>'
+            . '<li>Suites permitidas: <b>' . implode(', ', TrialLimits::allowedSuites()) . '</b></li>'
+            . '<li>Scanners de segurança: <b>desligados</b></li>'
+            : '<li>Tudo ilimitado</li>';
+
+        $html = '<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Frankei Trial</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;background:#fdf8ef;color:#2E1A10;margin:0;padding:40px;line-height:1.6}
+.box{max-width:640px;margin:60px auto;background:#fff;border:1px solid #e8dcc8;border-radius:16px;padding:32px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+h1{margin:0 0 8px;font-size:26px;letter-spacing:-.02em}
+.sub{color:#6b5544;font-size:14px;margin-bottom:24px}
+.limits{background:#faf6ee;border-left:3px solid #e8a44f;border-radius:8px;padding:14px 18px;font-size:13px}
+.limits ul{margin:6px 0;padding-left:18px}
+.tag{display:inline-block;margin-left:8px;vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="box">
+    <h1>Frankei Trial' . $badge . '</h1>
+    <p class="sub">Versão limitada — só testes Unit. Análise de segurança não incluída.</p>
+    <div class="limits">
+        <b>Limites do plano <code>' . htmlspecialchars($plan) . '</code>:</b>
+        <ul>' . $limits . '</ul>
+    </div>
+    <p style="margin-top:24px;font-size:13px;color:#8a7a68">
+        <b>Fase 1</b> — estrutura base. UI completa chega nas próximas fases.
+    </p>
+</div>
+</body>
+</html>';
+
+        return (new Response($html))
+            ->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function health(Request $request): Response
+    {
+        return Response::json([
+            'ok'   => true,
+            'plugin' => 'frankei-trial',
+            'plan' => TrialLimits::plan(),
+            'limits' => [
+                'maxFiles'              => TrialLimits::maxFiles() === PHP_INT_MAX ? null : TrialLimits::maxFiles(),
+                'maxTests'              => TrialLimits::maxTests() === PHP_INT_MAX ? null : TrialLimits::maxTests(),
+                'maxFindings'           => TrialLimits::maxFindings() === PHP_INT_MAX ? null : TrialLimits::maxFindings(),
+                'allowedSuites'         => TrialLimits::allowedSuites(),
+                'allowSecurityScanners' => TrialLimits::allowSecurityScanners(),
+            ],
+            'timestamp' => date('c'),
+        ]);
+    }
+}

@@ -1,0 +1,1298 @@
+/* Frankei Trial — UI logic */
+(function () {
+  'use strict';
+
+  var state = {
+    plan: 'trial',
+    total: 0,
+    shown: 0,
+    limit: null,
+    tests: [],
+    suites: [],
+    porSuite: {},
+    engine: 'pest',
+    suite: 'all',
+    running: false,
+    classesPage: 1,
+    classesPerPage: 5,
+    classesTotal: 0,
+    classesPages: 0,
+    editorConverted: false,
+    editorOriginalContent: '',
+    editorOriginalEngine: ''
+    editorBlockedByLimit: false,
+    editorBlockReason: ''
+  };
+
+  var $list      = document.getElementById('fkTrialList');
+  var $btnRun    = document.getElementById('fkTrialRun');
+  var $terminal  = document.getElementById('fkTrialTerminal');
+  var $counter   = document.getElementById('fkTrialCounter');
+  var $ballNum   = document.getElementById('fkTrialBallNum');
+  var $ballHint  = document.getElementById('fkTrialBallHint');
+  var $cardCounter = document.getElementById('fkTrialCardCounter');
+  var $engineSel = document.getElementById('fkTrialEngine');
+  var $suiteSel  = document.getElementById('fkTrialSuite');
+  var $status    = document.getElementById('fkTrialStatus');
+  var $btnReport = document.getElementById('fkTrialReport');
+  var $suitesBar = document.getElementById('fkTrialSuitesBar');
+  var $runSummary = document.getElementById('fkTrialRunSummary');
+  var $runStats   = document.getElementById('fkTrialRunStats');
+  var $btnAnalyze = document.getElementById('fkTrialRunAnalyze');
+  var $classesCard    = document.getElementById('fkTrialClassesCard');
+  var $classesList    = document.getElementById('fkTrialClassesList');
+  var $classesCounter = document.getElementById('fkTrialClassesCounter');
+  var $pagination     = document.getElementById('fkTrialPagination');
+  var $pageInfo       = document.getElementById('fkTrialPageInfo');
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function t(key) {
+    return (window.FrankeiI18n && window.FrankeiI18n.t) ? window.FrankeiI18n.t(key) : key;
+  }
+
+  function setStatus(msg, cls) {
+    if (!$status) return;
+    $status.textContent = msg || '';
+    $status.className = 'fk-trial-term-status' + (cls ? ' ' + cls : '');
+  }
+
+  function setRunning(on) {
+    state.running = on;
+    if (!$btnRun) return;
+    $btnRun.disabled = on;
+    if (on) {
+      $btnRun.dataset.orig = $btnRun.innerHTML;
+      $btnRun.innerHTML = '<span class="fk-trial-spinner"></span> RUN';
+      setStatus(t('A correr...'), 'run');
+    } else if ($btnRun.dataset.orig) {
+      $btnRun.innerHTML = $btnRun.dataset.orig;
+    }
+  }
+
+
+  var SUITE_ICONS = {
+    'Unit':     '🧪',
+    'Feature':  '🎯',
+    'Coverage': '📊',
+    'all':      '📦'
+  };
+
+  function renderSuitesBar() {
+    if (!$suitesBar) return;
+    var suites = state.suites || [];
+    var counts = state.porSuite || {};
+
+    if (!suites.length) {
+      $suitesBar.innerHTML = '<span class="fk-trial-suites-loading">Sem suites disponíveis</span>';
+      return;
+    }
+
+    // "Todas" + cada suite
+    var items = [];
+    items.push({
+      id: 'all',
+      name: t('Todas') || 'Todas',
+      count: state.total
+    });
+    suites.forEach(function (s) {
+      items.push({
+        id: s,
+        name: s,
+        count: counts[s] || 0
+      });
+    });
+
+    $suitesBar.innerHTML = items.map(function (it) {
+      var icon = SUITE_ICONS[it.id] || '📂';
+      var isActive = (state.suite === it.id);
+      var isLocked = false; // Fase 4B: aplicar aqui a constante de bloqueio
+      var proBadge = '';    // Fase 4B: '<span class="fk-trial-suite-chip-pro">PRO</span>'
+      var disabled = (it.count === 0) ? 'disabled' : '';
+      var lockedClass = isLocked ? ' is-locked' : '';
+
+      return '<span class="fk-trial-suite-chip' +
+        (isActive ? ' is-active' : '') + lockedClass + '" data-suite="' + esc(it.id) + '">' +
+        '<span class="fk-trial-suite-chip-icon">' + icon + '</span>' +
+        '<span class="fk-trial-suite-chip-name">' + esc(it.name) + '</span>' +
+        '<span class="fk-trial-suite-chip-count">' + it.count + '</span>' +
+        proBadge +
+        '<button type="button" class="fk-trial-suite-chip-run" ' + disabled +
+          ' data-run-suite="' + esc(it.id) + '" title="Correr esta suite">▶</button>' +
+      '</span>';
+    }).join('');
+  }
+
+  // Handler de cliques na barra
+  if ($suitesBar) {
+    $suitesBar.addEventListener('click', function (e) {
+      var runBtn = e.target.closest('.fk-trial-suite-chip-run');
+      if (runBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        var suiteId = runBtn.dataset.runSuite;
+        var chip = runBtn.closest('.fk-trial-suite-chip');
+        if (chip && chip.classList.contains('is-locked')) {
+          setStatus('🔒 Suite bloqueada no plano ' + state.plan, 'warn');
+          return;
+        }
+        // Correr a suite
+        state.suite = suiteId;
+        // Sincronizar com o select (se existir)
+        if ($suiteSel) $suiteSel.value = suiteId;
+        runTests();
+        return;
+      }
+
+      var chip = e.target.closest('.fk-trial-suite-chip');
+      if (chip) {
+        var suiteId = chip.dataset.suite;
+        if (chip.classList.contains('is-locked')) return;
+        state.suite = suiteId;
+        if ($suiteSel) $suiteSel.value = suiteId;
+        renderSuitesBar(); // actualizar visual do "active"
+      }
+    });
+  }
+
+
+  /* ── Parser do output Pest/PHPUnit ── */
+  function parseTestOutput(lines) {
+    var stats = {
+      tests: 0, passed: 0, failed: 0, skipped: 0,
+      assertions: 0, time: '—', ok: false
+    };
+
+    var texto = (lines || []).join('\n');
+
+    // Pest/PHPUnit: "Tests:    14 passed (34 assertions)"
+    var m1 = texto.match(/Tests:\s+(\d+)\s+passed/i);
+    if (m1) { stats.passed = parseInt(m1[1], 10) || 0; }
+    var m1b = texto.match(/(\d+)\s+failed/i);
+    if (m1b) { stats.failed = parseInt(m1b[1], 10) || 0; }
+    var m1c = texto.match(/(\d+)\s+skipped/i);
+    if (m1c) { stats.skipped = parseInt(m1c[1], 10) || 0; }
+    var m1d = texto.match(/([\d.,]+)\s+assertions/i);
+    if (m1d) { stats.assertions = parseInt(m1d[1].replace(/[.,]/g, ''), 10) || 0; }
+    var m1e = texto.match(/Duration:\s+([\d.,]+\s*\w+)/i);
+    if (m1e) { stats.time = m1e[1]; }
+
+    // Formato "OK (14 tests, 41 assertions)" do PHPUnit
+    var m2 = texto.match(/OK \((\d+) tests?,\s*(\d+)\s+assertions?\)/i);
+    if (m2) {
+      stats.passed = parseInt(m2[1], 10) || 0;
+      stats.assertions = parseInt(m2[2], 10) || 0;
+    }
+
+    // Formato Pest PT: "Passaram  14"
+    var m3 = texto.match(/Pass(aram)?\s*[:·]?\s*(\d+)/i);
+    if (m3) stats.passed = parseInt(m3[2], 10) || stats.passed;
+
+    stats.tests = stats.passed + stats.failed + stats.skipped;
+    stats.ok = (stats.failed === 0 && stats.tests > 0);
+
+    return stats;
+  }
+
+  /* ── Render do resumo ── */
+  function renderRunSummary(data) {
+    if (!$runSummary || !$runStats) return;
+
+    var stats = parseTestOutput(data.lines || []);
+
+    // Se não conseguiu parsear nada, usar dados do backend
+    if (stats.tests === 0 && data.total_lines) {
+      stats.time = (data.elapsed_ms || 0) + 'ms';
+    }
+
+    $runSummary.hidden = false;
+
+    var html = '';
+    html += '<span class="fk-trial-stat ' + (stats.ok ? 'ok' : (stats.failed > 0 ? 'err' : 'muted')) + '">' +
+              '<span class="fk-trial-stat-icon">' + (stats.ok ? '✅' : '❌') + '</span>' +
+              '<span class="fk-trial-stat-value">' + stats.tests + ' ' + esc(t('testes')) + '</span>' +
+            '</span>';
+
+    if (stats.passed > 0) {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat ok">' +
+                '<span class="fk-trial-stat-icon">✅</span>' +
+                '<span class="fk-trial-stat-value">' + stats.passed + '</span>' +
+              '</span>';
+    }
+    if (stats.failed > 0) {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat err">' +
+                '<span class="fk-trial-stat-icon">❌</span>' +
+                '<span class="fk-trial-stat-value">' + stats.failed + '</span>' +
+              '</span>';
+    }
+    if (stats.skipped > 0) {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat warn">' +
+                '<span class="fk-trial-stat-icon">⏭️</span>' +
+                '<span class="fk-trial-stat-value">' + stats.skipped + '</span>' +
+              '</span>';
+    }
+    if (stats.assertions > 0) {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat info">' +
+                '<span class="fk-trial-stat-icon">📊</span>' +
+                '<span class="fk-trial-stat-value">' + stats.assertions + '</span>' +
+              '</span>';
+    }
+    if (stats.time !== '—') {
+      html += '<span class="fk-trial-stat-sep">·</span>' +
+              '<span class="fk-trial-stat muted">' +
+                '<span class="fk-trial-stat-icon">⏱️</span>' +
+                '<span class="fk-trial-stat-value">' + esc(stats.time) + '</span>' +
+              '</span>';
+    }
+
+    $runStats.innerHTML = html;
+
+    // Ativar botão Analisar
+    if ($btnAnalyze) $btnAnalyze.disabled = false;
+  }
+
+
+  /* ═══════════════════════════════════════════════════════
+     CLASSES — tabela + paginação
+     ═══════════════════════════════════════════════════════ */
+
+  function renderClasses(data) {
+    if (!$classesList) return;
+
+    state.classesTotal = data.total;
+    state.classesPages = data.pages;
+    state.classesPage  = data.page;
+
+    if (data.total === 0) {
+      $classesList.innerHTML = '<div class="fk-trial-empty">' +
+        '<div class="fk-trial-empty-icon">📋</div>' +
+        '<p>' + esc(data.message || t('Sem resultados ainda')) + '</p>' +
+      '</div>';
+      if ($pagination) $pagination.hidden = true;
+      if ($classesCounter) $classesCounter.textContent = '0 / 0';
+      return;
+    }
+
+    if ($classesCounter) {
+      var start = (data.page - 1) * data.perPage + 1;
+      var end   = Math.min(data.page * data.perPage, data.total);
+      $classesCounter.textContent = start + '–' + end + ' / ' + data.total;
+    }
+
+    var rows = data.classes.map(function (c) {
+      var cls = 'is-' + (c.status || 'pass');
+      var statusBadge = {
+        passed:  '<span class="fk-trial-cls-badge ok">✅ ' + c.tests + '</span>',
+        failed:  '<span class="fk-trial-cls-badge err">❌ ' + (c.failures + c.errors) + ' / ' + c.tests + '</span>',
+        partial: '<span class="fk-trial-cls-badge warn">⚠️ ' + c.tests + '</span>',
+        skipped: '<span class="fk-trial-cls-badge none">⏭️ ' + c.tests + '</span>',
+      }[c.status] || '<span class="fk-trial-cls-badge none">—</span>';
+
+      var ns = c.classname.lastIndexOf('\\');
+      var namespacePart = ns >= 0 ? c.classname.substring(0, ns + 1) : '';
+      var shortPart     = c.classname.substring(ns + 1);
+
+      return '<tr class="' + cls + '" data-classname="' + esc(c.classname) + '">' +
+        '<td style="padding:12px 14px">' +
+          '<span class="fk-trial-cls-namespace">' + esc(namespacePart) + '</span>' +
+          '<span class="fk-trial-cls-name">' + esc(shortPart) + '</span>' +
+        '</td>' +
+        '<td><span class="fk-trial-cls-suite">' + esc(c.suite || 'Unit') + '</span></td>' +
+        '<td class="center" style="padding:12px 14px;text-align:center">' + statusBadge + '</td>' +
+        '<td class="num" style="padding:12px 14px;text-align:right">' + c.tests + '</td>' +
+        '<td class="num" style="padding:12px 14px;text-align:right">' + c.assertions + '</td>' +
+        '<td class="num" style="padding:12px 14px;text-align:right">' + (c.time < 0.01 ? '<0.01s' : c.time.toFixed(3) + 's') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    $classesList.innerHTML =
+      '<table class="fk-trial-classes-table" style="width:100%;border-collapse:separate;border-spacing:0">' +
+        '<thead><tr>' +
+          '<th style="padding:12px 14px;text-align:left">' + esc(t('Classe')) + '</th>' +
+          '<th style="padding:12px 14px;text-align:left">' + esc(t('Suite')) + '</th>' +
+          '<th class="center" style="padding:12px 14px;text-align:center">' + esc(t('Estado')) + '</th>' +
+          '<th class="num" style="padding:12px 14px;text-align:right">' + esc(t('Testes')) + '</th>' +
+          '<th class="num" style="padding:12px 14px;text-align:right">' + esc(t('Assertions')) + '</th>' +
+          '<th class="num" style="padding:12px 14px;text-align:right">' + esc(t('Tempo')) + '</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>';
+
+    // Paginação
+    if ($pagination && data.pages > 1) {
+      $pagination.hidden = false;
+      if ($pageInfo) $pageInfo.textContent = data.page + ' / ' + data.pages;
+      $pagination.querySelectorAll('[data-page-action]').forEach(function (b) {
+        var a = b.dataset.pageAction;
+        b.disabled =
+          (a === 'first' || a === 'prev') ? (data.page <= 1) :
+          (a === 'next'  || a === 'last') ? (data.page >= data.pages) : false;
+      });
+    } else if ($pagination) {
+      $pagination.hidden = true;
+    }
+  }
+
+  function loadClasses(page) {
+    if (!$classesList || !$classesCard) return;
+    state.classesPage = page || 1;
+
+    $classesCard.hidden = false;
+    $classesList.innerHTML = '<div class="fk-trial-empty">' +
+      '<span class="fk-trial-spinner"></span> ' + esc(t('A carregar...')) +
+    '</div>';
+
+    var url = '/api/frankei-trial/tests/classes?page=' + state.classesPage +
+              '&perPage=' + state.classesPerPage;
+
+    fetch(url, { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          $classesList.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+            esc(d.error || 'Erro') + '</div>';
+          return;
+        }
+        renderClasses(d);
+      })
+      .catch(function (e) {
+        $classesList.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+          esc(e.message) + '</div>';
+      });
+  }
+
+  /* Paginação — botões */
+  if ($pagination) {
+    $pagination.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-page-action]');
+      if (!b || b.disabled) return;
+      var a = b.dataset.pageAction;
+      var p = state.classesPage;
+      if (a === 'first') p = 1;
+      if (a === 'prev')  p = Math.max(1, p - 1);
+      if (a === 'next')  p = Math.min(state.classesPages, p + 1);
+      if (a === 'last')  p = state.classesPages;
+      loadClasses(p);
+    });
+  }
+
+  /* Clique numa linha → abre Modal B */
+  if ($classesList) {
+    $classesList.addEventListener('click', function (e) {
+      var tr = e.target.closest('tr[data-classname]');
+      if (!tr) return;
+      var classname = tr.dataset.classname;
+      abrirEditorTeste(classname);
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     FK_TRIAL_EDITOR — Modal editor de testes
+     Abre ao clicar numa classe da tabela
+     ═══════════════════════════════════════════════════════ */
+
+  /* Detecta se um teste é Pest ou PHPUnit */
+  function detectTestEngine(content) {
+    if (!content) return null;
+    var c = content;
+
+    // Pest: it(), test(), expect(), use function Pest
+    if (/use\s+function\s+Pest\b/i.test(c) ||
+        /^\s*it\s*\(/m.test(c) ||
+        /^\s*test\s*\(/m.test(c) ||
+        /\bexpect\s*\(/.test(c) ||
+        /\btoBe(True|False|Empty|Null|GreaterThan|LessThan|Same)?\s*\(/.test(c)) {
+      return 'pest';
+    }
+
+    // PHPUnit: extends TestCase, public function test*, assert*
+    if (/extends\s+[\w\\]*TestCase\b/.test(c) ||
+        /public\s+function\s+test[A-Z_]/i.test(c) ||
+        /\$this->assert[A-Z]/.test(c)) {
+      return 'phpunit';
+    }
+
+    return null;
+  }
+
+  /* Mostra aviso + opção de converter quando o engine escolhido difere */
+  function verificarEngineEscolhido(novoEngine) {
+    var detectado = state.editorDetectedEngine || 'pest';
+    if (novoEngine === detectado) {
+      state.editorEngine = novoEngine;
+      setEditStatus && setEditStatus('Pronto', 'ok');
+      return;
+    }
+
+    // Mismatch — perguntar
+    var msg = 'O teste está escrito em ' + detectado.toUpperCase() + '.\n\n' +
+              'Queres criar/converter para ' + novoEngine.toUpperCase() + '?\n\n' +
+              'OK = converter agora\n' +
+              'Cancelar = correr na mesma com ' + novoEngine.toUpperCase() + ' (pode falhar)';
+
+    if (confirm(msg)) {
+      converterEngine(novoEngine);
+    } else {
+      state.editorEngine = novoEngine;
+    }
+  }
+
+  /* Converte o teste para outro motor (mostra no editor, não grava) */
+  function converterEngine(novoEngine) {
+    var classname = state.editorClassname;
+    if (!classname) return;
+
+    setEditStatus('A converter para ' + novoEngine.toUpperCase() + '...', 'run');
+
+    fetch('/api/frankei-trial/tests/convert', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ class: classname, engine: novoEngine })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d.ok) {
+        setEditStatus('✗ ' + (d.error || 'Erro'), 'err');
+        return;
+      }
+
+      // Substituir o conteúdo do textarea
+      if (typeof window.__fkTrialSetEditorCode === 'function') {
+        window.__fkTrialSetEditorCode(d.code);
+      }
+
+      state.editorEngine = d.to;
+      state.editorDetectedEngine = d.to;
+      state.editorConverted = true;
+
+      // FORÇA o botão Gravar a ficar ativo — independente do que aconteceu antes
+      window.__fkSetDirty(true);
+
+      // Atualizar botão undo (visível)
+      atualizarUndoBtn();
+      state.editorConverted = true;
+
+      // FORÇA o botão Gravar a ficar ativo — independente do que aconteceu antes
+      window.__fkSetDirty(true);
+
+      // Atualizar botão undo (visível)
+      atualizarUndoBtn();
+
+      // Mostrar warnings
+      if (d.warnings && d.warnings.length) {
+        setEditStatus('Convertido com ' + d.warnings.length + ' aviso(s) — revê antes de gravar', 'warn');
+        console.warn('[trial-convert] Warnings:', d.warnings);
+      } else {
+        setEditStatus('Convertido para ' + d.to.toUpperCase() + ' — revê antes de gravar', 'ok');
+      }
+    })
+    .catch(function (e) {
+      setEditStatus('✗ ' + e.message, 'err');
+    });
+  }
+
+
+  function abrirEditorTeste(classname) {
+    var modal = document.getElementById('fkModal');
+    if (!modal) {
+      setStatus('✗ Modal indisponível', 'err');
+      return;
+    }
+    var body = modal.querySelector('.fk-modal-body') || document.getElementById('fkModalBody');
+    if (!body) {
+      setStatus('✗ .fk-modal-body não encontrado', 'err');
+      return;
+    }
+
+    // Activar modo editor (modal grande)
+    modal.classList.add('open', 'fk-editor-mode');
+
+    // Guardar classname no state para conversão posterior
+    state.editorClassname = classname;
+
+    var shortName = classname.split(String.fromCharCode(92)).pop() || classname;
+
+    // Esqueleto inicial
+    body.innerHTML =
+      '<div class="fk-edit-wrap">' +
+        '<header class="fk-edit-head">' +
+          '<div class="fk-edit-title">' +
+            '<span class="fk-edit-icon">📝</span>' +
+            '<div class="fk-edit-info">' +
+              '<span class="fk-edit-name" id="fkEditName">' + esc(shortName) + '</span>' +
+              '<span class="fk-edit-path" id="fkEditPath">a carregar...</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="fk-edit-actions">' +
+            '<button type="button" class="fk-edit-btn fk-edit-undo" id="fkEditUndo" title="Desfazer conversão" hidden>↶ Desfazer</button>' +
+            '<button type="button" class="fk-edit-btn fk-edit-new" id="fkEditNew" title="Novo teste limpo">🆕 Novo</button>' +
+            '<button type="button" class="fk-edit-btn fk-edit-copy" id="fkEditCopy" title="Copiar código para o clipboard" hidden>📋 Copiar</button>' +
+            '<button type="button" class="fk-edit-btn fk-edit-undo" id="fkEditUndo" title="Desfazer conversão" hidden>↶ Desfazer</button>' +
+            '<select class="fk-edit-engine" id="fkEditEngine" title="Motor de testes">' +
+              '<option value="pest">🐀 Pest</option>' +
+              '<option value="phpunit">🐘 PHPUnit</option>' +
+            '</select>' +
+            '<button type="button" class="fk-edit-btn fk-edit-btn-run" id="fkEditRun" title="Correr este teste">▶ Correr</button>' +
+            '<button type="button" class="fk-edit-btn fk-edit-btn-save" id="fkEditSave" title="Gravar alterações" disabled>💾 Gravar</button>' +
+            '<button type="button" class="fk-edit-btn" id="fkEditReload" title="Recarregar do disco">↻</button>' +
+            '<button type="button" class="fk-edit-btn fk-edit-btn-close" id="fkEditClose" title="Fechar">✕</button>' +
+          '</div>' +
+        '</header>' +
+
+        '<div class="fk-edit-body">' +
+          '<div class="fk-edit-loading" id="fkEditLoading">' +
+            '<span class="fk-trial-spinner"></span> A carregar ficheiro...' +
+          '</div>' +
+        '</div>' +
+
+        '<pre class="fk-edit-output" id="fkEditOutput" hidden></pre>' +
+
+        '<footer class="fk-edit-foot">' +
+          '<span class="fk-edit-status" id="fkEditStatus">' +
+            '<span class="fk-edit-dot" id="fkEditDot"></span> Pronto' +
+          '</span>' +
+          '<span class="fk-edit-meta" id="fkEditMeta"></span>' +
+        '</footer>' +
+      '</div>';
+
+    // Referências
+    var $status    = document.getElementById('fkEditStatus');
+    var $meta      = document.getElementById('fkEditMeta');
+    var $path      = document.getElementById('fkEditPath');
+    var $body      = body.querySelector('.fk-edit-body');
+    var $output    = document.getElementById('fkEditOutput');
+    var $btnRun    = document.getElementById('fkEditRun');
+    var $btnSave   = document.getElementById('fkEditSave');
+    var $btnReload = document.getElementById('fkEditReload');
+    var $btnClose  = document.getElementById('fkEditClose');
+    var $engineSel = document.getElementById('fkEditEngine');
+    var $btnUndo   = document.getElementById('fkEditUndo');
+    var $btnNew    = document.getElementById('fkEditNew');
+    var $btnCopy   = document.getElementById('fkEditCopy');
+
+    function atualizarUndoBtn() {
+      if (!$btnUndo) return;
+      $btnUndo.hidden = !state.editorConverted;
+    }
+    var $btnUndo   = document.getElementById('fkEditUndo');
+
+    function atualizarUndoBtn() {
+      if (!$btnUndo) return;
+      $btnUndo.hidden = !state.editorConverted;
+    }
+
+    var codeArea = null;
+    var currentContent = '';
+    var isDirty = false;
+
+    function setEditStatus(msg, cls) {
+      $status.className = 'fk-edit-status' + (cls ? ' ' + cls : '');
+      $status.innerHTML = '<span class="fk-edit-dot' + (isDirty ? ' is-dirty' : '') + '" id="fkEditDot"></span> ' + esc(msg);
+    }
+
+    
+  /* ══════════════════════════════════════════════════════════════
+     Helper global: ativa/desativa o botão Gravar de forma robusta.
+     Faz query ao DOM sempre — evita closure stale.
+     ══════════════════════════════════════════════════════════════ */
+  window.__fkSetDirty = function (dirty) {
+    var btn = document.getElementById('fkEditSave');
+    if (!btn) {
+      console.warn('[fk-dirty] botão #fkEditSave não existe (ainda)');
+      return;
+    }
+    if (dirty) {
+      btn.disabled = false;
+      btn.removeAttribute('disabled');
+      btn.classList.add('is-dirty');
+    } else {
+      btn.disabled = true;
+      btn.setAttribute('disabled', 'disabled');
+      btn.classList.remove('is-dirty');
+    }
+    // Pontinho amarelo
+    var dot = document.querySelector('.fk-edit-dot');
+    if (dot) dot.style.background = dirty ? '#f59e0b' : 'transparent';
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     Limite de ficheiros por target (vem do .env)
+     ══════════════════════════════════════════════════════════════ */
+  window.__fkTrialMaxFiles = 2;  // default
+  (function carregarConfigTrial() {
+    fetch('/api/frankei-trial/tests/config', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok && d.max_test_files_per_target) {
+          window.__fkTrialMaxFiles = d.max_test_files_per_target;
+          console.log('[trial-config] limite =', window.__fkTrialMaxFiles);
+        }
+      })
+      .catch(function () {});
+  })();
+
+
+  function marcarDirty() {
+      isDirty = true;
+      if (window.__fkSetDirty) window.__fkSetDirty(true);
+      if ($btnSave) { $btnSave.disabled = false; $btnSave.removeAttribute('disabled'); }
+      setEditStatus('Alterado · não gravado', 'warn');
+    }
+
+    function limparDirty() {
+      isDirty = false;
+      if (window.__fkSetDirty) window.__fkSetDirty(false);
+      if ($btnSave) { $btnSave.disabled = true; $btnSave.setAttribute('disabled','disabled'); }
+    }
+
+    // ─── Carregar ───
+    function carregar() {
+      var url = '/api/frankei/test-file?class=' + encodeURIComponent(classname);
+      fetch(url, { credentials: 'include' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) throw new Error(d.error || 'Erro');
+
+          currentContent = d.content || '';
+          if ($path) $path.textContent = d.file || classname;
+
+          codeArea = document.createElement('textarea');
+          codeArea.className = 'fk-edit-code';
+          codeArea.spellcheck = false;
+          codeArea.value = currentContent;
+
+          $body.innerHTML = '';
+          $body.appendChild(codeArea);
+
+          codeArea.addEventListener('keydown', function (e) {
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              var s = this.selectionStart, ep = this.selectionEnd;
+              this.value = this.value.substring(0, s) + '    ' + this.value.substring(ep);
+              this.selectionStart = this.selectionEnd = s + 4;
+              marcarDirty();
+            }
+          });
+          codeArea.addEventListener('input', marcarDirty);
+
+          var kb = Math.round((d.size || 0) / 102.4) / 10;
+          if ($meta) $meta.textContent = kb + ' KB · ' + (d.mtime || '');
+          // Detectar engine
+          var detected = detectTestEngine(currentContent);
+          state.editorDetectedEngine = detected || 'pest';
+          state.editorEngine = state.editorDetectedEngine;
+
+          // Guardar estado original para undo
+          state.editorOriginalContent = currentContent;
+          state.editorOriginalEngine = state.editorDetectedEngine;
+          state.editorConverted = false;
+          // Reset bloqueio
+          state.editorBlockedByLimit = false;
+          state.editorBlockReason = '';
+          var btnReset = document.getElementById('fkEditCopy');
+          if (btnReset) btnReset.hidden = true;
+
+          // Guardar estado original para undo
+          state.editorOriginalContent = currentContent;
+          state.editorOriginalEngine = state.editorDetectedEngine;
+          state.editorConverted = false;
+          if ($engineSel) $engineSel.value = state.editorDetectedEngine;
+
+          limparDirty();
+        })
+        .catch(function (e) {
+          $body.innerHTML = '<div class="fk-edit-loading" style="color:#ef4444">✗ Erro: ' + esc(e.message) + '</div>';
+          setEditStatus('Erro', 'err');
+        });
+    }
+
+    // ─── Gravar ───
+    function gravar() {
+      if (!codeArea) return;
+      $btnSave.disabled = true;
+      setEditStatus('A gravar...', 'run');
+
+      var endpoint = state.editorNewFile
+        ? '/api/frankei-trial/tests/create'
+        : '/api/frankei-trial/tests/save';
+
+      fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          class: classname,
+          content: codeArea.value,
+          engine: state.editorEngine || 'pest',
+          from_engine: state.editorDetectedEngine || '',
+          to_engine: state.editorEngine || '',
+        })
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.error || 'Erro');
+        currentContent = codeArea.value;
+        limparDirty();
+        var msg = 'Gravado';
+        if (d.from_engine && d.to_engine && d.from_engine !== d.to_engine) {
+          msg = 'Convertido ' + d.from_engine.toUpperCase() + ' → ' + d.to_engine.toUpperCase() + ' · backup: ' + d.backup;
+        } else if (d.backup) {
+          msg = 'Gravado · backup: ' + d.backup;
+        }
+        setEditStatus(msg, 'ok');
+        // Actualizar engine detectado após gravar
+        if (d.to_engine) {
+          state.editorDetectedEngine = d.to_engine;
+          state.editorEngine = d.to_engine;
+          state.editorOriginalEngine = d.to_engine;
+        }
+        // O conteúdo actual passa a ser o "original"
+        state.editorOriginalContent = codeArea.value;
+        state.editorConverted = false;
+        state.editorNewFile = false;
+        if (typeof atualizarUndoBtn === 'function') atualizarUndoBtn();
+        window.__fkSetDirty(false);
+        var kb = Math.round((d.bytes || 0) / 102.4) / 10;
+        if ($meta) $meta.textContent = kb + ' KB · ' + (d.mtime || '');
+      })
+      .catch(function (e) {
+        setEditStatus('✗ ' + e.message, 'err');
+        $btnSave.disabled = false;
+      });
+    }
+
+    // ─── Correr ───
+    function correr() {
+      $btnRun.disabled = true;
+      setEditStatus('A correr...', 'run');
+      $output.hidden = false;
+      $output.textContent = '→ beaver test --filter=' + classname + '\n\n';
+
+      fetch('/api/frankei-trial/tests/run-class', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ class: classname, engine: $engineSel ? $engineSel.value : 'pest' })
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var head = (d.ok ? '✓ Sucesso' : '✗ Falha') + ' · ' + d.elapsed_ms + 'ms\n' +
+                   '─────────────────────────────\n\n';
+        $output.textContent = head + (d.lines || []).join('\n');
+        setEditStatus(d.ok ? 'Passou' : 'Falhou', d.ok ? 'ok' : 'err');
+      })
+      .catch(function (e) {
+        $output.textContent = '✗ Erro: ' + e.message;
+        setEditStatus('Erro', 'err');
+      })
+      .finally(function () { $btnRun.disabled = false; });
+    }
+
+    // ─── Fechar ───
+    function fechar() {
+      if (isDirty && !confirm('Tens alterações por gravar. Fechar mesmo assim?')) return;
+      modal.classList.remove('open', 'fk-editor-mode');
+      body.innerHTML = '';
+    }
+
+    if ($btnRun)    $btnRun.addEventListener('click', correr);
+    if ($btnSave)   $btnSave.addEventListener('click', gravar);
+    if ($btnReload) $btnReload.addEventListener('click', function () {
+      if (isDirty && !confirm('Recarregar vai perder as alterações. Continuar?')) return;
+      carregar();
+    });
+    if ($btnClose)  $btnClose.addEventListener('click', fechar);
+
+    // ── 📋 Copiar (só aparece quando bloqueado) ──
+    if ($btnCopy) {
+      $btnCopy.addEventListener('click', function () {
+        var txt = codeArea ? codeArea.value : '';
+        if (!txt) {
+          setEditStatus('✗ Nada para copiar', 'err');
+          return;
+        }
+        function ok() {
+          setEditStatus('📋 Código copiado para o clipboard (' + txt.length + ' chars)', 'ok');
+        }
+        function fail() {
+          // Fallback: selecionar temporariamente + execCommand
+          try {
+            codeArea.focus();
+            codeArea.select();
+            var okExec = document.execCommand('copy');
+            if (okExec) ok();
+            else setEditStatus('✗ Falha ao copiar — copia manualmente', 'err');
+          } catch (e) {
+            setEditStatus('✗ ' + e.message, 'err');
+          }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(ok).catch(fail);
+        } else {
+          fail();
+        }
+      });
+    }
+
+    // ── Guardas: bloquear Ctrl+A / C / X / S e menu de contexto ──
+    if (codeArea) {
+      codeArea.addEventListener('keydown', function (e) {
+        var meta = e.ctrlKey || e.metaKey;
+        if (!meta) return;
+        var k = (e.key || '').toLowerCase();
+
+        // Bloquear sempre o Ctrl+S nativo (o save do plugin usa o botão 💾)
+        if (k === 's') {
+          e.preventDefault();
+          e.stopPropagation();
+          // Se não estiver bloqueado por limite, dispara o save
+          if (!state.editorBlockedByLimit && $btnSave && !$btnSave.disabled) {
+            $btnSave.click();
+          } else if (state.editorBlockedByLimit) {
+            window.__fkPiscarLimite(1500);
+            setEditStatus('⛔ ' + (state.editorBlockReason || 'Não é possível gravar'), 'err');
+          }
+          return;
+        }
+
+        // Bloquear sempre cópia / seleção-total / corte
+        if (k === 'a' || k === 'c' || k === 'x') {
+          e.preventDefault();
+          e.stopPropagation();
+          setEditStatus('⛔ Cópia bloqueada — usa o botão 📋 (aparece quando o limite é atingido)', 'warn');
+          return;
+        }
+      }, true);
+
+      // Bloquear menu de contexto (botão direito)
+      codeArea.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setEditStatus('⛔ Clique direito bloqueado', 'warn');
+        return false;
+      });
+
+      // Bloquear drag-select de "cópia rápida" via right-drag? Não; deixa o esquerdo.
+      codeArea.addEventListener('mousedown', function (e) {
+        if (e.button === 2) {
+          e.preventDefault();
+          return false;
+        }
+      });
+    }
+
+
+    // ── 🆕 Novo teste limpo ──
+    if ($btnNew) {
+      $btnNew.addEventListener('click', function () {
+        var maxFiles = window.__fkTrialMaxFiles || 2;
+        var nome = prompt(
+          'Nome da classe de teste (ex: MyServiceTest):\n\n' +
+          '⚠️  Limite: ' + maxFiles + ' ficheiro(s) de teste por objecto.\n' +
+          /*'Ajustável em .env → FK_TRIAL_MAX_TEST_FILES_PER_TARGET',*/
+          ''
+        );
+        if (!nome) return;
+        nome = nome.trim().replace(/[^A-Za-z0-9_]/g, '');
+        if (!nome) { setEditStatus('✗ Nome inválido', 'err'); return; }
+
+        var eng = prompt('Motor? Escreve "pest" ou "phpunit":', state.editorEngine || 'pest');
+        if (!eng) return;
+        eng = eng.toLowerCase().trim();
+        if (eng !== 'pest' && eng !== 'phpunit') {
+          setEditStatus('✗ Motor tem de ser pest ou phpunit', 'err');
+          return;
+        }
+
+        var tmpl = __fkTemplate(nome, eng);
+        if (typeof window.__fkTrialSetEditorCode === 'function') {
+          window.__fkTrialSetEditorCode(tmpl);
+        }
+        state.editorClassname = nome;
+        state.editorEngine = eng;
+        state.editorDetectedEngine = eng;
+        state.editorConverted = false;
+        state.editorNewFile = true;         // marca: ainda não existe no disco
+        state.editorOriginalContent = '';
+        state.editorOriginalEngine = eng;
+        if ($engineSel) $engineSel.value = eng;
+        if (typeof atualizarUndoBtn === 'function') atualizarUndoBtn();
+        window.__fkSetDirty(true);
+        setEditStatus('Novo teste ' + nome + ' (' + eng.toUpperCase() + ') — clica 💾 para criar', 'warn');
+      });
+    }
+
+    // ── Templates ──
+    function __fkTemplate(nomeClasse, engine) {
+      if (engine === 'pest') {
+        return "<?php\n\n" +
+          "declare(strict_types=1);\n\n" +
+          "// Teste: " + nomeClasse + "\n\n" +
+          "it('exemplo funciona', function () {\n" +
+          "    expect(true)->toBeTrue();\n" +
+          "});\n";
+      }
+      return "<?php\n\n" +
+        "declare(strict_types=1);\n\n" +
+        "namespace Tests\\Unit;\n\n" +
+        "use Tests\\TestCase;\n\n" +
+        "class " + nomeClasse + " extends TestCase\n" +
+        "{\n" +
+        "    public function test_exemplo_funciona(): void\n" +
+        "    {\n" +
+        "        $this->assertTrue(true);\n" +
+        "    }\n" +
+        "}\n";
+    }
+
+
+    // Undo da conversão
+    if ($btnUndo) {
+      $btnUndo.addEventListener('click', function () {
+        if (!state.editorConverted) return;
+
+        // 1. Se temos conteúdo original em memória → usar
+        if (state.editorOriginalContent) {
+          if (typeof window.__fkTrialSetEditorCode === 'function') {
+            window.__fkTrialSetEditorCode(state.editorOriginalContent);
+          }
+          state.editorEngine = state.editorOriginalEngine || 'pest';
+          state.editorDetectedEngine = state.editorEngine;
+          if ($engineSel) $engineSel.value = state.editorEngine;
+          state.editorConverted = false;
+          atualizarUndoBtn();
+          setEditStatus('Conversão desfeita · ' + state.editorEngine.toUpperCase(), 'ok');
+          return;
+        }
+
+        // 2. Fallback: buscar ao backend
+        setEditStatus('A restaurar backup...', 'run');
+        fetch('/api/frankei-trial/tests/undo-conversion', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ class: state.editorClassname, prefer_engine: state.editorOriginalEngine || '' })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) {
+            setEditStatus('✗ ' + (d.error || 'Sem backup'), 'err');
+            return;
+          }
+          if (typeof window.__fkTrialSetEditorCode === 'function') {
+            window.__fkTrialSetEditorCode(d.code);
+          }
+          state.editorEngine = d.engine || 'pest';
+          state.editorDetectedEngine = state.editorEngine;
+          if ($engineSel) $engineSel.value = state.editorEngine;
+          state.editorConverted = false;
+          atualizarUndoBtn();
+          setEditStatus('Backup restaurado · ' + state.editorEngine.toUpperCase(), 'ok');
+        })
+        .catch(function (e) {
+          setEditStatus('✗ ' + e.message, 'err');
+        });
+      });
+    }
+
+    // Undo da conversão
+    if ($btnUndo) {
+      $btnUndo.addEventListener('click', function () {
+        if (!state.editorConverted) return;
+
+        // 1. Se temos conteúdo original em memória → usar
+        if (state.editorOriginalContent) {
+          if (typeof window.__fkTrialSetEditorCode === 'function') {
+            window.__fkTrialSetEditorCode(state.editorOriginalContent);
+          }
+          state.editorEngine = state.editorOriginalEngine || 'pest';
+          state.editorDetectedEngine = state.editorEngine;
+          if ($engineSel) $engineSel.value = state.editorEngine;
+          state.editorConverted = false;
+          atualizarUndoBtn();
+          setEditStatus('Conversão desfeita · ' + state.editorEngine.toUpperCase(), 'ok');
+          return;
+        }
+
+        // 2. Fallback: buscar ao backend
+        setEditStatus('A restaurar backup...', 'run');
+        fetch('/api/frankei-trial/tests/undo-conversion', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ class: state.editorClassname, prefer_engine: state.editorOriginalEngine || '' })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) {
+            setEditStatus('✗ ' + (d.error || 'Sem backup'), 'err');
+            return;
+          }
+          if (typeof window.__fkTrialSetEditorCode === 'function') {
+            window.__fkTrialSetEditorCode(d.code);
+          }
+          state.editorEngine = d.engine || 'pest';
+          state.editorDetectedEngine = state.editorEngine;
+          if ($engineSel) $engineSel.value = state.editorEngine;
+          state.editorConverted = false;
+          atualizarUndoBtn();
+          setEditStatus('Backup restaurado · ' + state.editorEngine.toUpperCase(), 'ok');
+        })
+        .catch(function (e) {
+          setEditStatus('✗ ' + e.message, 'err');
+        });
+      });
+    }
+
+    // Engine selector
+    if ($engineSel) {
+      $engineSel.addEventListener('change', function () {
+        verificarEngineEscolhido(this.value);
+      });
+    }
+
+    document.addEventListener('keydown', function escH(e) {
+      if (e.key === 'Escape' && modal.classList.contains('open')) {
+        fechar();
+        document.removeEventListener('keydown', escH);
+      }
+    });
+
+    modal.addEventListener('click', function backH(e) {
+      if (e.target === modal) {
+        fechar();
+        modal.removeEventListener('click', backH);
+      }
+    });
+
+    carregar();
+
+    window.__fkTrialReloadEditor = carregar;
+    window.__fkTrialSetEditorCode = function (novoCode) {
+      if (!codeArea) {
+        // Fallback: tentar query directa (editor pode estar noutro scope)
+        codeArea = document.querySelector('.fk-edit-code');
+      }
+      if (!codeArea) {
+        console.warn('[fk-editor] textarea não encontrada');
+        return;
+      }
+      codeArea.value = novoCode;
+      currentContent = novoCode;
+      isDirty = false;
+      marcarDirty();
+      window.__fkSetDirty(true);
+      console.log('[fk-editor] código atualizado · Gravar ativo');
+    };
+  }
+
+  function renderList(data) {
+    state.plan     = data.plan;
+    state.total    = data.total;
+    state.shown    = data.shown;
+    state.limit    = data.limit;
+    state.tests    = data.tests || [];
+    state.suites   = data.suites || ['Unit'];
+    state.porSuite = data.por_suite || {};
+
+    // Popular suite selector
+    if ($suiteSel && $suiteSel.options.length <= 1) {
+      $suiteSel.innerHTML = '<option value="all">' + esc(t('Todas')) + '</option>';
+      state.suites.forEach(function (s) {
+        var opt = document.createElement('option');
+        opt.value = s;
+        var count = state.porSuite[s] || 0;
+        opt.textContent = s + ' (' + count + ')';
+        $suiteSel.appendChild(opt);
+      });
+    }
+
+    // Ball
+    if ($ballNum)  $ballNum.textContent = state.total;
+    if ($ballHint) {
+      $ballHint.textContent = state.limit === null
+        ? t('Testes disponíveis')
+        : t('Testes disponíveis') + ' / máx ' + state.limit;
+    }
+
+    if ($counter) {
+      $counter.textContent = state.limit === null
+        ? state.total + ' ' + t('testes')
+        : state.total + ' ' + t('testes') + ' · máx ' + state.limit;
+    }
+
+    if ($cardCounter) {
+      $cardCounter.textContent = state.shown + ' / ' + state.total;
+    }
+
+    renderSuitesBar();
+
+    if (!$list) return;
+
+    if (state.tests.length === 0) {
+      $list.innerHTML = '<div class="fk-trial-empty">' +
+        '<div class="fk-trial-empty-icon">🧪</div>' +
+        '<p>' + esc(t('Sem testes Unit.')) + '</p>' +
+      '</div>';
+      return;
+    }
+
+    $list.innerHTML = '<div class="fk-trial-test-list">' +
+      state.tests.map(function (t) {
+        var kb = Math.round((t.size || 0) / 1024 * 10) / 10;
+        var suiteTag = '<span style="font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;margin-right:6px">' +
+          esc(t.suite || 'Unit') + '</span>';
+        return '<div class="fk-trial-test">' +
+          '<div>' +
+            '<div class="fk-trial-test-name">' + suiteTag + esc(t.name) + '</div>' +
+            '<div class="fk-trial-test-meta">' + kb + ' KB</div>' +
+          '</div>' +
+          '<div class="fk-trial-test-check">✓</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  function loadList() {
+    if (!$list) return;
+    setStatus(t('A carregar testes...'), '');
+    $list.innerHTML = '<div class="fk-trial-empty">' +
+      '<span class="fk-trial-spinner"></span> ' + esc(t('A carregar testes...')) +
+    '</div>';
+
+    fetch('/api/frankei-trial/tests/list', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) {
+          $list.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+            esc(d.error || 'Erro') + '</div>';
+          return;
+        }
+        renderList(d);
+        setStatus('✓ ' + d.total + ' ' + t('testes') + ' prontos', 'ok');
+      })
+      .catch(function (e) {
+        $list.innerHTML = '<div class="fk-trial-empty" style="color:#b91c1c">' +
+          'Erro: ' + esc(e.message) + '</div>';
+        setStatus('✗ Erro', 'err');
+      });
+  }
+
+  function runTests() {
+    if (state.running) return;
+    setRunning(true);
+
+    state.engine = $engineSel ? $engineSel.value : 'pest';
+    state.suite  = $suiteSel  ? $suiteSel.value  : 'all';
+
+    if ($terminal) {
+      $terminal.textContent = '→ beaver test --engine=' + state.engine +
+        (state.suite !== 'all' ? ' --testsuite=' + state.suite : '') + '\n\n';
+    }
+
+    fetch('/api/frankei-trial/tests/run', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suite: state.suite, engine: state.engine })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        // Atualizar status no header
+        setStatus(
+          (d.ok ? '✓ Sucesso' : '✗ Falha') + ' · ' + d.elapsed_ms + 'ms',
+          d.ok ? 'ok' : 'err'
+        );
+
+        if (!$terminal) return;
+        var head = '═══ ' + (d.ok ? '✓ Sucesso' : '✗ Falha') + ' ═══\n' +
+                   'Suite:  ' + (d.suite || 'all') + '  |  Engine: ' + (d.engine || '?') + '\n' +
+                   'Tempo:  ' + d.elapsed_ms + 'ms  |  Exit: ' + d.exit_code + '\n' +
+                   (d.truncated ? 'Output truncado\n' : '') +
+                   '─────────────────────────────\n\n';
+        $terminal.textContent = head + (d.lines || []).join('\n');
+        renderRunSummary(d);
+      })
+      .catch(function (e) {
+        setStatus('✗ Erro', 'err');
+        if ($terminal) $terminal.textContent = '✗ Erro: ' + (e.message || e) + '\n';
+      })
+      .finally(function () { setRunning(false); });
+  }
+
+
+
+
+
+  function abrirReportModal() {
+    // O modal é gerido pelo frankei (dashboard.js → reportInit())
+    // Basta chamar o botão oculto que ele escuta
+    var hidden = document.getElementById('fkTermReportBtn');
+    if (!hidden) {
+      setStatus('✗ Modal indisponível', 'err');
+      return;
+    }
+    hidden.click();
+    setStatus('📊 Report aberto', '');
+  }
+
+  if ($btnReport) $btnReport.addEventListener('click', abrirReportModal);
+
+  /* FK_ANALYZE_HANDLER — botão "🔍 Analisar em detalhe" abre o Modal A */
+  if ($btnAnalyze) {
+    $btnAnalyze.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // O dashboard.js do frankei ligou um handler em #fkTermReportBtn (invisível)
+      // Clicar nele dispara o reportInit() que abre o #fkReportModal
+      var hidden = document.getElementById('fkTermReportBtn');
+      if (!hidden) {
+        setStatus('✗ Modal indisponível', 'err');
+        return;
+      }
+
+      hidden.click();
+
+      // Pequeno delay para o modal abrir, depois ir para tab "Resumo"
+      setTimeout(function () {
+        var tabResumo = document.querySelector('#fkReportTabs [data-view="summary"]');
+        if (tabResumo) tabResumo.click();
+      }, 150);
+    });
+  }
+
+  if ($btnRun) $btnRun.addEventListener('click', runTests);
+
+  // Re-render ao mudar idioma
+  window.addEventListener('frankei:lang', function () {
+    renderList({
+      plan: state.plan, total: state.total, shown: state.shown,
+      limit: state.limit, tests: state.tests, suites: state.suites,
+      por_suite: state.porSuite,
+    });
+  });
+
+  // FK_SINGLE_BOOT: chamar loadList + loadClasses UMA só vez
+  function bootOnce() {
+    loadList();
+    loadClasses(1);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootOnce);
+  } else {
+    bootOnce();
+  }
+})();

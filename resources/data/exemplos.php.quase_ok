@@ -1,0 +1,1064 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // ============================================
+    // HTTP
+    // ============================================
+
+    'routing' => [
+        'titulo'    => 'Routing básico',
+        'categoria' => 'HTTP',
+        'descricao' => 'Define rotas com parâmetros, grupos e middlewares.',
+        'tags'      => ['Router', 'HTTP', 'Grupos'],
+        'snippet'   => '$router->get("/", fn() => view("home"));' . "\n\n" .
+                       '$router->group(["prefix" => "produtos"], function ($router) {' . "\n" .
+                       '    $router->get("/", [ProdutoController::class, "index"]);' . "\n" .
+                       '    $router->get("/{id}", [ProdutoController::class, "show"]);' . "\n" .
+                       '});',
+    ],
+
+    'router_methods' => [
+        'titulo'    => 'Verbos HTTP',
+        'categoria' => 'HTTP',
+        'descricao' => 'GET, POST, PUT, PATCH e DELETE com middlewares opcionais.',
+        'tags'      => ['Router', 'HTTP', 'REST'],
+        'snippet'   => '$router->get("/produtos", [ProdutoController::class, "index"]);' . "\n" .
+                       '$router->post("/produtos", [ProdutoController::class, "store"]);' . "\n" .
+                       '$router->put("/produtos/{id}", [ProdutoController::class, "update"]);' . "\n" .
+                       '$router->patch("/produtos/{id}", [ProdutoController::class, "patch"]);' . "\n" .
+                       '$router->delete("/produtos/{id}", [ProdutoController::class, "destroy"]);' . "\n\n" .
+                       '// Com middleware inline (3º argumento)' . "\n" .
+                       '$router->get("/admin", [AdminController::class, "index"], [' . "\n" .
+                       '    RequireAuth::class,' . "\n" .
+                       ']);',
+    ],
+
+    'middleware' => [
+        'titulo'    => 'Middleware',
+        'categoria' => 'HTTP',
+        'descricao' => 'Intercepta requests antes/depois do handler.',
+        'tags'      => ['Middleware', 'HTTP', 'Pipeline'],
+        'snippet'   => 'class RequireAuth {' . "\n" .
+                       '    public function handle(Request $request, callable $next): Response' . "\n" .
+                       '    {' . "\n" .
+                       '        if (!Auth::check()) {' . "\n" .
+                       '            return Response::redirect("/login");' . "\n" .
+                       '        }' . "\n\n" .
+                       '        return $next($request);' . "\n" .
+                       '    }' . "\n" .
+                       '}',
+    ],
+
+    'controllers' => [
+        'titulo'    => 'Controllers',
+        'categoria' => 'HTTP',
+        'descricao' => 'Handlers organizados por recurso.',
+        'tags'      => ['Controller', 'HTTP', 'REST'],
+        'snippet'   => 'class ProdutoController {' . "\n" .
+                       '    public function index(Request $req): Response' . "\n" .
+                       '    {' . "\n" .
+                       '        $produtos = Produto::all();' . "\n" .
+                       '        return Response::html(view("produtos.index", [' . "\n" .
+                       '            "produtos" => $produtos,' . "\n" .
+                       '        ]));' . "\n" .
+                       '    }' . "\n\n" .
+                       '    public function show(Request $req, int $id): Response' . "\n" .
+                       '    {' . "\n" .
+                       '        $produto = Produto::findOrFail($id);' . "\n" .
+                       '        return Response::html(view("produtos.show", [' . "\n" .
+                       '            "produto" => $produto,' . "\n" .
+                       '        ]));' . "\n" .
+                       '    }' . "\n" .
+                       '}',
+    ],
+
+    'request' => [
+        'titulo'    => 'Request',
+        'categoria' => 'HTTP',
+        'descricao' => 'Acede a input, headers e método HTTP.',
+        'tags'      => ['Request', 'HTTP'],
+        'snippet'   => '$request = Request::capture();' . "\n\n" .
+                       '$request->input("nome");           // valor ou null' . "\n" .
+                       '$request->input("pagina", 1);      // com default' . "\n" .
+                       '$request->all();                   // todos os inputs' . "\n" .
+                       '$request->header("Accept");        // header' . "\n" .
+                       '$request->isMethod("POST");        // bool' . "\n" .
+                       '$request->isJson();                // bool',
+    ],
+
+    'response' => [
+        'titulo'    => 'Response',
+        'categoria' => 'HTTP',
+        'descricao' => 'Respostas HTML, JSON, texto e redirects.',
+        'tags'      => ['Response', 'HTTP'],
+        'snippet'   => '// HTML' . "\n" .
+                       'return Response::html("<h1>Olá</h1>");' . "\n\n" .
+                       '// JSON' . "\n" .
+                       'return Response::json(["status" => "ok"]);' . "\n\n" .
+                       '// Texto' . "\n" .
+                       'return Response::text("OK");' . "\n\n" .
+                       '// Redirect' . "\n" .
+                       'return Response::redirect("/login");' . "\n\n" .
+                       '// Com header custom' . "\n" .
+                       'return Response::json($data)' . "\n" .
+                       '    ->withHeader("X-Total", "42");',
+    ],
+
+    // ============================================
+    // VIEWS
+    // ============================================
+
+    'views' => [
+        'titulo'    => 'Views',
+        'categoria' => 'Views',
+        'descricao' => 'Renderiza templates com dados e escape.',
+        'tags'      => ['View', 'Templates'],
+        'snippet'   => '// Helper global (2 args apenas)' . "\n" .
+                       'return view("produtos.index", [' . "\n" .
+                       '    "produtos" => $produtos,' . "\n" .
+                       ']);' . "\n\n" .
+                       '// Instância direta (com layout opcional)' . "\n" .
+                       '$view = app()->make(View::class);' . "\n" .
+                       '$html = $view->make("produtos.show", [' . "\n" .
+                       '    "produto" => $produto,' . "\n" .
+                       '], "layouts.app");' . "\n\n" .
+                       '// Escape de output' . "\n" .
+                       'echo e($userInput);   // htmlspecialchars',
+    ],
+
+    // ============================================
+    // I18N
+    // ============================================
+
+    'i18n' => [
+        'titulo'    => 'Traduções (i18n)',
+        'categoria' => 'Internacionalização',
+        'descricao' => 'Traduz chaves com substituições, plural e locale.',
+        'tags'      => ['i18n', 'Tradução', 'Locale'],
+        'snippet'   => '// Traduzir uma chave' . "\n" .
+                       'echo __("messages.welcome");' . "\n\n" .
+                       '// Com substituições' . "\n" .
+                       'echo __("messages.hello", ["name" => "Franco"]);' . "\n\n" .
+                       '// Echo direto' . "\n" .
+                       '_e("messages.welcome");' . "\n\n" .
+                       '// Plural (formato "singular|plural")' . "\n" .
+                       'echo _n("items.count", 3, ["count" => 3]);' . "\n\n" .
+                       '// Forçar locale' . "\n" .
+                       'echo _x("messages.welcome", "en");',
+    ],
+
+    // ============================================
+    // ARQUITETURA
+    // ============================================
+
+    'container' => [
+        'titulo'    => 'Container (DI)',
+        'categoria' => 'Arquitetura',
+        'descricao' => 'Injeção de dependências e resolução de serviços.',
+        'tags'      => ['Container', 'DI', 'IoC'],
+        'snippet'   => '$app = Application::getInstance();' . "\n\n" .
+                       '// Registar factory' . "\n" .
+                       '$app->bind(Mailer::class, function () {' . "\n" .
+                       '    return new SmtpMailer(config("mail.host"));' . "\n" .
+                       '});' . "\n\n" .
+                       '// Registar instância' . "\n" .
+                       '$app->instance("db", $pdo);' . "\n\n" .
+                       '// Resolver' . "\n" .
+                       '$mailer = $app->make(Mailer::class);' . "\n\n" .
+                       '// Helpers globais' . "\n" .
+                       'app();                    // Application' . "\n" .
+                       'base_path("storage");     // caminho absoluto',
+    ],
+
+    'config' => [
+        'titulo'    => 'Configuração',
+        'categoria' => 'Arquitetura',
+        'descricao' => 'Acede a valores de configuração com dot notation.',
+        'tags'      => ['Config', 'Dot notation'],
+        'snippet'   => '// Chave simples' . "\n" .
+                       'config("app.name");' . "\n\n" .
+                       '// Dot notation (aninhado)' . "\n" .
+                       'config("database.connections.mysql.host");' . "\n\n" .
+                       '// Com default' . "\n" .
+                       'config("app.timezone", "UTC");' . "\n\n" .
+                       '// Tudo' . "\n" .
+                       'config();   // array completo',
+    ],
+
+    // ============================================
+    // TAREFAS
+    // ============================================
+    'scheduling' => [
+        'titulo'    => 'Scheduling (Cron)',
+        'categoria' => 'Tarefas',
+        'descricao' => 'Agenda jobs recorrentes com expressões cron.',
+        'tags'      => ['Cron', 'Scheduling', 'Jobs'],
+        'snippet'   => 'use Beaver\\Scheduling\\CronManager;' . "\n" .
+                       'use Beaver\\Scheduling\\Drivers\\LinuxCron;' . "\n" .
+                       'use Beaver\\Scheduling\\ScheduledJob;' . "\n\n" .
+                       '// Driver default (auto-resolvido pelo SO)' . "\n" .
+                       '$cron = new CronManager();' . "\n\n" .
+                       '// Driver explícito (Linux)' . "\n" .
+                       '$cron = new CronManager(new LinuxCron());' . "\n\n" .
+                       '// Sincronizar todos os jobs ativos com o SO' . "\n" .
+                       '$total = $cron->syncAll();   // int' . "\n\n" .
+                       '// Obter jobs ativos' . "\n" .
+                       '$jobs = ScheduledJob::active();   // ScheduledJob[]' . "\n\n" .
+                       '// Marcar resultado da execução' . "\n" .
+                       '$job->markAsRun();' . "\n" .
+                       '$job->markAsFailed("Timeout");',
+    ],
+
+    // ============================================
+    // EXTENSIBILIDADE
+    // ============================================
+
+    'plugins' => [
+        'titulo'    => 'Plugins',
+        'categoria' => 'Extensibilidade',
+        'descricao' => 'Sistema de plugins com hooks, rotas, views e migrations.',
+        'tags'      => ['Plugins', 'Extensibilidade'],
+        'snippet'   => 'class MeuPlugin extends PluginBase {' . "\n" .
+                       '    public function boot(): void' . "\n" .
+                       '    {' . "\n" .
+                       '        // Registar hooks' . "\n" .
+                       '        $this->hooks()->on("post.published", function ($post) {' . "\n" .
+                       '            // reagir ao evento' . "\n" .
+                       '        });' . "\n\n" .
+                       '        // Carregar recursos do plugin' . "\n" .
+                       '        $this->loadRoutes();' . "\n" .
+                       '        $this->loadViews();' . "\n" .
+                       '        $this->loadTranslations();' . "\n" .
+                       '        $this->loadMigrations();' . "\n" .
+                       '    }' . "\n" .
+                       '}',
+    ],
+
+    'hooks' => [
+        'titulo'    => 'Hooks (Eventos)',
+        'categoria' => 'Extensibilidade',
+        'descricao' => 'Sistema pub/sub baseado em hooks com prioridade.',
+        'tags'      => ['Hooks', 'Events', 'Pub/Sub'],
+        'snippet'   => 'use Beaver\\Plugin\\Hooks;' . "\n\n" .
+                       '// Registar listener com prioridade' . "\n" .
+                       'Hooks::on("user.registered", function ($user) {' . "\n" .
+                       '    // enviar email de boas-vindas' . "\n" .
+                       '}, priority: 10);' . "\n\n" .
+                       '// Emitir evento' . "\n" .
+                       '$resultados = Hooks::emit("user.registered", $user);' . "\n\n" .
+                       '// Filtrar um valor através de listeners' . "\n" .
+                       '$html = Hooks::filter("content.render", $html);' . "\n\n" .
+                       '// Verificar / listar' . "\n" .
+                       'Hooks::has("user.registered");   // bool' . "\n" .
+                       'Hooks::listeners();               // array',
+    ],
+
+    // ============================================
+    // BASE DE DADOS
+    // ============================================
+
+    'relations' => [
+        'titulo'    => 'Relações',
+        'categoria' => 'Base de Dados',
+        'descricao' => 'belongsTo, hasOne, hasMany e belongsToMany.',
+        'tags'      => ['ORM', 'Relações', 'Eloquent-like'],
+        'snippet'   => 'class Produto extends Model {' . "\n" .
+                       '    public function categoria(): BelongsTo {' . "\n" .
+                       '        return $this->belongsTo(Categoria::class, "categoria_id");' . "\n" .
+                       '    }' . "\n\n" .
+                       '    public function imagens(): HasMany {' . "\n" .
+                       '        return $this->hasMany(Imagem::class, "produto_id");' . "\n" .
+                       '    }' . "\n" .
+                       '}' . "\n\n" .
+                       '$produto = Produto::find(1);' . "\n" .
+                       '$cat  = $produto->categoria;' . "\n" .
+                       '$imgs = $produto->imagens;',
+    ],
+
+    'casts' => [
+        'titulo'    => 'Casts de Atributos',
+        'categoria' => 'Base de Dados',
+        'descricao' => 'Converte automaticamente tipos ao ler/escrever.',
+        'tags'      => ['ORM', 'Casts', 'Tipos'],
+        'snippet'   => 'class Produto extends Model {' . "\n" .
+                       '    protected array $casts = [' . "\n" .
+                       '        "preco"        => "float",' . "\n" .
+                       '        "stock"        => "int",' . "\n" .
+                       '        "is_ativo"     => "bool",' . "\n" .
+                       '        "metadata"     => "array",' . "\n" .
+                       '        "publicado_em" => "datetime",' . "\n" .
+                       '    ];' . "\n" .
+                       '}' . "\n\n" .
+                       '$produto = Produto::find(1);' . "\n" .
+                       '$produto->preco;        // float' . "\n" .
+                       '$produto->publicado_em; // DateTimeImmutable',
+    ],
+
+    'migrations' => [
+        'titulo'    => 'Migrations',
+        'categoria' => 'Base de Dados',
+        'descricao' => 'Versionamento do esquema com Schema.',
+        'tags'      => ['Migrations', 'Schema', 'Blueprint'],
+        'snippet'   => 'use Beaver\\Database\\Migrations\\Schema;' . "\n\n" .
+                       '$schema = new Schema("produtos");' . "\n\n" .
+                       '$schema->id();' . "\n" .
+                       '$schema->string("nome", 255);' . "\n" .
+                       '$schema->decimal("preco", 10, 2);' . "\n" .
+                       '$schema->integer("stock")->default(0);' . "\n" .
+                       '$schema->boolean("is_ativo", true);' . "\n" .
+                       '$schema->json("metadata")->nullable();' . "\n" .
+                       '$schema->foreignId("categoria_id");' . "\n" .
+                       '$schema->timestamps();' . "\n\n" .
+                       '$sql = $schema->toCreateSql("sqlite");',
+    ],
+
+    'blueprint' => [
+        'titulo'    => 'Blueprint (colunas)',
+        'categoria' => 'Base de Dados',
+        'descricao' => 'Tipos de coluna e modificadores disponíveis.',
+        'tags'      => ['Blueprint', 'Schema', 'Colunas'],
+        'snippet'   => '$schema = new Schema("produtos");' . "\n\n" .
+                       '// Tipos' . "\n" .
+                       '$schema->id();' . "\n" .
+                       '$schema->string("nome", 255);' . "\n" .
+                       '$schema->text("descricao");' . "\n" .
+                       '$schema->integer("stock");' . "\n" .
+                       '$schema->decimal("preco", 10, 2);' . "\n" .
+                       '$schema->boolean("is_ativo", true);' . "\n" .
+                       '$schema->date("publicado_em");' . "\n" .
+                       '$schema->datetime("expira_em");' . "\n" .
+                       '$schema->time("abre_as");' . "\n" .
+                       '$schema->json("metadata");' . "\n" .
+                       '$schema->uuid("token");' . "\n\n" .
+                       '// Modificadores' . "\n" .
+                       '$schema->string("email")->unique();' . "\n" .
+                       '$schema->string("bio")->nullable();' . "\n" .
+                       '$schema->integer("stock")->default(0);',
+    ],
+
+    // ============================================
+    // CLI
+    // ============================================
+
+    'console' => [
+        'titulo'    => 'Comandos CLI',
+        'categoria' => 'CLI',
+        'descricao' => 'Cria comandos personalizados para a CLI do Beaver.',
+        'tags'      => ['CLI', 'Console', 'Command'],
+        'snippet'   => 'use Beaver\\Console\\Command;' . "\n\n" .
+                       'class NewsletterSendCommand extends Command' . "\n" .
+                       '{' . "\n" .
+                       '    protected string $signature   = "newsletter:send {list} {--force}";' . "\n" .
+                       '    protected string $description = "Envia a newsletter";' . "\n\n" .
+                       '    public function handle(): int' . "\n" .
+                       '    {' . "\n" .
+                       '        $list  = $this->argument("list");' . "\n" .
+                       '        $force = $this->option("force");' . "\n\n" .
+                       '        if (!$list) {' . "\n" .
+                       '            $this->error("Falta a lista.");' . "\n" .
+                       '            return self::INVALID;' . "\n" .
+                       '        }' . "\n\n" .
+                       '        if (!$force && !$this->confirm("Confirmas o envio?")) {' . "\n" .
+                       '            $this->warning("Cancelado.");' . "\n" .
+                       '            return self::SUCCESS;' . "\n" .
+                       '        }' . "\n\n" .
+                       '        $this->info("A enviar para {$list}...");' . "\n" .
+                       '        $this->success("Enviado.");' . "\n\n" .
+                       '        return self::SUCCESS;' . "\n" .
+                       '    }' . "\n" .
+                       '}',
+    ],
+
+    'console_helpers' => [
+        'titulo'    => 'Helpers de Console',
+        'categoria' => 'CLI',
+        'descricao' => 'Output formatado e interação com o utilizador.',
+        'tags'      => ['CLI', 'Console', 'Output'],
+        'snippet'   => '$this->info("Mensagem informativa");' . "\n" .
+                       '$this->success("Operação concluída");' . "\n" .
+                       '$this->warning("Atenção com X");' . "\n" .
+                       '$this->error("Algo falhou");' . "\n" .
+                       '$this->line("");' . "\n\n" .
+                       '// Interação' . "\n" .
+                       '$nome = $this->ask("Qual o teu nome?", "Franco");' . "\n" .
+                       '$ok   = $this->confirm("Continuar?", false);' . "\n\n" .
+                       '// Argumentos e opções' . "\n" .
+                       '$id    = $this->argument("id");' . "\n" .
+                       '$force = $this->option("force");' . "\n\n" .
+                       '// Códigos de retorno' . "\n" .
+                       'return self::SUCCESS;   // 0' . "\n" .
+                       'return self::FAILURE;   // 1' . "\n" .
+                       'return self::INVALID;   // 2',
+    ],
+
+    // ============================================
+    // SDK (Plugin API)
+    // ============================================
+
+    'sdk_plugin' => [
+        'titulo'    => 'SDK — Plugin base',
+        'categoria' => 'SDK',
+        'descricao' => 'Contrato oficial para criar plugins no Beaver.',
+        'tags'      => ['SDK', 'Plugins', 'API'],
+        'snippet'   => 'use Beaver\\Plugin\\PluginBase;' . "\n" .
+                       'use Beaver\\Sdk\\HooksCatalog;' . "\n\n" .
+                       'class MeuPlugin extends PluginBase' . "\n" .
+                       '{' . "\n" .
+                       '    public function boot(): void' . "\n" .
+                       '    {' . "\n" .
+                       '        // Carregar recursos do plugin' . "\n" .
+                       '        $this->loadViews();' . "\n" .
+                       '        $this->loadTranslations();' . "\n" .
+                       '        $this->loadRoutes();' . "\n" .
+                       '        $this->loadMigrations();' . "\n\n" .
+                       '        // Reagir a eventos do core' . "\n" .
+                       '        $this->hooks()->on(' . "\n" .
+                       '            HooksCatalog::ORDER_PLACED,' . "\n" .
+                       '            fn($order) => /* ... */,' . "\n" .
+                       '        );' . "\n" .
+                       '    }' . "\n" .
+                       '}',
+    ],
+
+    'sdk_context' => [
+        'titulo'    => 'SDK — Permissões',
+        'categoria' => 'SDK',
+        'descricao' => 'Contexto e permissões declaradas no manifest do plugin.',
+        'tags'      => ['SDK', 'Permissões', 'Segurança'],
+        'snippet'   => 'use Beaver\\Sdk\\Context;' . "\n" .
+                       'use Beaver\\Sdk\\PermissionDeniedException;' . "\n\n" .
+                       '// O PluginManager injeta o Context no boot()' . "\n" .
+                       '// Permissões em plugin.json: "permissions": ["db.write"]' . "\n\n" .
+                       '$ctx = $this->context();' . "\n\n" .
+                       '$ctx->has("db.write");              // bool (sem efeitos)' . "\n" .
+                       '$ctx->check("db.write", "users");    // bool + audit' . "\n" .
+                       '$ctx->granted();                     // ["db.read", ...]' . "\n" .
+                       '$ctx->mode();                        // "off"|"audit"|"enforce"' . "\n\n" .
+                       '// Em mode "enforce", check() lança exceção se negado:' . "\n" .
+                       'try {' . "\n" .
+                       '    $ctx->check("db.write", "users");' . "\n" .
+                       '} catch (PermissionDeniedException $e) {' . "\n" .
+                       '    // acesso bloqueado' . "\n" .
+                       '}' . "\n\n" .
+                       '// Atalho no PluginBase' . "\n" .
+                       'if ($this->hasPermission("db.write")) { /* ... */ }',
+    ],
+
+    'sdk_hooks' => [
+        'titulo'    => 'SDK — ScopedHooks',
+        'categoria' => 'SDK',
+        'descricao' => 'Hooks com escopo de permissões aplicado automaticamente.',
+        'tags'      => ['SDK', 'Hooks', 'Eventos'],
+        'snippet'   => 'use Beaver\\Sdk\\HooksCatalog;' . "\n\n" .
+                       '// No boot() do plugin' . "\n" .
+                       '$hooks = $this->hooks();   // ScopedHooks ou Hooks' . "\n\n" .
+                       '$hooks->on(HooksCatalog::ORDER_PLACED, function ($order) {' . "\n" .
+                       '    // Se o plugin não tiver permissão, é ignorado' . "\n" .
+                       '    // (em mode "enforce") ou registado no audit (mode "audit")' . "\n" .
+                       '});' . "\n\n" .
+                       '// Emitir um evento' . "\n" .
+                       '$hooks->emit(HooksCatalog::CUSTOMER_CREATED, $user);' . "\n\n" .
+                       '// Filtrar um valor' . "\n" .
+                       '$html = $hooks->filter(HooksCatalog::VIEW_RENDERED, $html);',
+    ],
+
+    'sdk_hooks_catalog' => [
+        'titulo'    => 'SDK — Catálogo de eventos',
+        'categoria' => 'SDK',
+        'descricao' => 'Constantes de eventos oficiais do core.',
+        'tags'      => ['SDK', 'Eventos', 'Constantes'],
+        'snippet'   => 'use Beaver\\Sdk\\HooksCatalog;' . "\n\n" .
+                       'HooksCatalog::APP_BOOTED;' . "\n" .
+                       'HooksCatalog::PLUGIN_BOOTED;' . "\n" .
+                       'HooksCatalog::ORDER_PLACED;' . "\n" .
+                       'HooksCatalog::ORDER_PAID;' . "\n" .
+                       'HooksCatalog::ORDER_CANCELLED;' . "\n" .
+                       'HooksCatalog::ORDER_SHIPPED;' . "\n" .
+                       'HooksCatalog::CUSTOMER_CREATED;' . "\n" .
+                       'HooksCatalog::CUSTOMER_UPDATED;' . "\n" .
+                       'HooksCatalog::HTTP_REQUEST;' . "\n" .
+                       'HooksCatalog::HTTP_RESPONSE;' . "\n" .
+                       'HooksCatalog::ADMIN_MENU;' . "\n" .
+                       'HooksCatalog::VIEW_RENDERED;' . "\n\n" .
+                       '// Listar todos' . "\n" .
+                       'HooksCatalog::all();',
+    ],
+
+    'sdk_testing' => [
+        'titulo'    => 'SDK — Testing',
+        'categoria' => 'SDK',
+        'descricao' => 'Harness oficial para testar plugins.',
+        'tags'      => ['SDK', 'Testing', 'Plugins'],
+        'snippet'   => 'use Beaver\\Sdk\\Testing\\PluginTester;' . "\n" .
+                       'use Beaver\\Sdk\\HooksCatalog;' . "\n\n" .
+                       '$t = PluginTester::for(' . "\n" .
+                       '    MeuPlugin::class,' . "\n" .
+                       '    __DIR__ . "/../",' . "\n" .
+                       ');' . "\n\n" .
+                       '// Validar e arrancar (encadeável)' . "\n" .
+                       '$t->validateManifest()->boot();' . "\n\n" .
+                       '// Emitir e verificar eventos via $t->hooks' . "\n" .
+                       '$t->hooks->emit(HooksCatalog::ORDER_PLACED, $order);' . "\n\n" .
+                       '$t->hooks->wasEmitted("order.placed");   // bool' . "\n" .
+                       '$t->hooks->emitted("order.placed");      // array' . "\n" .
+                       '$t->hooks->allEmitted();                 // array' . "\n\n" .
+                       '// Reset entre testes' . "\n" .
+                       '$t->hooks->reset();' . "\n\n" .
+                       '// Manifest carregado' . "\n" .
+                       '$manifest = $t->manifest();',
+    ],
+
+    'sdk_theme' => [
+        'titulo'    => 'SDK — Temas',
+        'categoria' => 'SDK',
+        'descricao' => 'Gestão de temas (ativar, listar, assets e views).',
+        'tags'      => ['SDK', 'Temas', 'Assets'],
+        'snippet'   => 'use Beaver\\Sdk\\Theme\\ThemeManager;' . "\n" .
+                       'use Beaver\\Sdk\\Theme\\ThemePaths;' . "\n" .
+                       'use Beaver\\Sdk\\Theme\\ThemeManifest;' . "\n" .
+                       'use Beaver\\Sdk\\Theme\\ThemeValidator;' . "\n\n" .
+                       '// Paths a partir da config' . "\n" .
+                       '$paths  = ThemePaths::fromConfig(config("themes"));' . "\n" .
+                       '$themes = new ThemeManager($paths);' . "\n\n" .
+                       '// Listar e procurar' . "\n" .
+                       '$themes->all();                      // array<string, ThemeManifest>' . "\n" .
+                       '$themes->exists("dark");             // bool' . "\n" .
+                       '$manifest = $themes->find("dark");   // ?ThemeManifest' . "\n\n" .
+                       '// Ativar / desativar' . "\n" .
+                       '$themes->activate("dark");' . "\n" .
+                       '$themes->active();                    // "dark"|null' . "\n" .
+                       '$themes->deactivate();' . "\n\n" .
+                       '// Paths do tema ativo' . "\n" .
+                       '$themes->activeBase();                // /themes/dark' . "\n" .
+                       '$themes->viewsBase();' . "\n" .
+                       '$themes->assetsBase("css");' . "\n\n" .
+                       '// Manifest do tema' . "\n" .
+                       '$manifest->hasSupport("dark_mode");  // bool' . "\n" .
+                       '$manifest->isChild();                // bool' . "\n" .
+                       '$manifest->get("colors.primary");    // mixed' . "\n\n" .
+                       '// Validação' . "\n" .
+                       'ThemeValidator::validateOrFail($manifest->toArray());',
+    ],
+
+    'sdk_manifest' => [
+        'titulo'    => 'SDK — Manifest',
+        'categoria' => 'SDK',
+        'descricao' => 'Carrega e valida o plugin.json de um plugin.',
+        'tags'      => ['SDK', 'Manifest', 'Validação'],
+        'snippet'   => 'use Beaver\\Sdk\\Manifest;' . "\n" .
+                       'use Beaver\\Sdk\\ManifestValidator;' . "\n\n" .
+                       '// Carregar do ficheiro' . "\n" .
+                       '$data = json_decode(' . "\n" .
+                       '    file_get_contents(__DIR__ . "/plugin.json"),' . "\n" .
+                       '    true,' . "\n" .
+                       ');' . "\n\n" .
+                       '// Validar contra o schema' . "\n" .
+                       '$errors = ManifestValidator::validate($data);' . "\n\n" .
+                       'if ($errors === []) {' . "\n" .
+                       '    $manifest = Manifest::fromArray($data);' . "\n" .
+                       '    $manifest->className();      // "Beaver\\\\Plugins\\\\X\\\\XPlugin"' . "\n" .
+                       '    $manifest->hasPermission("db.write");  // bool' . "\n" .
+                       '}' . "\n\n" .
+                       '// Permissões permitidas (catálogo)' . "\n" .
+                       'ManifestValidator::allowedPermissions();' . "\n\n" .
+                       '// CLI: php beaver plugin:validate <slug>',
+    ],
+
+    'sdk_permissions_auditor' => [
+        'titulo'    => 'SDK — Auditoria de permissões',
+        'categoria' => 'SDK',
+        'descricao' => 'Registo de tentativas de uso indevido de permissões.',
+        'tags'      => ['SDK', 'Auditoria', 'Segurança'],
+        'snippet'   => 'use Beaver\\Sdk\\PermissionAuditor;' . "\n\n" .
+                       '$auditor = new PermissionAuditor();' . "\n\n" .
+                       '// Consultar registos' . "\n" .
+                       '$auditor->all();                       // todos os eventos' . "\n" .
+                       '$auditor->forPlugin("sms-gateway");    // por plugin' . "\n" .
+                       '$auditor->forScope("db.write");        // por escopo' . "\n" .
+                       '$auditor->summary();                   // resumo agregado' . "\n\n" .
+                       '// Ficheiro de log (se configurado)' . "\n" .
+                       '$auditor->logFile();                   // ?string' . "\n\n" .
+                       '// Reset' . "\n" .
+                       '$auditor->reset();',
+    ],
+
+    'sdk_version' => [
+        'titulo'    => 'SDK — Versão e compatibilidade',
+        'categoria' => 'SDK',
+        'descricao' => 'Verifica se o framework satisfaz a versão exigida.',
+        'tags'      => ['SDK', 'Versão', 'Compatibilidade'],
+        'snippet'   => 'use Beaver\\Sdk\\SdkVersion;' . "\n\n" .
+                       '// Constantes' . "\n" .
+                       'SdkVersion::API_VERSION;     // "1.0.0"' . "\n" .
+                       'SdkVersion::MIN_FRAMEWORK;   // "0.1.0"' . "\n\n" .
+                       '// Verificar compatibilidade' . "\n" .
+                       'SdkVersion::satisfies("0.2.0", ">=0.1.0");  // true' . "\n" .
+                       'SdkVersion::satisfies("0.2.0", "^0.1.0");   // true' . "\n\n" .
+                       '// No manifest do plugin' . "\n" .
+                       '// "beaver_version": ">=0.1.0"',
+    ],
+
+    // ============================================
+    // SEGURANÇA
+    // ============================================
+
+    'hashing' => [
+        'titulo'    => 'Hashing de passwords',
+        'categoria' => 'Segurança',
+        'descricao' => 'Hashing híbrido: helpers globais + container + DI.',
+        'tags'      => ['Hashing', 'Segurança', 'Passwords'],
+        'snippet'   => '//  Helper global (uso comum)' . "\n" .
+                       '$hash = hash_make("password123");' . "\n" .
+                       'hash_check("password123", $hash);   // true' . "\n\n" .
+                       '//  Container (controlo)' . "\n" .
+                       '$hasher = app()->make(Hasher::class);' . "\n" .
+                       '$hasher->make("password123");' . "\n\n" .
+                       '//  Injeção (controllers/services)' . "\n" .
+                       'public function __construct(private Hasher $hasher) {}',
+    ],
+
+    // ─── Validação ──────────────────────────────────────
+    'validation' => [
+        'titulo'    => 'Validação de dados',
+        'categoria' => 'Validação',
+        'descricao' => 'Valida regras com mensagens traduzidas (i18n).',
+        'tags'      => ['Validation', 'Regras', 'i18n'],
+        'snippet'   => '$errors = validate($request->all(), [' . "\n" .
+                       '    "email"    => "required|email",' . "\n" .
+                       '    "password" => "required|min:8|confirmed",' . "\n" .
+                       '    "age"      => "integer|min:18|max:99",' . "\n" .
+                       '], [' . "\n" .
+                       '    "email"    => "Email",' . "\n" .
+                       '    "password" => "Password",' . "\n" .
+                       '    "age"      => "Idade",' . "\n" .
+                       ']);' . "\n\n" .
+                       'if ($errors !== []) {' . "\n" .
+                       '    // ["email" => ["O campo Email ..."], ...]' . "\n" .
+                       '    return Response::json([' . "\n" .
+                       '        "errors" => $errors,' . "\n" .
+                       '    ], 422);' . "\n" .
+                       '}',
+    ],
+
+    'validation_rules' => [
+        'titulo'    => 'Regras de validação',
+        'categoria' => 'Validação',
+        'descricao' => 'Catálogo de regras disponíveis.',
+        'tags'      => ['Validation', 'Regras', 'Catálogo'],
+        'snippet'   => '// Texto' . "\n" .
+                       '"nome"    => "required|string|min:3|max:255"' . "\n\n" .
+                       '// Email' . "\n" .
+                       '"email"   => "required|email|unique:users,email"' . "\n\n" .
+                       '// Números' . "\n" .
+                       '"idade"   => "integer|min:18|max:99"' . "\n" .
+                       '"preco"   => "numeric|between:0,9999"' . "\n\n" .
+                       '// Escolha' . "\n" .
+                       '"estado"  => "in:ativo,inativo,pausado"' . "\n\n" .
+                       '// Confirmação' . "\n" .
+                       '"password" => "required|min:8|confirmed"' . "\n\n" .
+                       '// Formatos' . "\n" .
+                       '"site"    => "url"' . "\n" .
+                       '"slug"    => "regex:/^[a-z0-9-]+$/"',
+    ],
+
+    // ─── Cache ──────────────────────────────────────────
+    'cache' => [
+        'titulo'    => 'Cache',
+        'categoria' => 'Performance',
+        'descricao' => 'Guardar valores com TTL. Drivers: file, array, null.',
+        'tags'      => ['Cache', 'Performance', 'TTL'],
+        'snippet'   => '// Guardar 1 hora' . "\n" .
+                       'cache_put("users", $users, 3600);' . "\n\n" .
+                       '// Ler' . "\n" .
+                       '$users = cache_get("users");' . "\n\n" .
+                       '// O padrão mais usado: calcular se não existir' . "\n" .
+                       '$users = cache_remember(' . "\n" .
+                       '    "users", 3600,' . "\n" .
+                       '    fn() => User::all(),' . "\n" .
+                       ');' . "\n\n" .
+                       '// Apagar' . "\n" .
+                       'cache_forget("users");',
+    ],
+
+    // ─── Logging ────────────────────────────────────────
+    'logging' => [
+        'titulo'    => 'Logging',
+        'categoria' => 'Debug',
+        'descricao' => 'Registra eventos em ficheiros diários com contexto.',
+        'tags'      => ['Logging', 'Debug', 'Logs'],
+        'snippet'   => 'log_debug("Debug detalhado", ["payload" => $data]);' . "\n" .
+                       'log_info("Utilizador registado", ["id" => 42]);' . "\n" .
+                       'log_warning("Cache miss", ["key" => "users"]);' . "\n" .
+                       'log_error("BD falhou", ["error" => $e->getMessage()]);' . "\n" .
+                       'log_critical("Sistema em baixo");' . "\n\n" .
+                       '// Ficheiro: storage/logs/beaver-2026-09-27.log',
+    ],
+
+    // ─── Storage ────────────────────────────────────────
+    'storage' => [
+        'titulo'    => 'Storage',
+        'categoria' => 'Ficheiros',
+        'descricao' => 'Gestão de ficheiros. Discos: local (privado), public.',
+        'tags'      => ['Storage', 'Ficheiros', 'Uploads'],
+        'snippet'   => '// Ficheiros privados (storage/app/)' . "\n" .
+                       'storage_put("logs/app.txt", "Linha 1");' . "\n" .
+                       '$content = storage_get("logs/app.txt");' . "\n" .
+                       'storage_exists("logs/app.txt");   // bool' . "\n" .
+                       'storage_delete("logs/app.txt");' . "\n\n" .
+                       '// Ficheiros públicos (storage/public/)' . "\n" .
+                       'storage_disk("public")->put("fotos/a.jpg", $bin);' . "\n" .
+                       'storage_url("fotos/a.jpg", "public");' . "\n" .
+                       '// → /storage/fotos/a.jpg',
+    ],
+
+    // ─── Encriptação ────────────────────────────────────
+    'encryption' => [
+        'titulo'    => 'Encriptação',
+        'categoria' => 'Segurança',
+        'descricao' => 'AES-256-GCM com deteção de manipulação.',
+        'tags'      => ['Encryption', 'Segurança', 'AES'],
+        'snippet'   => '// Encriptar' . "\n" .
+                       '$encrypted = encrypt_value("dados sensíveis");' . "\n\n" .
+                       '// Desencriptar' . "\n" .
+                       '$original = decrypt_value($encrypted);' . "\n\n" .
+                       '// Funciona com qualquer tipo' . "\n" .
+                       '$encrypted = encrypt_value([' . "\n" .
+                       '    "user_id" => 42,' . "\n" .
+                       '    "role"    => "admin",' . "\n" .
+                       ']);' . "\n\n" .
+                       '// Deteta manipulação (auth tag)' . "\n" .
+                       '// Se alguém alterar o payload, decrypt_value() lança exceção.',
+    ],
+
+    // ─── Cookies ────────────────────────────────────────
+    'cookies' => [
+        'titulo'    => 'Cookies',
+        'categoria' => 'Cookies',
+        'descricao' => 'Cookies HTTP com defaults seguros (HttpOnly, SameSite).',
+        'tags'      => ['Cookies', 'HTTP', 'Segurança'],
+        'snippet'   => '// Definir (1 hora)' . "\n" .
+                       'cookie_set("theme", "dark", 3600);' . "\n\n" .
+                       '// Ler' . "\n" .
+                       'cookie_get("theme");           // "dark" | null' . "\n" .
+                       'cookie_get("nao", "fallback"); // "fallback"' . "\n\n" .
+                       '// Verificar' . "\n" .
+                       'cookie_has("theme");           // bool' . "\n\n" .
+                       '// Apagar' . "\n" .
+                       'cookie_forget("theme");' . "\n\n" .
+                       '// Opções avançadas' . "\n" .
+                       'cookie_set("session", $id, 3600, [' . "\n" .
+                       '    "secure"   => true,' . "\n" .
+                       '    "httponly" => true,' . "\n" .
+                       '    "samesite" => "Strict",' . "\n" .
+                       ']);',
+    ],
+
+    // ─── Email ──────────────────────────────────────────
+    'mail' => [
+        'titulo'    => 'Email (SMTP)',
+        'categoria' => 'Email',
+        'descricao' => 'Envio de emails via SMTP, log ou array. Zero dependências.',
+        'tags'      => ['Mail', 'SMTP', 'Email'],
+        'snippet'   => '// Envio simples' . "\n" .
+                       'mail_send(' . "\n" .
+                       '    "user@example.com",' . "\n" .
+                       '    "Bem-vindo",' . "\n" .
+                       '    "Olá! Bem-vindo ao Beaver.",' . "\n" .
+                       ');' . "\n\n" .
+                       '// HTML' . "\n" .
+                       'mail_send(' . "\n" .
+                       '    "user@example.com",' . "\n" .
+                       '    "Bem-vindo",' . "\n" .
+                       '    "<h1>Olá!</h1>",' . "\n" .
+                       '    html: true,' . "\n" .
+                       ');' . "\n\n" .
+                       '// Múltiplos destinatários' . "\n" .
+                       'mail_send([' . "\n" .
+                       '    "a@x.com", "b@x.com",' . "\n" .
+                       '], "Newsletter", "...");' . "\n\n" .
+                       '// Drivers: smtp, log, array' . "\n" .
+                       '// .env: MAIL_DRIVER=smtp',
+    ],
+
+    // ─── Rate Limiter ───────────────────────────────────
+    'rate_limiter' => [
+        'titulo'    => 'Rate Limiter',
+        'categoria' => 'Segurança',
+        'descricao' => 'Limita tentativas por chave. Protege contra força bruta.',
+        'tags'      => ['RateLimiter', 'Segurança', 'Força bruta'],
+        'snippet'   => '// 5 tentativas por minuto' . "\n" .
+                       '$limiter = rate_limiter("login", 5, 60);' . "\n" .
+                       '$key     = $request->ip();' . "\n\n" .
+                       'if ($limiter->tooManyAttempts($key)) {' . "\n" .
+                       '    $seconds = $limiter->availableIn($key);' . "\n" .
+                       '    return Response::json([' . "\n" .
+                       '        "error" => "Tenta em {$seconds}s",' . "\n" .
+                       '    ], 429);' . "\n" .
+                       '}' . "\n\n" .
+                       '$limiter->hit($key);' . "\n\n" .
+                       '// Sucesso — reset' . "\n" .
+                       '$limiter->clear($key);',
+    ],
+
+    // ─── Queue ──────────────────────────────────────────
+    'queue' => [
+        'titulo'    => 'Queue (Jobs)',
+        'categoria' => 'Tarefas',
+        'descricao' => 'Jobs assíncronos com retry. Drivers: sync, database, array.',
+        'tags'      => ['Queue', 'Jobs', 'Assíncrono'],
+        'snippet'   => 'class SendWelcomeEmail extends Job' . "\n" .
+                       '{' . "\n" .
+                       '    public function __construct(' . "\n" .
+                       '        public int $userId,' . "\n" .
+                       '    ) {}' . "\n\n" .
+                       '    public function handle(): void' . "\n" .
+                       '    {' . "\n" .
+                       '        $user = User::find($this->userId);' . "\n" .
+                       '        mail_send($user->email, "Bem-vindo", "...");' . "\n" .
+                       '    }' . "\n" .
+                       '}' . "\n\n" .
+                       '// Enfileirar' . "\n" .
+                       'dispatch(new SendWelcomeEmail(42));' . "\n\n" .
+                       '// Diferido (1h)' . "\n" .
+                       'dispatch_later(3600, new SendReminder(42));' . "\n\n" .
+                       '// Worker' . "\n" .
+                       '// php beaver queue:work',
+    ],
+
+    // ─── CLI ────────────────────────────────────────────
+    'cli' => [
+        'titulo'    => 'Comandos CLI (beaver)',
+        'categoria' => 'CLI',
+        'descricao' => 'A CLI do Beaver gera código, corre migrations e serve o projeto.',
+        'tags'      => ['CLI', 'Console', 'Comandos'],
+        'snippet'   => '# Servidor de desenvolvimento' . "\n" .
+                       'php beaver serve --port=9000' . "\n\n" .
+                       '# Geração de código' . "\n" .
+                       'php beaver make:controller ProdutoController' . "\n" .
+                       'php beaver make:model Produto' . "\n" .
+                       'php beaver make:migration create_produtos_table' . "\n" .
+                       'php beaver make:seeder Produto' . "\n" .
+                       'php beaver make:middleware AuthMiddleware' . "\n" .
+                       'php beaver make:request StoreProdutoRequest' . "\n" .
+                       'php beaver make:factory Produto' . "\n" .
+                       'php beaver make:plugin MeuPlugin' . "\n\n" .
+                       '# Base de dados' . "\n" .
+                       'php beaver migrate' . "\n" .
+                       'php beaver migrate:rollback' . "\n" .
+                       'php beaver migrate:fresh' . "\n" .
+                       'php beaver migrate:status' . "\n" .
+                       'php beaver db:seed' . "\n" .
+                       'php beaver db:wipe' . "\n\n" .
+                       '# Queue' . "\n" .
+                       'php beaver queue:work' . "\n" .
+                       'php beaver queue:list' . "\n" .
+                       'php beaver queue:retry --all' . "\n\n" .
+                       '# Plugins' . "\n" .
+                       'php beaver plugin:list' . "\n" .
+                       'php beaver plugin:validate' . "\n" .
+                       'php beaver plugin:info <slug>' . "\n\n" .
+                       '# Temas' . "\n" .
+                       'php beaver theme:list' . "\n" .
+                       'php beaver theme:activate <slug>' . "\n\n" .
+                       '# Utilitários' . "\n" .
+                       'php beaver about' . "\n" .
+                       'php beaver help',
+    ],
+
+    // ─── Auth ───────────────────────────────────────────
+    'auth' => [
+        'titulo'    => 'Autenticação',
+        'categoria' => 'Segurança',
+        'descricao' => 'Login, sessões e user atual com driver plugável.',
+        'tags'      => ['Auth', 'Login', 'Sessões'],
+        'snippet'   => 'use Beaver\\Auth\\Auth;' . "\n\n" .
+                       '// Login' . "\n" .
+                       'if (Auth::attempt([' . "\n" .
+                       '    "email"    => $email,' . "\n" .
+                       '    "password" => $password,' . "\n" .
+                       '])) {' . "\n" .
+                       '    // autenticado' . "\n" .
+                       '}' . "\n\n" .
+                       '// Estado' . "\n" .
+                       'Auth::check();      // bool' . "\n" .
+                       'Auth::guest();      // bool' . "\n" .
+                       'Auth::user();       // User|null' . "\n" .
+                       'Auth::id();         // int|string|null' . "\n\n" .
+                       '// Logout' . "\n" .
+                       'Auth::logout();' . "\n\n" .
+                       '// Middleware nas rotas' . "\n" .
+                       '$router->get("/admin", $ctrl, [' . "\n" .
+                       '    RequireAuth::class,' . "\n" .
+                       ']);',
+    ],
+
+    // ─── Database ───────────────────────────────────────
+    'database' => [
+        'titulo'    => 'Base de Dados (PDO)',
+        'categoria' => 'Base de Dados',
+        'descricao' => 'Acesso direto à BD via PDO. SQLite, MySQL, PostgreSQL.',
+        'tags'      => ['Database', 'PDO', 'SQL'],
+        'snippet'   => 'use Beaver\\Database\\Database;' . "\n\n" .
+                       '$db = Database::getInstance();' . "\n\n" .
+                       '// SELECT' . "\n" .
+                       '$rows = $db->select(' . "\n" .
+                       '    "SELECT * FROM users WHERE is_active = :active",' . "\n" .
+                       '    [":active" => 1],' . "\n" .
+                       ');' . "\n\n" .
+                       '// SELECT (1 linha)' . "\n" .
+                       '$user = $db->selectOne(' . "\n" .
+                       '    "SELECT * FROM users WHERE id = :id",' . "\n" .
+                       '    [":id" => 42],' . "\n" .
+                       ');' . "\n\n" .
+                       '// INSERT' . "\n" .
+                       '$db->insert(' . "\n" .
+                       '    "INSERT INTO users (name, email) VALUES (:n, :e)",' . "\n" .
+                       '    [":n" => "Ana", ":e" => "ana@x.com"],' . "\n" .
+                       ');' . "\n\n" .
+                       '// UPDATE / DELETE' . "\n" .
+                       '$db->update("UPDATE users SET name = :n WHERE id = :id", [...]);' . "\n" .
+                       '$db->delete("DELETE FROM users WHERE id = :id", [...]);' . "\n\n" .
+                       '// Drivers suportados: sqlite, mysql, pgsql',
+    ],
+
+    // ─── SDK ────────────────────────────────────────────
+    'sdk' => [
+        'titulo'    => 'SDK de Plugins',
+        'categoria' => 'SDK',
+        'descricao' => 'Contrato oficial para criar plugins no Beaver.',
+        'tags'      => ['SDK', 'Plugins', 'API'],
+        'snippet'   => '// O SDK define:' . "\n" .
+                       '//   - O que é um plugin válido (plugin.json)' . "\n" .
+                       '//   - Permissões declaradas (db.read, network.outbound, ...)' . "\n" .
+                       '//   - Catálogo de hooks (HooksCatalog::ORDER_PLACED)' . "\n" .
+                       '//   - Harness de testes (PluginTester, FakeHooks)' . "\n\n" .
+                       'use Beaver\\Sdk\\HooksCatalog;' . "\n" .
+                       'use Beaver\\Sdk\\Testing\\PluginTester;' . "\n\n" .
+                       '// Testar um plugin' . "\n" .
+                       '$t = PluginTester::for(' . "\n" .
+                       '    MeuPlugin::class,' . "\n" .
+                       '    __DIR__ . "/../",' . "\n" .
+                       ');' . "\n" .
+                       '$t->validateManifest()->boot();' . "\n\n" .
+                       '$t->hooks->emit(HooksCatalog::ORDER_PLACED, $order);' . "\n" .
+                       '$t->hooks->wasEmitted("order.placed");   // bool' . "\n\n" .
+                       '// CLI: php beaver plugin:make MeuPlugin',
+    ],
+
+    // ─── Themes ─────────────────────────────────────────
+    'themes' => [
+        'titulo'    => 'Temas',
+        'categoria' => 'Views',
+        'descricao' => 'Sistema de temas instaláveis com preview e assets.',
+        'tags'      => ['Themes', 'Views', 'Assets'],
+        'snippet'   => 'use Beaver\\Sdk\\Theme\\ThemeManager;' . "\n" .
+                       'use Beaver\\Sdk\\Theme\\ThemePaths;' . "\n\n" .
+                       '$paths  = ThemePaths::fromConfig(config("themes"));' . "\n" .
+                       '$themes = new ThemeManager($paths);' . "\n\n" .
+                       '// Listar e procurar' . "\n" .
+                       '$themes->all();                      // array<string, ThemeManifest>' . "\n" .
+                       '$themes->exists("dark");             // bool' . "\n" .
+                       '$manifest = $themes->find("dark");   // ?ThemeManifest' . "\n\n" .
+                       '// Ativar / desativar' . "\n" .
+                       '$themes->activate("dark");' . "\n" .
+                       '$themes->active();                    // "dark"|null' . "\n" .
+                       '$themes->deactivate();' . "\n\n" .
+                       '// CLI' . "\n" .
+                       '// php beaver theme:list' . "\n" .
+                       '// php beaver theme:activate dark',
+    ],
+
+    // ─── Validação de email (caso real) ─────────────────
+    'email_validation' => [
+        'titulo'    => 'Validar email antes do POST',
+        'categoria' => 'Validação',
+        'descricao' => 'Valida o email no controller antes de gravar. Com regras encadeadas.',
+        'tags'      => ['Validation', 'Email', 'HTTP', 'POST'],
+        'snippet'   => '// POST /registar' . "\n" .
+                       'public function registar(Request $req): Response' . "\n" .
+                       '{' . "\n" .
+                       '    // Validar ANTES de tocar na BD' . "\n" .
+                       '    $errors = validate(' . "\n" .
+                       '        $req->all(),' . "\n" .
+                       '        [' . "\n" .
+                       '            "email"    => "required|email",' . "\n" .
+                       '            "password" => "required|min:8|confirmed",' . "\n" .
+                       '            "idade"    => "integer|min:18",' . "\n" .
+                       '        ],' . "\n" .
+                       '        [' . "\n" .
+                       '            "email"    => "Email",' . "\n" .
+                       '            "password" => "Password",' . "\n" .
+                       '            "idade"    => "Idade",' . "\n" .
+                       '        ],' . "\n" .
+                       '    );' . "\n\n" .
+                       '    //  Se houver erros, devolver 422 com mensagens' . "\n" .
+                       '    if ($errors !== []) {' . "\n" .
+                       '        return Response::json([' . "\n" .
+                       '            "ok"     => false,' . "\n" .
+                       '            "errors" => $errors,' . "\n" .
+                       '        ], 422);' . "\n" .
+                       '    }' . "\n\n" .
+                       '    //   Validar unicidade ANTES de criar' . "\n" .
+                       '    $existe = User::where("email", $req->input("email"))->first();' . "\n" .
+                       '    if ($existe !== null) {' . "\n" .
+                       '        return Response::json([' . "\n" .
+                       '            "ok"     => false,' . "\n" .
+                       '            "errors" => [' . "\n" .
+                       '                "email" => ["Email já registado."],' . "\n" .
+                       '            ],' . "\n" .
+                       '        ], 422);' . "\n" .
+                       '    }' . "\n\n" .
+                       '    //   Só agora criar' . "\n" .
+                       '    $user = User::create([' . "\n" .
+                       '        "email"    => $req->input("email"),' . "\n" .
+                       '        "password" => hash_make($req->input("password")),' . "\n" .
+                       '    ]);' . "\n\n" .
+                       '    return Response::json([' . "\n" .
+                       '        "ok"   => true,' . "\n" .
+                       '        "user" => $user->toArray(),' . "\n" .
+                       '    ], 201);' . "\n" .
+                       '}',
+    ],
+
+    // ─── Cron: enviar vídeo de vigilância por email ─────
+    'cron_video_email' => [
+        'titulo'    => 'Cron — vídeo por email',
+        'categoria' => 'Tarefas',
+        'descricao' => 'Envia um vídeo de vigilância por email a cada hora.',
+        'tags'      => ['Cron', 'Scheduling', 'Email', 'Anexos'],
+        'snippet'   => 'use Beaver\\Scheduling\\ScheduledJob;' . "\n" .
+                       'use Beaver\\Mail\\Mailer;' . "\n\n" .
+                       '// 1. Registar o job na BD (uma só vez)' . "\n" .
+                       'ScheduledJob::create([' . "\n" .
+                       '    "name"            => "enviar-video-vigilancia",' . "\n" .
+                       '    "handler"         => EnviarVideoJob::class,' . "\n" .
+                       '    "cron_expression" => "0 * * * *",   // de hora a hora' . "\n" .
+                       '    "is_active"       => 1,' . "\n" .
+                       ']);' . "\n\n" .
+                       '// 2. O job em si' . "\n" .
+                       'class EnviarVideoJob extends Job' . "\n" .
+                       '{' . "\n" .
+                       '    public function handle(): void' . "\n" .
+                       '    {' . "\n" .
+                       '        // Vídeo da hora anterior' . "\n" .
+                       '        $hora = date("Y-m-d_H", strtotime("-1 hour"));' . "\n" .
+                       '        $video = storage_path("app/vigilancia/cam1_{$hora}.mp4");' . "\n\n" .
+                       '        if (!is_file($video)) {' . "\n" .
+                       '            log_warning("Sem vídeo", ["hora" => $hora]);' . "\n" .
+                       '            return;' . "\n" .
+                       '        }' . "\n\n" .
+                       '        // Enviar por email' . "\n" .
+                       '        mailer()->sendWithAttachments(' . "\n" .
+                       '            to:          config("vigilancia.email"),' . "\n" .
+                       '            subject:     "Vídeo vigilância — {$hora}",' . "\n" .
+                       '            body:        "Segue o vídeo da última hora.",' . "\n" .
+                       '            attachments: [$video],' . "\n" .
+                       '        );' . "\n" .
+                       '    }' . "\n" .
+                       '}' . "\n\n" .
+                       '// 3. Crontab do sistema (uma vez):' . "\n" .
+                       '// 0 * * * * cd /var/www/beaver && php beaver job:run enviar-video-vigilancia',
+    ],
+];

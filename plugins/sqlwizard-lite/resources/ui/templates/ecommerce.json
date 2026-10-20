@@ -1,0 +1,195 @@
+{
+  "name": "E-commerce",
+  "icon": "🛒",
+  "description": "Users, products, orders, items",
+  "tables": [
+    {
+      "id": "t_users",
+      "name": "users",
+      "x": 60,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "t_categories",
+      "name": "categories",
+      "x": 60,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "VARCHAR(100)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "id": "t_products",
+      "name": "products",
+      "x": 420,
+      "y": 60,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "category_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "price",
+          "type": "DECIMAL(10,2)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "stock",
+          "type": "INT",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_orders",
+      "name": "orders",
+      "x": 420,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "total",
+          "type": "DECIMAL(10,2)",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(50)",
+          "pk": false,
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "pk": false,
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "id": "t_order_items",
+      "name": "order_items",
+      "x": 780,
+      "y": 420,
+      "columns": [
+        {
+          "name": "id",
+          "type": "INT",
+          "pk": true,
+          "nullable": false
+        },
+        {
+          "name": "order_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "product_id",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "qty",
+          "type": "INT",
+          "pk": false,
+          "nullable": false
+        },
+        {
+          "name": "price",
+          "type": "DECIMAL(10,2)",
+          "pk": false,
+          "nullable": false
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "t_products",
+      "to": "t_categories",
+      "card": "n:1"
+    },
+    {
+      "from": "t_orders",
+      "to": "t_users",
+      "card": "n:1"
+    },
+    {
+      "from": "t_order_items",
+      "to": "t_orders",
+      "card": "n:1"
+    },
+    {
+      "from": "t_order_items",
+      "to": "t_products",
+      "card": "n:1"
+    }
+  ]
+}

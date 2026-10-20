@@ -1,0 +1,80 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Beaver\Plugins\FrankeiTrial\Support;
+
+/**
+ * Limites e configuração do plano activo.
+ *
+ * ⚙️  TROCAR O PLANO: alterar `config/plan.php`
+ *      - 'trial'   → 25 ficheiros + 25 testes Unit (default)
+ *      - 'pro'     → tudo ilimitado
+ *      - 'premium' → tudo ilimitado + features extra
+ */
+class TrialLimits
+{
+    public const PLAN_TRIAL   = 'trial';
+    public const PLAN_PRO     = 'pro';
+    public const PLAN_PREMIUM = 'premium';
+
+    private static ?string $planCache = null;
+
+    public static function plan(): string
+    {
+        if (self::$planCache !== null) {
+            return self::$planCache;
+        }
+
+        $configFile = dirname(__DIR__, 2) . '/config/plan.php';
+        $plan = self::PLAN_TRIAL;
+
+        if (is_file($configFile)) {
+            $cfg = require $configFile;
+            if (is_array($cfg) && !empty($cfg['plan'])) {
+                $plan = (string) $cfg['plan'];
+            }
+        }
+
+        if (!in_array($plan, [self::PLAN_TRIAL, self::PLAN_PRO, self::PLAN_PREMIUM], true)) {
+            $plan = self::PLAN_TRIAL;
+        }
+
+        return self::$planCache = $plan;
+    }
+
+    public static function isTrial(): bool   { return self::plan() === self::PLAN_TRIAL; }
+    public static function isPro(): bool     { return self::plan() === self::PLAN_PRO; }
+    public static function isPremium(): bool { return self::plan() === self::PLAN_PREMIUM; }
+
+    /** Máx de ficheiros a analisar */
+    public static function maxFiles(): int
+    {
+        return self::isTrial() ? 25 : PHP_INT_MAX;
+    }
+
+    /** Máx de testes a correr */
+    public static function maxTests(): int
+    {
+        return self::isTrial() ? 25 : PHP_INT_MAX;
+    }
+
+    /** Máx de findings a mostrar */
+    public static function maxFindings(): int
+    {
+        return self::isTrial() ? 25 : 500;
+    }
+
+    /** Suites de testes permitidas */
+    public static function allowedSuites(): array
+    {
+        // FASE 3A: todas as suites (bloqueio final fica na 3E)
+        return ['Unit', 'Feature', 'Coverage'];
+    }
+
+    /** O plano permite scanners de segurança? */
+    public static function allowSecurityScanners(): bool
+    {
+        return !self::isTrial();
+    }
+}
